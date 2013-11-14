@@ -31,7 +31,7 @@ index 0000000..86528b1
 +CFLAGS += -mno-tls-direct-seg-refs
 +CFLAGS += -Wstrict-prototypes
 +CFLAGS += -Wno-unused-value
-+CFLAGS += -m32 -march=i686
++CFLAGS += -m64
 +CFLAGS += -Wdeclaration-after-statement
 +CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 +
@@ -130,8 +130,8 @@ index 0000000..360a84d
 +$(MY_OUTPUT_DIR)/ioemu.inc:
 +	( echo IOEMU_PKG_NAME := xen-device-model && \
 +	  echo IOEMU_PKG_VERSION := $(IOEMU_VERSION)-$(IOEMU_RELEASE) && \
-+	  echo IOEMU_PKG_ARCH := i686 && \
-+	  echo IOEMU_PKG_FILE := RPMS/i686/xen-device-model-$(IOEMU_VERSION)-$(IOEMU_RELEASE).i686.rpm ) >$@
++	  echo IOEMU_PKG_ARCH := x86_64 && \
++	  echo IOEMU_PKG_FILE := RPMS/x86_64/xen-device-model-$(IOEMU_VERSION)-$(IOEMU_RELEASE).x86_64.rpm ) >$@
 +
 +SOURCES = $(RPM_SOURCESDIR)/xen-device-model-$(IOEMU_VERSION).tar.bz2 \
 +	  $(RPM_SOURCESDIR)/xen-device-model-development.patch \
@@ -159,7 +159,7 @@ index 0000000..360a84d
 +	-rm changelog.tmp
 +
 +$(RPM_BUILD_COOKIE): $(RPM_DIRECTORIES) $(SOURCES)
-+	$(RPMBUILD) --target i686 -ba $(RPM_SPECSDIR)/xen-device-model.spec
++	$(RPMBUILD) --target x86_64 -ba $(RPM_SPECSDIR)/xen-device-model.spec
 +	@touch $@
 +
 +$(MY_SOURCES)/MANIFEST: $(MY_SOURCES_DIRSTAMP) $(RPM_BUILD_COOKIE)
@@ -244,9 +244,16 @@ diff --git a/xen-config.mak b/xen-config.mak
 index 77fef4f..f099478 100644
 --- a/xen-config.mak
 +++ b/xen-config.mak
-@@ -9,4 +9,4 @@ CONFIG_SOFTMMU=yes
+@@ -3,10 +3,10 @@ XEN_ROOT ?= $(QEMU_ROOT)/../xen-unstable.hg
  
+ include ../config-host.mak
+ 
+-TARGET_ARCH=i386
++TARGET_ARCH=x86_64
+ TARGET_PATH:=$(SRC_PATH)/$(TARGET_DIRS)
+ CONFIG_SOFTMMU=yes
+
  CFLAGS += -I$(QEMU_ROOT)/hw
  
 -bindir = ${LIBEXEC}
-+bindir = ${prefix}/lib/xen/bin
++bindir = ${prefix}/lib64/xen/bin
