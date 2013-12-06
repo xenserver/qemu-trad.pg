@@ -1,6 +1,10 @@
-diff -r 7d5e6712f2bd Makefile.target
---- a/Makefile.target	Fri Jan 18 17:29:06 2013 +0000
-+++ b/Makefile.target	Sun Jan 20 09:05:29 2013 +0000
+# HG changeset patch
+# Parent 3b4d1e084bdc0fc56594a7afccafd5f68ca73c66
+
+diff --git a/Makefile.target b/Makefile.target
+index 1cf7f34..51bcf4a 100644
+--- a/Makefile.target
++++ b/Makefile.target
 @@ -503,7 +503,7 @@ endif #CONFIG_BSD_USER
  # System emulator target
  ifndef CONFIG_USER_ONLY
@@ -10,9 +14,10 @@ diff -r 7d5e6712f2bd Makefile.target
  # virtio has to be here due to weird dependency between PCI and virtio-net.
  # need to fix this properly
  OBJS+=virtio.o virtio-blk.o virtio-balloon.o virtio-net.o virtio-console.o
-diff -r 7d5e6712f2bd block-raw-posix.c
---- a/block-raw-posix.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/block-raw-posix.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/block-raw-posix.c b/block-raw-posix.c
+index 4a763df..4abfe3b 100644
+--- a/block-raw-posix.c
++++ b/block-raw-posix.c
 @@ -32,6 +32,7 @@
  #ifdef CONFIG_AIO
  #include "posix-aio-compat.h"
@@ -21,7 +26,7 @@ diff -r 7d5e6712f2bd block-raw-posix.c
  
  #ifdef CONFIG_COCOA
  #include <paths.h>
-@@ -196,10 +197,15 @@ static int raw_open(BlockDriverState *bs
+@@ -196,10 +197,15 @@ static int raw_open(BlockDriverState *bs, const char *filename, int flags)
  
      fd = open(filename, open_flags, 0644);
      if (fd < 0) {
@@ -41,10 +46,11 @@ diff -r 7d5e6712f2bd block-raw-posix.c
      }
      s->fd = fd;
      s->aligned_buf = NULL;
-diff -r 7d5e6712f2bd hw/hw.h
---- a/hw/hw.h	Fri Jan 18 17:29:06 2013 +0000
-+++ b/hw/hw.h	Sun Jan 20 09:05:29 2013 +0000
-@@ -34,6 +34,7 @@ QEMUFile *qemu_fopen_ops(void *opaque, Q
+diff --git a/hw/hw.h b/hw/hw.h
+index 6547a6e..d29cc9b 100644
+--- a/hw/hw.h
++++ b/hw/hw.h
+@@ -34,6 +34,7 @@ QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
                           QEMUFileCloseFunc *close,
                           QEMUFileRateLimit *rate_limit);
  QEMUFile *qemu_fopen(const char *filename, const char *mode);
@@ -52,9 +58,10 @@ diff -r 7d5e6712f2bd hw/hw.h
  QEMUFile *qemu_fopen_socket(int fd);
  QEMUFile *qemu_popen(FILE *popen_file, const char *mode);
  QEMUFile *qemu_popen_cmd(const char *command, const char *mode);
-diff -r 7d5e6712f2bd hw/piix4acpi.c
---- a/hw/piix4acpi.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/hw/piix4acpi.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
+index 7c7e85f..190d0c8 100644
+--- a/hw/piix4acpi.c
++++ b/hw/piix4acpi.c
 @@ -28,6 +28,7 @@
  #include "pci.h"
  #include "sysemu.h"
@@ -81,9 +88,10 @@ diff -r 7d5e6712f2bd hw/piix4acpi.c
  
      /* signal the CP ACPI hot insert done */
      xenstore_record_dm_state("pci-inserted");
-diff -r 7d5e6712f2bd i386-dm/helper2.c
---- a/i386-dm/helper2.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/i386-dm/helper2.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index f9eaec0..0398a74 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
 @@ -44,6 +44,7 @@
  #include <signal.h>
  #include <assert.h>
@@ -100,7 +108,7 @@ diff -r 7d5e6712f2bd i386-dm/helper2.c
  
  //#define DEBUG_MMU
  
-@@ -170,6 +172,10 @@ CPUX86State *cpu_x86_init(const char *cp
+@@ -170,6 +172,10 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
              return NULL;
          }
          bufioreq_local_port = rc;
@@ -111,7 +119,7 @@ diff -r 7d5e6712f2bd i386-dm/helper2.c
      }
  
      return env;
-@@ -179,26 +185,19 @@ CPUX86State *cpu_x86_init(const char *cp
+@@ -179,26 +185,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
  void cpu_reset(CPUX86State *env)
  {
      extern int s3_shutdown_flag;
@@ -146,7 +154,7 @@ diff -r 7d5e6712f2bd i386-dm/helper2.c
  }
  
  void cpu_x86_close(CPUX86State *env)
-@@ -449,14 +448,11 @@ void timeoffset_get(void)
+@@ -450,14 +449,11 @@ void timeoffset_get(void)
  
  static void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
  {
@@ -162,7 +170,7 @@ diff -r 7d5e6712f2bd i386-dm/helper2.c
  }
  
  static void __handle_ioreq(CPUState *env, ioreq_t *req)
-@@ -645,19 +641,12 @@ int main_loop(void)
+@@ -646,19 +642,12 @@ int main_loop(void)
  
  void destroy_hvm_domain(void)
  {
@@ -188,9 +196,10 @@ diff -r 7d5e6712f2bd i386-dm/helper2.c
 +    else
 +        fprintf(logfile, "Issued domain %d poweroff\n", domid);
  }
-diff -r 7d5e6712f2bd keymaps.c
---- a/keymaps.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/keymaps.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/keymaps.c b/keymaps.c
+index 2fb5a51..5d5b910 100644
+--- a/keymaps.c
++++ b/keymaps.c
 @@ -22,6 +22,8 @@
   * THE SOFTWARE.
   */
@@ -200,7 +209,7 @@ diff -r 7d5e6712f2bd keymaps.c
  static int get_keysym(const char *name)
  {
      const name2keysym_t *p;
-@@ -90,18 +92,15 @@ static kbd_layout_t *parse_keyboard_layo
+@@ -90,18 +92,15 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
  					   kbd_layout_t * k)
  {
      FILE *f;
@@ -222,10 +231,12 @@ diff -r 7d5e6712f2bd keymaps.c
  	return 0;
      }
      for(;;) {
-diff -r 7d5e6712f2bd privsep.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/privsep.c	Sun Jan 20 09:05:29 2013 +0000
-@@ -0,0 +1,1140 @@
+diff --git a/privsep.c b/privsep.c
+new file mode 100644
+index 0000000..2b5ac63
+--- /dev/null
++++ b/privsep.c
+@@ -0,0 +1,1149 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -464,8 +475,17 @@ diff -r 7d5e6712f2bd privsep.c
 +        msg.msg_control = tmp;
 +        msg.msg_controllen = sizeof(tmp);
 +
++retry:
 +        if ((n = recvmsg(sock, &msg, 0)) == -1)
-+                warn("%s: recvmsg", "receive_fd");
++        {
++            warn("%s: recvmsg", "receive_fd");
++            if ( errno == EINTR )
++            {
++                warn("%s: Interrupted system call.  termsig %d.  Retrying.\n",
++                     __func__, termsig);
++                goto retry;
++            }
++        }
 +        if (n != sizeof(int))
 +                warnx("%s: recvmsg: expected received 1 got %zd",
 +                      "receive_fd", n);
@@ -1366,9 +1386,11 @@ diff -r 7d5e6712f2bd privsep.c
 +        return NULL;
 +}
 +
-diff -r 7d5e6712f2bd privsep.h
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/privsep.h	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/privsep.h b/privsep.h
+new file mode 100644
+index 0000000..1ced0a2
+--- /dev/null
++++ b/privsep.h
 @@ -0,0 +1,20 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
@@ -1390,10 +1412,11 @@ diff -r 7d5e6712f2bd privsep.h
 +char* privsep_read_dm(char *subpath);
 +
 +#endif
-diff -r 7d5e6712f2bd qemu-xen.h
---- a/qemu-xen.h	Fri Jan 18 17:29:06 2013 +0000
-+++ b/qemu-xen.h	Sun Jan 20 09:05:29 2013 +0000
-@@ -70,12 +70,10 @@ int xenstore_parse_disable_pf_config(voi
+diff --git a/qemu-xen.h b/qemu-xen.h
+index c22581d..7891419 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -70,12 +70,10 @@ int xenstore_parse_disable_pf_config(void);
  void xenstore_parse_pf_config(struct pci_config_header *pch);
  int xenstore_fd(void);
  void xenstore_process_event(void *opaque);
@@ -1406,7 +1429,7 @@ diff -r 7d5e6712f2bd qemu-xen.h
  int store_dev_info(const char *devName, int domid,
                     CharDriverState *cState, const char *storeString);
  
-@@ -122,7 +120,6 @@ int xenstore_write(const char *path, con
+@@ -122,7 +120,6 @@ int xenstore_write(const char *path, const char *val);
    * at least when it comes to running our own frontends
    */
  
@@ -1422,9 +1445,10 @@ diff -r 7d5e6712f2bd qemu-xen.h
  
  /* xenfbfront.c */
  int xenfb_pv_display_init(DisplayState *ds);
-diff -r 7d5e6712f2bd savevm.c
---- a/savevm.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/savevm.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/savevm.c b/savevm.c
+index fa44994..172cd8a 100644
+--- a/savevm.c
++++ b/savevm.c
 @@ -327,6 +327,28 @@ fail:
      return NULL;
  }
@@ -1454,9 +1478,10 @@ diff -r 7d5e6712f2bd savevm.c
  typedef struct QEMUFileBdrv
  {
      BlockDriverState *bs;
-diff -r 7d5e6712f2bd vl.c
---- a/vl.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/vl.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/vl.c b/vl.c
+index cd609a7..a43b68a 100644
+--- a/vl.c
++++ b/vl.c
 @@ -48,6 +48,7 @@
  #include "hw/xen.h"
  #include <stdlib.h>
@@ -1473,7 +1498,7 @@ diff -r 7d5e6712f2bd vl.c
      QEMU_OPTION_runas,
      QEMU_OPTION_crashdump_dir,
      QEMU_OPTION_crashdump_quota,
-@@ -4518,6 +4520,7 @@ static const QEMUOption qemu_options[] =
+@@ -4518,6 +4520,7 @@ static const QEMUOption qemu_options[] = {
      { "tb-size", HAS_ARG, QEMU_OPTION_tb_size },
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
@@ -1481,7 +1506,7 @@ diff -r 7d5e6712f2bd vl.c
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -4874,6 +4877,7 @@ int main(int argc, char **argv, char **e
+@@ -4874,6 +4877,7 @@ int main(int argc, char **argv, char **envp)
      int fd = 0;
      struct passwd *pwd = NULL;
      const char *chroot_dir = NULL;
@@ -1526,9 +1551,10 @@ diff -r 7d5e6712f2bd vl.c
      main_loop();
      quit_timers();
      net_cleanup();
-diff -r 7d5e6712f2bd xen-vl-extra.c
---- a/xen-vl-extra.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/xen-vl-extra.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/xen-vl-extra.c b/xen-vl-extra.c
+index 206ac65..a5140eb 100644
+--- a/xen-vl-extra.c
++++ b/xen-vl-extra.c
 @@ -8,6 +8,7 @@
   * there is only one place where this file is included. */
  
@@ -1546,9 +1572,10 @@ diff -r 7d5e6712f2bd xen-vl-extra.c
      
      /* ??? Should this occur after vm_stop?  */
      qemu_aio_flush();
-diff -r 7d5e6712f2bd xenstore.c
---- a/xenstore.c	Fri Jan 18 17:29:06 2013 +0000
-+++ b/xenstore.c	Sun Jan 20 09:05:29 2013 +0000
+diff --git a/xenstore.c b/xenstore.c
+index 55ee928..5717fb9 100644
+--- a/xenstore.c
++++ b/xenstore.c
 @@ -14,6 +14,7 @@
  #include "block_int.h"
  #include <unistd.h>
@@ -1563,9 +1590,9 @@ diff -r 7d5e6712f2bd xenstore.c
  #include "qemu-timer.h"
 +#include "privsep.h"
  #include "qemu-xen.h"
+ #include "xen_backend.h"
  #include "console.h"
- 
-@@ -59,8 +61,7 @@ void xenstore_do_eject(BlockDriverState 
+@@ -60,8 +62,7 @@ void xenstore_do_eject(BlockDriverState *bs)
          fprintf(stderr, "couldn't find disk to eject.\n");
          return;
      }
@@ -1575,7 +1602,7 @@ diff -r 7d5e6712f2bd xenstore.c
  }
  
  static struct {
-@@ -72,9 +73,6 @@ static struct {
+@@ -73,9 +74,6 @@ static struct {
  void xenstore_set_device_locked(BlockDriverState *bs)
  {
      int i;
@@ -1585,7 +1612,7 @@ diff -r 7d5e6712f2bd xenstore.c
  
      i = xenstore_find_device(bs);
      if (i == -1) {
-@@ -84,22 +82,10 @@ void xenstore_set_device_locked(BlockDri
+@@ -85,22 +83,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
      /* not a cdrom device */
      if (!xenbus_param_paths[i])
          return;
@@ -1610,9 +1637,9 @@ diff -r 7d5e6712f2bd xenstore.c
 +    else
 +        privsep_unlock_cd(i);
  }
-  
+ 
  #define UWAIT_MAX (30*1000000) /* thirty seconds */
-@@ -725,6 +711,7 @@ void xenstore_parse_domain_config(int hv
+@@ -726,6 +712,7 @@ void xenstore_parse_domain_config(int hvm_domid)
              if (!strcmp(danger_type, "cdrom") || !strcmp(danger_type, "floppy")) {
                  if (pasprintf(&buf, "%s/params", bpath) != -1) {
                      char *buf2, *frontend;
@@ -1620,7 +1647,7 @@ diff -r 7d5e6712f2bd xenstore.c
                      xs_watch(xsh, buf, dev);
                      asprintf(&buf2, "%s/frontend", bpath);
                      frontend = xs_read(xsh, XBT_NULL, buf2, &len);
-@@ -1034,7 +1021,7 @@ static void xenstore_process_logdirty_ev
+@@ -1035,7 +1022,7 @@ static void xenstore_process_logdirty_event(void)
      }
  
      /* Ack that we've service the command */
@@ -1629,7 +1656,7 @@ diff -r 7d5e6712f2bd xenstore.c
  
      free(act);
  out:
-@@ -1046,21 +1033,14 @@ out:
+@@ -1047,21 +1034,14 @@ out:
  /* Accept state change commands from the control tools */
  static void xenstore_process_dm_command_event(void)
  {
@@ -1654,7 +1681,7 @@ diff -r 7d5e6712f2bd xenstore.c
      if (!strncmp(command, "save", len)) {
          fprintf(logfile, "dm-command: pause and save state\n");
          xen_pause_requested = 1;
-@@ -1068,43 +1048,28 @@ static void xenstore_process_dm_command_
+@@ -1069,43 +1049,28 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -1704,7 +1731,7 @@ diff -r 7d5e6712f2bd xenstore.c
          if (!par)
              goto out;
  
-@@ -1113,12 +1078,7 @@ static void xenstore_process_dm_command_
+@@ -1114,12 +1079,7 @@ static void xenstore_process_dm_command_event(void)
      } else if (!strncmp(command, "pci-ins", len)) {
          fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
  
@@ -1718,7 +1745,7 @@ diff -r 7d5e6712f2bd xenstore.c
          if (!par)
              goto out;
  
-@@ -1130,26 +1090,9 @@ static void xenstore_process_dm_command_
+@@ -1131,26 +1091,9 @@ static void xenstore_process_dm_command_event(void)
      }
  
   out:
@@ -1745,16 +1772,16 @@ diff -r 7d5e6712f2bd xenstore.c
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1231,7 +1174,7 @@ xenstore_pv_driver_build_blacklisted(uin
+@@ -1232,7 +1175,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
 -    xenstore_record_dm("state", state);
 +    privsep_record_dm("state", state);
  }
- 
- static void xenstore_process_vcpu_set_event(char **vec)
-@@ -1547,22 +1490,14 @@ void xenstore_write_vncport(int display)
+ static int xenstore_process_one_vcpu_set_event(char *node)
+ {
+@@ -1603,22 +1546,14 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -1783,7 +1810,7 @@ diff -r 7d5e6712f2bd xenstore.c
  
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
-@@ -1819,26 +1754,6 @@ char *xenstore_vm_read(int domid, const 
+@@ -1875,26 +1810,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  

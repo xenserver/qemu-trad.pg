@@ -129,7 +129,6 @@ CA-41014-cannot-start-100th-VM.patch
 CA-32196-disable-fw-cfg.patch
 abort-on-bad-loadvm.patch
 savevm_dummy_handler_for_pcislots.patch
-retry_receivefd_on_EINTR.patch
 fix-vnc-overflow.patch
 fix_term_handling_if_paused.patch # upstream does not present same problem
 vnc_checks.patch
