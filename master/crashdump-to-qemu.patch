@@ -2,9 +2,11 @@ Provide a device model for Windows to use to stream crashdump data
 out to dom0.
 * * *
 
-diff -r 65c40e121eb9 hw/crashdump.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/hw/crashdump.c	Fri Nov 19 17:20:19 2010 +0000
+diff --git a/hw/crashdump.c b/hw/crashdump.c
+new file mode 100644
+index 0000000..0b40edc
+--- /dev/null
++++ b/hw/crashdump.c
 @@ -0,0 +1,258 @@
 +/* Stupid driver to make it easy to get kernel crashdumps out of
 +   Windows guests */
@@ -45,7 +47,7 @@ diff -r 65c40e121eb9 hw/crashdump.c
 +    char *path = NULL;
 +    int nr_files;
 +    int e;
-+    int fd;
++    int fd = -1;
 +
 +    d = opendir(crashdump_dir);
 +    if (d == NULL) {
@@ -264,10 +266,11 @@ diff -r 65c40e121eb9 hw/crashdump.c
 +
 +    atexit(tidy_up);
 +}
-diff -r 65c40e121eb9 qemu-xen.h
---- a/qemu-xen.h	Fri Nov 19 17:11:00 2010 +0000
-+++ b/qemu-xen.h	Fri Nov 19 17:20:19 2010 +0000
-@@ -138,4 +138,7 @@ int has_tpm_device_danger(void);
+diff --git a/qemu-xen.h b/qemu-xen.h
+index ed4545e..3dd6ac2 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -144,4 +144,7 @@ int has_tpm_device_danger(void);
  static void vga_dirty_log_start(void *s) { }
  static void vga_dirty_log_stop(void *s) { }
  
@@ -275,10 +278,11 @@ diff -r 65c40e121eb9 qemu-xen.h
 +void setup_crashdump(const char *crashdump_dir, long long crashdump_quota);
 +
  #endif /*QEMU_XEN_H*/
-diff -r 65c40e121eb9 vl.c
---- a/vl.c	Fri Nov 19 17:11:00 2010 +0000
-+++ b/vl.c	Fri Nov 19 17:20:19 2010 +0000
-@@ -58,6 +58,7 @@
+diff --git a/vl.c b/vl.c
+index 66b961a..3c9cab5 100644
+--- a/vl.c
++++ b/vl.c
+@@ -59,6 +59,7 @@
  #include <errno.h>
  #include <sys/time.h>
  #include <zlib.h>
@@ -286,7 +290,7 @@ diff -r 65c40e121eb9 vl.c
  
  #ifndef _WIN32
  #include <pwd.h>
-@@ -4317,6 +4318,8 @@ enum {
+@@ -4331,6 +4332,8 @@ enum {
      QEMU_OPTION_incoming,
      QEMU_OPTION_chroot,
      QEMU_OPTION_runas,
@@ -295,7 +299,7 @@ diff -r 65c40e121eb9 vl.c
  };
  
  typedef struct QEMUOption {
-@@ -4470,6 +4473,8 @@ static const QEMUOption qemu_options[] =
+@@ -4482,6 +4485,8 @@ static const QEMUOption qemu_options[] = {
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
      { "runas", HAS_ARG, QEMU_OPTION_runas },
@@ -304,7 +308,7 @@ diff -r 65c40e121eb9 vl.c
      { NULL },
  };
  
-@@ -4824,7 +4829,8 @@ int main(int argc, char **argv, char **e
+@@ -4836,7 +4841,8 @@ int main(int argc, char **argv, char **envp)
      struct passwd *pwd = NULL;
      const char *chroot_dir = NULL;
      const char *run_as = NULL;
@@ -314,7 +318,7 @@ diff -r 65c40e121eb9 vl.c
      qemu_cache_utils_init(envp);
      logfile = stderr; /* initial value */
  
-@@ -5579,6 +5585,14 @@ int main(int argc, char **argv, char **e
+@@ -5596,6 +5602,14 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_gfx_passthru:
                  select_vgahw("passthrough");
                  break;
@@ -329,7 +333,7 @@ diff -r 65c40e121eb9 vl.c
              }
          }
      }
-@@ -5854,6 +5868,15 @@ int main(int argc, char **argv, char **e
+@@ -5872,6 +5886,15 @@ int main(int argc, char **argv, char **envp)
      register_savevm("timer", 0, 2, timer_save, timer_load, NULL);
      register_savevm_live("ram", 0, 3, ram_save_live, NULL, ram_load, NULL);
  
@@ -345,9 +349,10 @@ diff -r 65c40e121eb9 vl.c
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-diff -r 65c40e121eb9 xen-hooks.mak
---- a/xen-hooks.mak	Fri Nov 19 17:11:00 2010 +0000
-+++ b/xen-hooks.mak	Fri Nov 19 17:20:19 2010 +0000
+diff --git a/xen-hooks.mak b/xen-hooks.mak
+index 00f9ac1..042fd20 100644
+--- a/xen-hooks.mak
++++ b/xen-hooks.mak
 @@ -25,6 +25,7 @@ LDFLAGS := $(CFLAGS) $(LDFLAGS)
  OBJS += piix4acpi.o
  OBJS += xenstore.o
