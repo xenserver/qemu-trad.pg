@@ -1,8 +1,8 @@
 diff --git a/hw/pci.h b/hw/pci.h
-index 46e4bf5..c5e9a76 100644
+index 84068a2..9a2c62a 100644
 --- a/hw/pci.h
 +++ b/hw/pci.h
-@@ -184,6 +184,32 @@ typedef struct PCIIORegion {
+@@ -200,6 +200,32 @@ typedef struct PCIIORegion {
  
  #define PCI_COMMAND_RESERVED_MASK_HI (PCI_COMMAND_RESERVED >> 8)
  
@@ -36,10 +36,10 @@ index 46e4bf5..c5e9a76 100644
      /* PCI config space */
      uint8_t config[4096];
 diff --git a/hw/usb-uhci.c b/hw/usb-uhci.c
-index a684935..72fd34d 100644
+index a684935..c6b2a3b 100644
 --- a/hw/usb-uhci.c
 +++ b/hw/usb-uhci.c
-@@ -1077,24 +1077,40 @@ static void uhci_map(PCIDevice *pci_dev, int region_num,
+@@ -1077,24 +1077,42 @@ static void uhci_map(PCIDevice *pci_dev, int region_num,
      register_ioport_read(addr, 32, 1, uhci_ioport_readb, s);
  }
  
@@ -53,6 +53,8 @@ index a684935..72fd34d 100644
 +
 +    pci_conf->vendor_id = 0x8086;
 +    pci_conf->device_id = device_id;
++    pci_conf->subsystem_vendor_id = 0x5853;
++    pci_conf->subsystem_id = 1;
 +    pci_conf->revision = 1;
 +    pci_conf->api = 0;
 +    pci_conf->subclass = 3;
@@ -91,10 +93,10 @@ index a684935..72fd34d 100644
      for(i = 0; i < NB_PORTS; i++) {
          qemu_register_usb_port(&s->ports[i].port, s, i, uhci_attach);
 diff --git a/hw/xen_platform.c b/hw/xen_platform.c
-index 5b8967a..c26203e 100644
+index 37e25c3..18896e3 100644
 --- a/hw/xen_platform.c
 +++ b/hw/xen_platform.c
-@@ -380,32 +380,6 @@ static void platform_mmio_map(PCIDevice *d, int region_num,
+@@ -389,32 +389,6 @@ static void platform_mmio_map(PCIDevice *d, int region_num,
      cpu_register_physical_memory(addr, 0x1000000, mmio_io_addr);
  }
  
