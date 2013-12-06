@@ -7,9 +7,10 @@ port 13 tells qemu which device of the current type to unplug.
 
 Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
 
-diff -r a378e486bbfa hw/ide.c
---- a/hw/ide.c	Tue Jan 15 15:51:15 2013 +0000
-+++ b/hw/ide.c	Tue Jan 15 15:51:21 2013 +0000
+diff --git a/hw/ide.c b/hw/ide.c
+index 97372e3..b20b789 100644
+--- a/hw/ide.c
++++ b/hw/ide.c
 @@ -3096,44 +3096,57 @@ static void ide_reset(IDEState *s)
  
  /* Unplug all of the IDE hard disks, starting at index @start in the
@@ -52,7 +53,7 @@ diff -r a378e486bbfa hw/ide.c
 +    /* Is a hard disk, unplug it. */
 +    for (j = 0; j < nb_drives; j++) {
 +        if (drives_table[j].bdrv == s->bs) {
-+            fprintf(stderr, "%s: drive %d\n", __func__, i, j);
++            fprintf(stderr, "%s: drive %d\n", __func__, i);
 +            drives_table[j].bdrv = NULL;
 +        }
      }
@@ -86,10 +87,11 @@ diff -r a378e486bbfa hw/ide.c
  }
  
  static void ide_init2(IDEState *ide_state,
-diff -r a378e486bbfa hw/pc.h
---- a/hw/pc.h	Tue Jan 15 15:51:15 2013 +0000
-+++ b/hw/pc.h	Tue Jan 15 15:51:21 2013 +0000
-@@ -162,7 +162,8 @@ void pci_piix3_ide_init(PCIBus *bus, Blo
+diff --git a/hw/pc.h b/hw/pc.h
+index 8b71d48..e7fc65c 100644
+--- a/hw/pc.h
++++ b/hw/pc.h
+@@ -162,7 +162,8 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn,
                          qemu_irq *pic);
  void pci_piix4_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn,
                          qemu_irq *pic);
@@ -99,10 +101,11 @@ diff -r a378e486bbfa hw/pc.h
  void ide_unplug_aux_harddisks(void);
  
  /* ne2000.c */
-diff -r a378e486bbfa hw/pci.c
---- a/hw/pci.c	Tue Jan 15 15:51:15 2013 +0000
-+++ b/hw/pci.c	Tue Jan 15 15:51:21 2013 +0000
-@@ -263,6 +263,10 @@ PCIDevice *pci_register_device(PCIBus *b
+diff --git a/hw/pci.c b/hw/pci.c
+index 35406a8..b7070e4 100644
+--- a/hw/pci.c
++++ b/hw/pci.c
+@@ -263,6 +263,10 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
      pci_dev->bus = bus;
      pci_dev->devfn = devfn;
      pstrcpy(pci_dev->name, sizeof(pci_dev->name), name);
@@ -113,7 +116,7 @@ diff -r a378e486bbfa hw/pci.c
      memset(pci_dev->irq_state, 0, sizeof(pci_dev->irq_state));
      pci_set_default_subsystem_id(pci_dev);
  
-@@ -838,50 +842,70 @@ PCIDevice *pci_nic_init(PCIBus *bus, NIC
+@@ -838,50 +842,70 @@ PCIDevice *pci_nic_init(PCIBus *bus, NICInfo *nd, int devfn,
      return NULL;
  }
  
@@ -220,10 +223,11 @@ diff -r a378e486bbfa hw/pci.c
  typedef struct {
      PCIDevice dev;
      PCIBus *bus;
-diff -r a378e486bbfa hw/pci.h
---- a/hw/pci.h	Tue Jan 15 15:51:15 2013 +0000
-+++ b/hw/pci.h	Tue Jan 15 15:51:21 2013 +0000
-@@ -283,6 +283,7 @@ PCIBus *pci_register_bus(pci_set_irq_fn 
+diff --git a/hw/pci.h b/hw/pci.h
+index 9a2c62a..a8a3afc 100644
+--- a/hw/pci.h
++++ b/hw/pci.h
+@@ -284,6 +284,7 @@ PCIBus *pci_register_bus(pci_set_irq_fn set_irq, pci_map_irq_fn map_irq,
  
  PCIDevice *pci_nic_init(PCIBus *bus, NICInfo *nd, int devfn,
                    const char *default_model);
@@ -231,9 +235,10 @@ diff -r a378e486bbfa hw/pci.h
  void pci_data_write(void *opaque, uint32_t addr, uint32_t val, int len);
  uint32_t pci_data_read(void *opaque, uint32_t addr, int len);
  int pci_bus_num(PCIBus *s);
-diff -r a378e486bbfa hw/xen_platform.c
---- a/hw/xen_platform.c	Tue Jan 15 15:51:15 2013 +0000
-+++ b/hw/xen_platform.c	Tue Jan 15 15:51:21 2013 +0000
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index 18896e3..a40f6bb 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
 @@ -3,6 +3,7 @@
   * 
   * Copyright (c) 2003-2004 Intel Corp.
@@ -286,7 +291,7 @@ diff -r a378e486bbfa hw/xen_platform.c
  
  static void log_throttling(const char *path, void *opaque)
  {
-@@ -69,7 +84,8 @@ static void log_throttling(const char *p
+@@ -69,7 +84,8 @@ static void log_throttling(const char *path, void *opaque)
  #define BUCKET_MAX_SIZE (128*1024)
  #define BUCKET_FILL_RATE 256
  
@@ -450,6 +455,14 @@ diff -r a378e486bbfa hw/xen_platform.c
 -                    "Drivers tried to set their version number (%d) before setting the product number?\n",
 -                    val);
 -            return;
+-        }
+-        fprintf(logfile, "PV driver build %d\n", val);
+-        if (xenstore_pv_driver_build_blacklisted(driver_product_version,
+-                                                 val)) {
+-            fprintf(logfile, "Drivers are blacklisted!\n");
+-            drivers_blacklisted = 1;
+-        }
+-        break;
 +    product_id = id;
 +}
 +
@@ -470,13 +483,27 @@ diff -r a378e486bbfa hw/xen_platform.c
 +
 +        fprintf(logfile, "UNPLUG: drivers %sblacklisted\n",
 +                (!drivers_blacklisted) ? "not " : "");
-+    }
+     }
 +
-+}
-+
+ }
+ 
+-static void platform_fixed_ioport_write1(void *opaque, uint32_t addr, uint32_t val)
 +static uint32_t
 +platform_fixed_ioport_read4(void *opaque, uint32_t addr)
-+{
+ {
+-    switch (addr - 0x10) {
+-    case 0: /* Platform flags */ {
+-        hvmmem_type_t mem_type = (val & PFFLAG_ROM_LOCK) ?
+-            HVMMEM_ram_ro : HVMMEM_ram_rw;
+-        if (xc_hvm_set_mem_type(xc_handle, domid, mem_type, 0xc0, 0x40))
+-            fprintf(logfile,"platform_fixed_ioport: unable to change ro/rw "
+-                    "state of ROM memory area!\n");
+-        else {
+-            platform_flags = val & PFFLAG_ROM_LOCK;
+-            fprintf(logfile,"platform_fixed_ioport: changed ro/rw "
+-                    "state of ROM memory area. now is %s state.\n",
+-                    (mem_type == HVMMEM_ram_ro ? "ro":"rw"));
+-        }
 +    return 0xFFFFFFFF;
 +}
 +
@@ -492,8 +519,19 @@ diff -r a378e486bbfa hw/xen_platform.c
 +
 +    default:
 +        val = 0xFFFF;
-+        break;
-+    }
+         break;
+     }
+-    case 2:
+-        /* Send bytes to syslog */
+-        if (val == '\n' || log_buffer_off == sizeof(log_buffer) - 1) {
+-            /* Flush buffer */
+-            log_buffer[log_buffer_off] = 0;
+-            throttle(log_buffer_off);
+-            fprintf(logfile, "%s\n", log_buffer);
+-            log_buffer_off = 0;
+-            break;
+-        }
+-        log_buffer[log_buffer_off++] = val;
 +
 +    return (uint32_t)val;
 +}
@@ -519,18 +557,28 @@ diff -r a378e486bbfa hw/xen_platform.c
 +        val = get_unplug_version();
 +
 +        fprintf(logfile, "UNPLUG: protocol %d active\n", val);
-+        break;
+         break;
 +
 +    default:
 +        val = 0xFF;
-+    }
+     }
 +
 +    return (uint32_t)val;
-+}
-+
+ }
+ 
+-static uint32_t platform_fixed_ioport_read2(void *opaque, uint32_t addr)
 +static void
 +platform_fixed_ioport_write4(void *opaque, uint32_t addr, uint32_t val)
-+{
+ {
+-    switch (addr - 0x10) {
+-    case 0:
+-        if (drivers_blacklisted) {
+-            /* The drivers will recognise this magic number and refuse
+-             * to do anything. */
+-            return 0xd249;
+-        } else {
+-            /* Magic value so that you can identify the interface. */
+-            return 0x49d2;
 +    if (unplug_version != 0)
 +        set_build_number(val);
 +}
@@ -546,88 +594,22 @@ diff -r a378e486bbfa hw/xen_platform.c
 +
 +            version_0_1_unplug(mask);
          }
--        fprintf(logfile, "PV driver build %d\n", val);
--        if (xenstore_pv_driver_build_blacklisted(driver_product_version,
--                                                 val)) {
--            fprintf(logfile, "Drivers are blacklisted!\n");
--            drivers_blacklisted = 1;
--        }
+-    default:
+-        return 0xffff;
 +        break;
 +
 +    case 0x12:
 +        if (unplug_version != 0)
 +            set_product_id((uint16_t)val);
 +
-         break;
++        break;
      }
  }
  
--static void platform_fixed_ioport_write1(void *opaque, uint32_t addr, uint32_t val)
+-static uint32_t platform_fixed_ioport_read1(void *opaque, uint32_t addr)
 +static void
 +platform_fixed_ioport_write1(void *opaque, uint32_t addr, uint32_t val)
  {
--    switch (addr - 0x10) {
--    case 0: /* Platform flags */ {
--        hvmmem_type_t mem_type = (val & PFFLAG_ROM_LOCK) ?
--            HVMMEM_ram_ro : HVMMEM_ram_rw;
--        if (xc_hvm_set_mem_type(xc_handle, domid, mem_type, 0xc0, 0x40))
--            fprintf(logfile,"platform_fixed_ioport: unable to change ro/rw "
--                    "state of ROM memory area!\n");
--        else {
--            platform_flags = val & PFFLAG_ROM_LOCK;
--            fprintf(logfile,"platform_fixed_ioport: changed ro/rw "
--                    "state of ROM memory area. now is %s state.\n",
--                    (mem_type == HVMMEM_ram_ro ? "ro":"rw"));
--        }
-+    static uint8_t unplug_type;
-+
-+    switch (addr) {
-+    case 0x10:
-+        set_platform_flags((uint8_t)val);
-         break;
--    }
--    case 2:
--        /* Send bytes to syslog */
--        if (val == '\n' || log_buffer_off == sizeof(log_buffer) - 1) {
--            /* Flush buffer */
--            log_buffer[log_buffer_off] = 0;
--            throttle(log_buffer_off);
--            fprintf(logfile, "%s\n", log_buffer);
--            log_buffer_off = 0;
--            break;
--        }
--        log_buffer[log_buffer_off++] = val;
-+
-+    case 0x11:
-+        if (unplug_version == 2)
-+            unplug_type = (uint8_t)val;
-+
-         break;
--    }
--}
- 
--static uint32_t platform_fixed_ioport_read2(void *opaque, uint32_t addr)
--{
--    switch (addr - 0x10) {
--    case 0:
--        if (drivers_blacklisted) {
--            /* The drivers will recognise this magic number and refuse
--             * to do anything. */
--            return 0xd249;
--        } else {
--            /* Magic value so that you can identify the interface. */
--            return 0x49d2;
--        }
--    default:
--        return 0xffff;
--    }
--}
-+    case 0x12:
-+        write_log((char)val);
-+        break;
- 
--static uint32_t platform_fixed_ioport_read1(void *opaque, uint32_t addr)
--{
 -    switch (addr - 0x10) {
 -    case 0:
 -        /* Platform flags */
@@ -637,6 +619,23 @@ diff -r a378e486bbfa hw/xen_platform.c
 -        return 1;
 -    default:
 -        return 0xff;
++    static uint8_t unplug_type;
++
++    switch (addr) {
++    case 0x10:
++        set_platform_flags((uint8_t)val);
++        break;
++
++    case 0x11:
++        if (unplug_version == 2)
++            unplug_type = (uint8_t)val;
++
++        break;
++
++    case 0x12:
++        write_log((char)val);
++        break;
++
 +    case 0x13:
 +        /*
 +         * The first write to this port sets the unpluc protocol version.
@@ -660,7 +659,7 @@ diff -r a378e486bbfa hw/xen_platform.c
  }
  
  static int platform_fixed_ioport_load(QEMUFile *f, void *opaque, int version_id)
-@@ -279,7 +423,7 @@ static int platform_fixed_ioport_load(QE
+@@ -279,7 +423,7 @@ static int platform_fixed_ioport_load(QEMUFile *f, void *opaque, int version_id)
          return -EINVAL;
  
      qemu_get_8s(f, &flags);
@@ -682,7 +681,7 @@ diff -r a378e486bbfa hw/xen_platform.c
  }
  
  static uint32_t xen_platform_ioport_readb(void *opaque, uint32_t addr)
-@@ -314,27 +459,22 @@ static void xen_platform_ioport_writeb(v
+@@ -314,27 +459,22 @@ static void xen_platform_ioport_writeb(void *opaque, uint32_t addr, uint32_t val
      val  &= 0xff;
  
      switch (addr) {
@@ -718,7 +717,7 @@ diff -r a378e486bbfa hw/xen_platform.c
  static void platform_ioport_map(PCIDevice *pci_dev, int region_num, uint32_t addr, uint32_t size, int type)
  {
      PCIXenPlatformState *d = (PCIXenPlatformState *)pci_dev;
-@@ -410,8 +550,9 @@ static int xen_pci_load(QEMUFile *f, voi
+@@ -410,8 +550,9 @@ static int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
      if (version_id >= 2) {
          if (version_id == 2) {
              uint8_t flags;
@@ -729,9 +728,10 @@ diff -r a378e486bbfa hw/xen_platform.c
          }
          qemu_get_be64(f);
      }
-diff -r a378e486bbfa net.c
---- a/net.c	Tue Jan 15 15:51:15 2013 +0000
-+++ b/net.c	Tue Jan 15 15:51:21 2013 +0000
+diff --git a/net.c b/net.c
+index 720027c..f4a0da7 100644
+--- a/net.c
++++ b/net.c
 @@ -1987,13 +1987,36 @@ void net_client_check(void)
      }
  }
@@ -750,15 +750,15 @@ diff -r a378e486bbfa net.c
  {
 -    struct IOHandlerRecord **pioh, *ioh;
 +    struct TAPState *tap;
++
++    for (tap = head_net_tap; tap; tap = tap->next)
++        net_tap_shutdown(tap);
++}
  
 -    while (head_net_tap) {
 -        qemu_set_fd_handler2(head_net_tap->fd, 0,0,0,0);
 -        close(head_net_tap->fd);
 -        head_net_tap = head_net_tap->next;
-+    for (tap = head_net_tap; tap; tap = tap->next)
-+        net_tap_shutdown(tap);
-+}
-+
 +void net_tap_shutdown_vlan(int id)
 +{
 +    struct TAPState *tap;
@@ -774,9 +774,10 @@ diff -r a378e486bbfa net.c
      }
  }
 +
-diff -r a378e486bbfa net.h
---- a/net.h	Tue Jan 15 15:51:15 2013 +0000
-+++ b/net.h	Tue Jan 15 15:51:21 2013 +0000
+diff --git a/net.h b/net.h
+index bc749d9..1071fdc 100644
+--- a/net.h
++++ b/net.h
 @@ -103,6 +103,7 @@ void net_cleanup(void);
  int slirp_is_inited(void);
  void net_client_check(void);
@@ -785,10 +786,11 @@ diff -r a378e486bbfa net.h
  void net_host_device_add(const char *device, const char *opts);
  void net_host_device_remove(int vlan_id, const char *device);
  
-diff -r a378e486bbfa qemu-xen.h
---- a/qemu-xen.h	Tue Jan 15 15:51:15 2013 +0000
-+++ b/qemu-xen.h	Tue Jan 15 15:51:21 2013 +0000
-@@ -46,7 +46,8 @@ void set_vram_mapping(void *opaque, unsi
+diff --git a/qemu-xen.h b/qemu-xen.h
+index de9063d..dcb8e9a 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -46,7 +46,8 @@ void set_vram_mapping(void *opaque, unsigned long begin, unsigned long end);
  void unset_vram_mapping(void *opaque);
  #endif
  
