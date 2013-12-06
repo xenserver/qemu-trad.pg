@@ -122,7 +122,6 @@ qemu-use-backdev.patch
 #
 
 hvm-multicore.patch
-#savevm-to-tmp
 #marathon
 depriv_qemu.patch
 move-disable-pf-key.patch
