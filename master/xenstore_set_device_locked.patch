@@ -64,7 +64,7 @@ diff -r 49ab480a75d6 xenstore.c
 +
 +    free(path);
 +}
-+ 
++
  #define UWAIT_MAX (30*1000000) /* thirty seconds */
  #define UWAIT     (100000)     /* 1/10th second  */
  

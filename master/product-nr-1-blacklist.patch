@@ -69,7 +69,7 @@ diff -r 51e561958f11 -r 528e63732d94 xenstore.c
 +            blacklist = 1;
 +
 +        break;
-     }        
+     }
      default:
 -        /* Don't know what product this is -> we can't blacklist
 -         * it. */

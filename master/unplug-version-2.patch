@@ -45,10 +45,10 @@ diff -r a378e486bbfa hw/ide.c
 +    s = principal_ide_controller->ide_if + i;
 +    if (!s->bs)
 +        return; /* drive not present */
-+ 
++
 +    if (s->is_cdrom)
 +        return; /* cdrom */
-+ 
++
 +    /* Is a hard disk, unplug it. */
 +    for (j = 0; j < nb_drives; j++) {
 +        if (drives_table[j].bdrv == s->bs) {
@@ -56,7 +56,7 @@ diff -r a378e486bbfa hw/ide.c
 +            drives_table[j].bdrv = NULL;
 +        }
      }
-+ 
++
 +    bdrv_flush(s->bs);
 +    bdrv_close(s->bs);
 +    s->bs = NULL;
@@ -458,7 +458,7 @@ diff -r a378e486bbfa hw/xen_platform.c
 +{
 +    if (product_id == 0) {
 +        fprintf(logfile, "UNPLUG: product_id has not been set\n");
-+    } else {    
++    } else {
 +        build_number = number;
 +
 +        fprintf(logfile, "UNPLUG: product_id: %d build_number: %d\n",
@@ -769,7 +769,7 @@ diff -r a378e486bbfa net.c
 +
 +        if (vlan->id != id)
 +            continue;
-+        
++
 +        net_tap_shutdown(tap);
      }
  }

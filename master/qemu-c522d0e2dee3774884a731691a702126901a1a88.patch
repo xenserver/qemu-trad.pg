@@ -34,7 +34,7 @@ index 3e34437..6ffbc46 100644
 @@ -736,7 +744,7 @@ static void vnc_update_client(void *opaque)
              server_row += ds_get_linesize(vs->ds);
          }
-  
+
 -	if (!has_dirty && !vs->audio_cap) {
 +        if (!has_dirty && !vs->audio_cap && !vs->force_update) {
  	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);

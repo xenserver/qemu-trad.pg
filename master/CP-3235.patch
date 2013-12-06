@@ -63,8 +63,8 @@ diff -r ab1e0817ce4f xenstore.c
 +    pch->device_id = 0x0001;
 +    pch->subsystem_id = 0x0001;
 +    pch->revision = 1;
-+     
-+    /* The presence of this key gates use of the others */   
++
++    /* The presence of this key gates use of the others */
 +    node = NULL;
 +    if ( pasprintf(&node, "/local/domain/%u/platform/device_id", domid) >= 0 ) {
 +        char *val;
@@ -90,7 +90,7 @@ diff -r ab1e0817ce4f xenstore.c
 +        }
 +        free(node);
 +    }
-+        
++
 +    pch->revision = 2;
 +
 +    node = NULL;

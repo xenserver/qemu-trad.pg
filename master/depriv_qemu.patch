@@ -692,7 +692,7 @@ diff -r 7d5e6712f2bd privsep.c
 +    }
 +}
 +
-+static int 
++static int
 +xenstore_vm_write(int domid, char *key, char *value)
 +{
 +    char *buf, *path;
@@ -930,7 +930,7 @@ diff -r 7d5e6712f2bd privsep.c
 +{
 +    char *path = NULL;
 +
-+    if (asprintf(&path, 
++    if (asprintf(&path,
 +                "/local/domain/0/device-model/%u/%s", domid, subpath) <= 0) {
 +        fprintf(logfile, "out of memory recording dm \n");
 +        goto out;
@@ -982,7 +982,7 @@ diff -r 7d5e6712f2bd privsep.c
 +    int len;
 +    char *path = NULL;
 +
-+    if (asprintf(&path, 
++    if (asprintf(&path,
 +                "/local/domain/0/device-model/%u/%s", domid, subpath) <= 0) {
 +        fprintf(logfile, "out of memory recording dm \n");
 +        free(path);
@@ -1025,7 +1025,7 @@ diff -r 7d5e6712f2bd privsep.c
 +    char *path = NULL;
 +    int pci_devid = 0;
 +
-+    if (asprintf(&path, 
++    if (asprintf(&path,
 +                "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid) == -1) {
 +        fprintf(logfile, "out of memory when updating vslots.\n");
 +        goto out;
@@ -1058,7 +1058,7 @@ diff -r 7d5e6712f2bd privsep.c
 +done:
 +    free(vslots);
 +}
-+ 
++
 +#ifndef CONFIG_STUBDOM
 +static void sigxfsz_handler_f(int num)
 +{
@@ -1146,14 +1146,14 @@ diff -r 7d5e6712f2bd privsep.c
 +
 +    if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, socks) == -1)
 +        err(1, "socketpair() failed");
-+    
++
 +    snprintf(root_directory, 64, "/var/xen/qemu/%d", getpid());
 +    if (mkdir(root_directory, 00755) < 0) {
 +        fprintf(stderr, "cannot create qemu scratch directory");
 +        strcpy(root_directory, "/var/empty");
 +    } else
 +        create_localtime();
-+        
++
 +    parent_pid = getpid();
 +    child = fork();
 +    if (child < 0)

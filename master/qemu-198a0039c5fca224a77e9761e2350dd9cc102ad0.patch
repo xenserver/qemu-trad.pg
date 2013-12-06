@@ -111,7 +111,7 @@ diff --git a/vnc.c b/vnc.c
 -        qemu_free(vs->server.ds);
 -        qemu_free(vs->guest.ds);
 -        qemu_free(vs);
--  
+-
  	return 0;
      }
      return ret;

@@ -14,7 +14,7 @@ diff -r 3b4d1e084bdc privsep.c
 +	{
 +	    warn("%s: recvmsg", "receive_fd");
 +	    if ( errno == EINTR )
-+	      { 
++	      {
 +		warn("%s: Interrupted system call.  termsig %d.  Retrying.\n",
 +		     __func__, termsig);
 +		goto retry;

@@ -1215,7 +1215,7 @@ diff --git a/vnc.c b/vnc.c
 +
 +        qemu_free(vs->old_data);
 +        qemu_free(vs);
-+  
++
  	return 0;
      }
      return ret;
@@ -1768,7 +1768,7 @@ diff --git a/vnc.c b/vnc.c
 +        vnc_write_u8(vs, 0);  /* msg id */
 +        vnc_write_u8(vs, 0);
 +        vnc_write_u16(vs, 1); /* number of rects */
-+        vnc_framebuffer_update(vs, 0, 0, ds_get_width(vs->ds), 
++        vnc_framebuffer_update(vs, 0, 0, ds_get_width(vs->ds),
 +                               ds_get_height(vs->ds), VNC_ENCODING_WMVi);
 +        pixel_format_message(vs);
 +        vnc_flush(vs);

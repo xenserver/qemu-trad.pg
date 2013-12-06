@@ -63,7 +63,7 @@ diff --git a/vnc.c b/vnc.c
 +                                       int w, int h);
 +static void vnc_refresh(void *opaque);
 +static int vnc_refresh_server_surface(VncDisplay *vd);
-+ 
++
  static inline void vnc_set_bit(uint32_t *d, int k)
  {
      d[k >> 5] |= 1 << (k & 0x1f);
@@ -355,7 +355,7 @@ diff --git a/vnc.c b/vnc.c
 +        dst_row += pitch - w * depth;
 +        y += inc;
 +    }
-+ 
++
      for (vs = vd->clients; vs != NULL; vs = vs->next) {
          if (vnc_has_feature(vs, VNC_FEATURE_COPYRECT))
              vnc_copy(vs, src_x, src_y, dst_x, dst_y, w, h);
@@ -436,7 +436,7 @@ diff --git a/vnc.c b/vnc.c
 -            guest_row  += ds_get_linesize(vs->ds);
 -            server_row += ds_get_linesize(vs->ds);
 -        }
-- 
+-
          if (!has_dirty && !vs->audio_cap && !vs->force_update)
  	    return;
  

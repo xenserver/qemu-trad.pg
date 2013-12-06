@@ -92,7 +92,7 @@ diff -r 2541b69ad89d sdl.c
 +                exit(1);
 +            }
 +        }
-+    } 
++    }
 +    SDL_UpdateRect(real_screen, rec.x, rec.y, rec.w, rec.h);
  }
  
@@ -122,7 +122,7 @@ diff -r 2541b69ad89d sdl.c
  
      surface->width = width;
      surface->height = height;
-+    
++
 +    if (scaling_active) {
 +        if (host_format.BytesPerPixel != 2 && host_format.BytesPerPixel != 4) {
 +            surface->linesize = width * 4;
@@ -236,7 +236,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 @@ -0,0 +1,447 @@
 +/*
 + * SDL_zoom - surface scaling
-+ * 
++ *
 + * Derived from: SDL_rotozoom,  LGPL (c) A. Schiffler
 + * from the SDL_gfx library.
 + *
@@ -271,7 +271,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 +
 +static void setRed16(Uint16 r, Uint16* color)
 +{
-+    *color = ((*color) & 0x07ff) + ((r & 0x001f) << 11); 
++    *color = ((*color) & 0x07ff) + ((r & 0x001f) << 11);
 +}
 +
 +static void setGreen16(Uint16 g, Uint16* color)
@@ -289,9 +289,9 @@ diff -r 2541b69ad89d sdl_zoom.c
 +{
 +    int x, y, sx, sy, *sax, *say, *csax, *csay, csx, csy, ex, ey, t1, t2, sstep, sstep_jump;
 +    Uint16 *c00, *c01, *c10, *c11, *sp, *csp, *dp;
-+    int d_gap;    
++    int d_gap;
 +
-+    if (smooth) { 
++    if (smooth) {
 +        /* For interpolation: assume source dimension is one pixel.
 +         * Smaller here to avoid overflow on right and bottom edge.
 +         */
@@ -341,10 +341,10 @@ diff -r 2541b69ad89d sdl_zoom.c
 +        }
 +
 +        /* Calculate sstep_jump */
-+        csax = sax; 
++        csax = sax;
 +        sstep_jump = 0;
 +        for (x = 0; x < dst_rect->x; x++) {
-+            csax++; 
++            csax++;
 +            sstep = (*csax >> 16);
 +            sstep_jump += sstep;
 +        }
@@ -355,25 +355,25 @@ diff -r 2541b69ad89d sdl_zoom.c
 +            c01 = c00 + 1;
 +            c10 = (Uint16 *) ((Uint8 *) csp + src->pitch) + sstep_jump;
 +            c11 = c10 + 1;
-+            csax = sax + dst_rect->x; 
++            csax = sax + dst_rect->x;
 +
 +            for (x = 0; x < dst->w; x++) {
 +
 +                /* Interpolate colours */
 +                ex = (*csax & 0xffff);
 +                ey = (*csay & 0xffff);
-+                t1 = ((((getRed16(*c01) - getRed16(*c00)) * ex) >> 16) + getRed16(*c00)) & 0x1f;   
++                t1 = ((((getRed16(*c01) - getRed16(*c00)) * ex) >> 16) + getRed16(*c00)) & 0x1f;
 +                t2 = ((((getRed16(*c11) - getRed16(*c10)) * ex) >> 16) + getRed16(*c10)) & 0x1f;
-+                setRed16((((t2 - t1) * ey) >> 16) + t1, dp); 
++                setRed16((((t2 - t1) * ey) >> 16) + t1, dp);
 +                t1 = ((((getGreen16(*c01) - getGreen16(*c00)) * ex) >> 16) + getGreen16(*c00)) & 0x3f;
 +                t2 = ((((getGreen16(*c11) - getGreen16(*c10)) * ex) >> 16) + getGreen16(*c10)) & 0x3f;
 +                setGreen16((((t2 - t1) * ey) >> 16) + t1, dp);
-+                t1 = ((((getBlue16(*c01) - getBlue16(*c00)) * ex) >> 16) + getBlue16(*c00)) & 0x1f; 
++                t1 = ((((getBlue16(*c01) - getBlue16(*c00)) * ex) >> 16) + getBlue16(*c00)) & 0x1f;
 +                t2 = ((((getBlue16(*c11) - getBlue16(*c10)) * ex) >> 16) + getBlue16(*c10)) & 0x1f;
-+                setBlue16((((t2 - t1) * ey) >> 16) + t1, dp); 
++                setBlue16((((t2 - t1) * ey) >> 16) + t1, dp);
 +
 +                /* Advance source pointers */
-+                csax++; 
++                csax++;
 +                sstep = (*csax >> 16);
 +                c00 += sstep;
 +                c01 += sstep;
@@ -400,10 +400,10 @@ diff -r 2541b69ad89d sdl_zoom.c
 +        }
 +
 +        /* Calculate sstep_jump */
-+        csax = sax; 
++        csax = sax;
 +        sstep_jump = 0;
 +        for (x = 0; x < dst_rect->x; x++) {
-+            csax++; 
++            csax++;
 +            sstep = (*csax >> 16);
 +            sstep_jump += sstep;
 +        }
@@ -447,7 +447,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 +    tColorRGBA *c00, *c01, *c10, *c11, *sp, *csp, *dp;
 +    int d_gap;
 +
-+    if (smooth) { 
++    if (smooth) {
 +        /* For interpolation: assume source dimension is one pixel.
 +         * Smaller here to avoid overflow on right and bottom edge.
 +         */
@@ -497,10 +497,10 @@ diff -r 2541b69ad89d sdl_zoom.c
 +        }
 +
 +        /* Calculate sstep_jump */
-+        csax = sax; 
++        csax = sax;
 +        sstep_jump = 0;
 +        for (x = 0; x < dst_rect->x; x++) {
-+            csax++; 
++            csax++;
 +            sstep = (*csax >> 16);
 +            sstep_jump += sstep;
 +        }
@@ -511,7 +511,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 +            c01 = c00 + 1;
 +            c10 = (tColorRGBA *) ((Uint8 *) csp + src->pitch) + sstep_jump;
 +            c11 = c10 + 1;
-+            csax = sax + dst_rect->x; 
++            csax = sax + dst_rect->x;
 +
 +            for (x = 0; x < dst->w; x++) {
 +
@@ -520,19 +520,19 @@ diff -r 2541b69ad89d sdl_zoom.c
 +                ey = (*csay & 0xffff);
 +                t1 = ((((c01->r - c00->r) * ex) >> 16) + c00->r) & 0xff;
 +                t2 = ((((c11->r - c10->r) * ex) >> 16) + c10->r) & 0xff;
-+                dp->r = (((t2 - t1) * ey) >> 16) + t1; 
++                dp->r = (((t2 - t1) * ey) >> 16) + t1;
 +                t1 = ((((c01->g - c00->g) * ex) >> 16) + c00->g) & 0xff;
 +                t2 = ((((c11->g - c10->g) * ex) >> 16) + c10->g) & 0xff;
-+                dp->g = (((t2 - t1) * ey) >> 16) + t1; 
++                dp->g = (((t2 - t1) * ey) >> 16) + t1;
 +                t1 = ((((c01->b - c00->b) * ex) >> 16) + c00->b) & 0xff;
 +                t2 = ((((c11->b - c10->b) * ex) >> 16) + c10->b) & 0xff;
-+                dp->b = (((t2 - t1) * ey) >> 16) + t1; 
++                dp->b = (((t2 - t1) * ey) >> 16) + t1;
 +                t1 = ((((c01->a - c00->a) * ex) >> 16) + c00->a) & 0xff;
 +                t2 = ((((c11->a - c10->a) * ex) >> 16) + c10->a) & 0xff;
 +                dp->a = (((t2 - t1) * ey) >> 16) + t1;
 +
 +                /* Advance source pointers */
-+                csax++; 
++                csax++;
 +                sstep = (*csax >> 16);
 +                c00 += sstep;
 +                c01 += sstep;
@@ -559,10 +559,10 @@ diff -r 2541b69ad89d sdl_zoom.c
 +        }
 +
 +        /* Calculate sstep_jump */
-+        csax = sax; 
++        csax = sax;
 +        sstep_jump = 0;
 +        for (x = 0; x < dst_rect->x; x++) {
-+            csax++; 
++            csax++;
 +            sstep = (*csax >> 16);
 +            sstep_jump += sstep;
 +        }
@@ -656,7 +656,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 +                             src_sfc->format->Bmask, src_sfc->format->Amask);
 +
 +    SDL_LockSurface(src_sfc);
-+    
++
 +    if (zoom_sfc->format->BitsPerPixel == 32)
 +        sdl_zoom_rgba32(src_sfc, zoom_sfc, smooth, &src_rect, &zoom, dst_sfc->h, dst_sfc->w);
 +    else if (zoom_sfc->format->BitsPerPixel == 16)
@@ -667,7 +667,7 @@ diff -r 2541b69ad89d sdl_zoom.c
 +    }
 +
 +    SDL_UnlockSurface(src_sfc);
-+    
++
 +    SDL_SetAlpha(zoom_sfc, SDL_SRCALPHA, 255);
 +
 +    ret = SDL_BlitSurface(zoom_sfc, 0, dst_sfc, &zoom);
@@ -687,7 +687,7 @@ diff -r 2541b69ad89d sdl_zoom.h
 @@ -0,0 +1,22 @@
 +/*
 + * SDL_zoom - surface scaling
-+ * 
++ *
 + * Derived from: SDL_rotozoom,  LGPL (c) A. Schiffler
 + * from the SDL_gfx library.
 + *

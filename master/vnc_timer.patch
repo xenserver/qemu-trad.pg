@@ -60,7 +60,7 @@ diff -r 3e18cc267db8 vnc.c
 @@ -770,10 +767,8 @@
              server_row += ds_get_linesize(vs->ds);
          }
-  
+
 -        if (!has_dirty && !vs->audio_cap && !vs->force_update) {
 -	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
 +        if (!has_dirty && !vs->audio_cap && !vs->force_update)

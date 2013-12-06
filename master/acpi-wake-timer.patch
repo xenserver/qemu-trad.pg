@@ -36,7 +36,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
  
 +static inline int unbcd(int coded, int val)
 +{
-+    if (!coded) 
++    if (!coded)
 +        return val;
 +    else
 +        return ((val >> 4) * 10) + (val & 0x0f);
@@ -58,7 +58,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +    if (!(rtc->cmos_data[0xB] & 0x02)  /* 12-hour clock */
 +        && (rtc->cmos_data[0x4] & 0x80)) /* PM */
 +        ch += 12;
-+    
++
 +    now = cs + cm * 60 + ch * 3600;
 +
 +    s = rtc->cmos_data[0x1];  /* Alarm secs */
@@ -68,20 +68,20 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +            && (rtc->cmos_data[0x5] & 0x80)) ? 43200 : 0; /* PM */
 +
 +    alarm = 0;
-+    /* Add alarm h/m/s.  If an entry is wildcarded (>= 0xc0), 
++    /* Add alarm h/m/s.  If an entry is wildcarded (>= 0xc0),
 +        * use the one from the current time. */
-+    if (s < 0xc0) alarm += unbcd(bcd, s); 
++    if (s < 0xc0) alarm += unbcd(bcd, s);
 +    else alarm += cs;
 +    if (m < 0xc0) alarm += unbcd(bcd, m) * 60;
 +    else alarm += cm * 60;
 +    if (h < 0xc0) alarm += unbcd(bcd, h & 0x7f) * 3600 + pm;
 +    else alarm += ch * 3600;
 +
-+    wait = (int) alarm - (int) now; 
++    wait = (int) alarm - (int) now;
 +    while (wait < 0) wait += 86400;
 +
 +    /* Handle wildcarded h/m/s entries */
-+    if (h >= 0xc0) { 
++    if (h >= 0xc0) {
 +        while (wait > 3600) wait -= 3600;
 +        if (m >= 0xc0) {
 +            while (wait > 60) wait -= 60;
@@ -97,7 +97,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +    }
 +
 +    fprintf(stderr, "RTC now %02i:%02i:%02i, "
-+            "alarm %02i:%02i:%02i (+%i secs)\n", 
++            "alarm %02i:%02i:%02i (+%i secs)\n",
 +            ch, cm, cs,
 +            (h < 0xc0) ? unbcd(bcd, h & 0x7f) : -1,
 +            (m < 0xc0) ? unbcd(bcd, m) : -1,
@@ -123,7 +123,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +        fprintf(stderr, "Can't allocate HVM state buffer\n");
 +        goto no_hvm_state;
 +    }
-+    if ((rec_len = xc_domain_hvm_getcontext(xc_handle, domid, buf, 
++    if ((rec_len = xc_domain_hvm_getcontext(xc_handle, domid, buf,
 +                                            rec_len)) == -1) {
 +        fprintf(stderr, "Can't get HVM state\n");
 +        goto no_hvm_state;
@@ -151,19 +151,19 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +
 +    if (get_hvm_state(&buf, &len) == 0) {
 +        struct hvm_save_descriptor *d;
-+        struct hvm_hw_pmtimer *pt;    
++        struct hvm_hw_pmtimer *pt;
 +        struct hvm_hw_rtc *rtc;
-+        
++
 +        for (d = buf;
 +             ((void *)d < (buf + len)) && d->typecode != HVM_SAVE_CODE(END);
 +             d = (void *)d + sizeof (*d) + d->length) {
 +            switch (d->typecode) {
-+                
++
 +            case HVM_SAVE_CODE(PMTIMER):
 +                pt = (struct hvm_hw_pmtimer *)(d + 1);
 +                wake_enabled = !!(pt->pm1a_en & RTC_EN);
 +                break;
-+                
++
 +            case HVM_SAVE_CODE(RTC):
 +                rtc = (struct hvm_hw_rtc *)(d + 1);
 +                wait = calculate_wait(rtc);
@@ -220,19 +220,19 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +
 +    if (get_hvm_state(&buf, &len) == 0) {
 +        struct hvm_save_descriptor *d;
-+        struct hvm_hw_pmtimer *pt;    
++        struct hvm_hw_pmtimer *pt;
 +        struct hvm_hw_rtc *rtc;
-+        
++
 +        for (d = buf;
 +             ((void *)d < (buf + len)) && d->typecode != HVM_SAVE_CODE(END);
 +             d = (void *)d + sizeof (*d) + d->length) {
 +            switch (d->typecode) {
-+                
++
 +            case HVM_SAVE_CODE(PMTIMER):
 +                pt = (struct hvm_hw_pmtimer *)(d + 1);
 +                wake_enabled = !!(pt->pm1a_en & RTC_EN);
 +                break;
-+                
++
 +            case HVM_SAVE_CODE(RTC):
 +                rtc = (struct hvm_hw_rtc *)(d + 1);
 +                wait = calculate_wait(rtc);
@@ -243,7 +243,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 +            }
 +        }
 +    }
-+    
++
 +    if (!wake_enabled) {
 +        fprintf(stderr, "S4: RTC wake not enabled: halting\n");
 +        goto halt;

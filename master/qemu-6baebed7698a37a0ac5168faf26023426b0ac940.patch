@@ -282,7 +282,7 @@ diff --git a/vnc.c b/vnc.c
 +            guest_row  += ds_get_linesize(vs->ds);
 +            server_row += ds_get_linesize(vs->ds);
 +        }
-+ 
++
  	if (!has_dirty && !vs->audio_cap) {
  	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
  	    return;

@@ -220,7 +220,7 @@ diff -r 65c40e121eb9 hw/crashdump.c
 +
 +    if (crashdump_failed)
 +        return;
-+    
++
 +    addr <<= TARGET_PAGE_BITS;
 +
 +    if (write_crashdump_page(addr) < 0)

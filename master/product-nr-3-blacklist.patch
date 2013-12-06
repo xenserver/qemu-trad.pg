@@ -116,7 +116,7 @@ diff -r 67dca6cd3fe4 xenstore.c
 +            return 1;
 +        else
 +            return 0;
-+    }        
++    }
      default:
          /* Don't know what product this is -> we can't blacklist
           * it. */
