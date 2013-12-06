@@ -172,7 +172,7 @@ index 0000000..022ff1a
 +
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
 new file mode 100644
-index 0000000..eb6b4ed
+index 0000000..d279b32
 --- /dev/null
 +++ b/mk/xen-device-model.spec.in
 @@ -0,0 +1,39 @@
@@ -185,7 +185,7 @@ index 0000000..eb6b4ed
 +Source0: xen-device-model-%{version}.tar.bz2
 +Patch0: xen-device-model-development.patch
 +BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
-+BuildRequires: SDL-devel, zlib-devel, xen-devel, ncurses-devel, pciutils-devel
++BuildRequires: SDL-devel, zlib-devel, xen-devel, xen-dom0-devel, ncurses-devel, pciutils-devel
 +
 +%description
 +This package contains qemu-dm, the Xen device model.
@@ -216,7 +216,7 @@ index 0000000..eb6b4ed
 +
 +%changelog
 diff --git a/sdl.c b/sdl.c
-index 796ecf9..0c8a2aa 100644
+index 4d063ce..ec60489 100644
 --- a/sdl.c
 +++ b/sdl.c
 @@ -388,7 +388,7 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
