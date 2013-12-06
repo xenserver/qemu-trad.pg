@@ -16,95 +16,95 @@
 #no-pxe-roms
 #logdirty-compatibility
 
-revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a
-revert-additional-changes
-revert-7440-f37b6dee9f16
+revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a.patch
+revert-additional-changes.patch
+revert-7440-f37b6dee9f16.patch
 
 #
 # patches from qemu upstream
 #
-qemu-753b4053311ff1437d99726970b1e7e6bf38249b # Support multiple VNC clients, pull vnc.c + compatibility fixes
-qemu-6baebed7698a37a0ac5168faf26023426b0ac940 # vnc: cleanup surface handling, fix screen corruption bug. (Gerd Hoffmann)
-qemu-c522d0e2dee3774884a731691a702126901a1a88 # vnc: throttle screen updates. (Gerd Hoffmann)
-qemu-3cded5400925452fcd1adca9109a5d30a92b4dac # vnc: Fix incorrect attempt to clear a flag
-qemu-0fc8e0ec7f42fb79763b875edea2f50c0691c1f4 # vnc: windup keypad keys for qemu console emulation
-qemu-bee1b01083b6adcf580fa30e65a2e59e7231af31 # vnc: fix segfault
-qemu-89ee676eadde78677addb74ef8f356757f6f6c0a # vnc: fix server surface pixel format.
-qemu-24cf0a6e36402f3bbab1d7317de6c4d511c832e1 # vnc: no need to set force_update for incremental update requests.
-qemu-afd3216027e3b28b0e180ac99d87e981d169b91c # vnc: Fix memory allocation (wrong structure size).
-qemu-198a0039c5fca224a77e9761e2350dd9cc102ad0 # vnc: rework VncState release workflow.
-qemu-f22f5b077c164b864dae9776f63ed9e48a973fb6 # vga: fix shadow GR regression
-qemu-babd03fde68093482528010a5435c14ce9128e3f # usb-linux.c: fix buffer overflow
+qemu-753b4053311ff1437d99726970b1e7e6bf38249b.patch # Support multiple VNC clients, pull vnc.c + compatibility fixes
+qemu-6baebed7698a37a0ac5168faf26023426b0ac940.patch # vnc: cleanup surface handling, fix screen corruption bug. (Gerd Hoffmann)
+qemu-c522d0e2dee3774884a731691a702126901a1a88.patch # vnc: throttle screen updates. (Gerd Hoffmann)
+qemu-3cded5400925452fcd1adca9109a5d30a92b4dac.patch # vnc: Fix incorrect attempt to clear a flag
+qemu-0fc8e0ec7f42fb79763b875edea2f50c0691c1f4.patch # vnc: windup keypad keys for qemu console emulation
+qemu-bee1b01083b6adcf580fa30e65a2e59e7231af31.patch # vnc: fix segfault
+qemu-89ee676eadde78677addb74ef8f356757f6f6c0a.patch # vnc: fix server surface pixel format.
+qemu-24cf0a6e36402f3bbab1d7317de6c4d511c832e1.patch # vnc: no need to set force_update for incremental update requests.
+qemu-afd3216027e3b28b0e180ac99d87e981d169b91c.patch # vnc: Fix memory allocation (wrong structure size).
+qemu-198a0039c5fca224a77e9761e2350dd9cc102ad0.patch # vnc: rework VncState release workflow.
+qemu-f22f5b077c164b864dae9776f63ed9e48a973fb6.patch # vga: fix shadow GR regression
+qemu-babd03fde68093482528010a5435c14ce9128e3f.patch # usb-linux.c: fix buffer overflow
 
-vnc_copyrect # where does this come from?
-vnc_timer
-vnc_single_server_surf
-vnc_dynamic_timer
-vnc_update_policy # where does this come from?
-vnc_refresh_vnc_disconnect # not fixed this way upstream
-qemu-5d95ac5b6475c3b6b0e36b5f04de49bba88b3e59 # vnc: fix use after free
-qemu-83755c173f4608764e3ee92428247d1c5e962e6a # vnc_refresh: return if vd->timer is NULL
+vnc_copyrect.patch # where does this come from?
+vnc_timer.patch
+vnc_single_server_surf.patch
+vnc_dynamic_timer.patch
+vnc_update_policy.patch # where does this come from?
+vnc_refresh_vnc_disconnect.patch # not fixed this way upstream
+qemu-5d95ac5b6475c3b6b0e36b5f04de49bba88b3e59.patch # vnc: fix use after free
+qemu-83755c173f4608764e3ee92428247d1c5e962e6a.patch # vnc_refresh: return if vd->timer is NULL
 
 #
 # to go upstream
 #
 
-fix_savevm_v1_compatibility
-savevm_george_compatibility
-sanify-usb-controller-setup
-usb-uhci-set-subsystem-id
-fix_cirrus_updates
-extra_safe_cirrus_updates
-monitor_on_xenstore
-qemu-sdl-zoom
-cdrom_insert_open_flags
-fix_rtl_saverestore
-vga-clear-fb-on-switch-to-graphic
-cirrus-fix-windows-raster-ops # patches vga-clear-fb-on-switch-to-graphic
-unplug-version-2
-CA-55725-retry-after-listen-fail
-CP-3235
-product-nr-3-blacklist
-product-nr-4-blacklist
-product-nr-1-blacklist
+fix_savevm_v1_compatibility.patch
+savevm_george_compatibility.patch
+sanify-usb-controller-setup.patch
+usb-uhci-set-subsystem-id.patch
+fix_cirrus_updates.patch
+extra_safe_cirrus_updates.patch
+monitor_on_xenstore.patch
+qemu-sdl-zoom.patch
+cdrom_insert_open_flags.patch
+fix_rtl_saverestore.patch
+vga-clear-fb-on-switch-to-graphic.patch
+cirrus-fix-windows-raster-ops.patch # patches vga-clear-fb-on-switch-to-graphic.patch
+unplug-version-2.patch
+CA-55725-retry-after-listen-fail.patch
+CP-3235.patch
+product-nr-3-blacklist.patch
+product-nr-4-blacklist.patch
+product-nr-1-blacklist.patch
 
 #
 # Build system
 #
 
-disable-blktap
+disable-blktap.patch
 build-makefiles.patch
-no_install-s
+no_install-s.patch
 # Change the buildrequires line of the spec file to allow building with mock
 
 #
 # Compatible with upstream but not worth the effort of upstreaming
 #
 
-qemu-3.4-fdc
-hvm-late-unpause
-crashdump-to-qemu
-xen-platform-scsi-controller
-xenstore_set_device_locked
-close-and-flush-disconnected-emulated-devices
-qemu-logconsole-to-file
-qemu-sdl-nograb
-qemu-dont-probe-disk-format
-qemu-force-lba-geometry
-qemu-fix-tap-open-race-CA-8496
-CA-8472
-qemu-sdl-hide-pointer-when-not-in-focus
-CA-10912-silence-parallel-msg
-qemu-enforce-read-only-CA-12833
-qemu-sdl-geometry
-acpi-wake-timer
-piix4acpi-pm-compat
-qemu-keymap
-vnc_clipboard
-vnclisten
-vnc-port
-vnc_scan_code
-vnc_xencenter_no_copyrect
+qemu-3.4-fdc.patch
+hvm-late-unpause.patch
+crashdump-to-qemu.patch
+xen-platform-scsi-controller.patch
+xenstore_set_device_locked.patch
+close-and-flush-disconnected-emulated-devices.patch
+qemu-logconsole-to-file.patch
+qemu-sdl-nograb.patch
+qemu-dont-probe-disk-format.patch
+qemu-force-lba-geometry.patch
+qemu-fix-tap-open-race-CA-8496.patch
+CA-8472.patch
+qemu-sdl-hide-pointer-when-not-in-focus.patch
+CA-10912-silence-parallel-msg.patch
+qemu-enforce-read-only-CA-12833.patch
+qemu-sdl-geometry.patch
+acpi-wake-timer.patch
+piix4acpi-pm-compat.patch
+qemu-keymap.patch
+vnc_clipboard.patch
+vnclisten.patch
+vnc-port.patch
+vnc_scan_code.patch
+vnc_xencenter_no_copyrect.patch
 large_resolution.patch
 
 
@@ -112,34 +112,34 @@ large_resolution.patch
 # Product specific
 #
 disable-qemu-ifup.patch
-enable_cirrus_irq
-xenstore-exit-on-domain-destruction # does not work with stubdom
-set_timeoffset
-qemu-use-backdev
+enable_cirrus_irq.patch
+xenstore-exit-on-domain-destruction.patch # does not work with stubdom
+set_timeoffset.patch
+qemu-use-backdev.patch
 
 #
 # Product specific, incompatible with Open Source
 #
 
-hvm-multicore
+hvm-multicore.patch
 #savevm-to-tmp
 #marathon
-depriv_qemu
-move-disable-pf-key
-CA-41014-cannot-start-100th-VM
+depriv_qemu.patch
+move-disable-pf-key.patch
+CA-41014-cannot-start-100th-VM.patch
 #
 ## Disable firmware config (fw_cfg) port
-CA-32196-disable-fw-cfg
-abort-on-bad-loadvm
-savevm_dummy_handler_for_pcislots
-retry_receivefd_on_EINTR
-fix-vnc-overflow
+CA-32196-disable-fw-cfg.patch
+abort-on-bad-loadvm.patch
+savevm_dummy_handler_for_pcislots.patch
+retry_receivefd_on_EINTR.patch
+fix-vnc-overflow.patch
 fix_term_handling_if_paused.patch # upstream does not present same problem
 vnc_checks.patch
 
 CA-86932-disable-console-for-parallel-port.patch
 CA-87350-fix-qemu-crash-on-snapshot.patch
-constant_devfn_for_nic
+constant_devfn_for_nic.patch
 evtchn_io_old_xen.patch
 evtchn_compat_define.patch
 less_xs_connection.patch
