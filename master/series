@@ -60,7 +60,6 @@ qemu-sdl-zoom.patch
 cdrom_insert_open_flags.patch
 fix_rtl_saverestore.patch
 vga-clear-fb-on-switch-to-graphic.patch
-cirrus-fix-windows-raster-ops.patch # patches vga-clear-fb-on-switch-to-graphic.patch
 unplug-version-2.patch
 CA-55725-retry-after-listen-fail.patch
 CP-3235.patch
