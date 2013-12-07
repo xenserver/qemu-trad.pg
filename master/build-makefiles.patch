@@ -36,7 +36,7 @@ index 0000000..86528b1
 +CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 +
 diff --git a/configure b/configure
-index ace3c3e..72dec4e 100755
+index 4547359..d7a03a8 100755
 --- a/configure
 +++ b/configure
 @@ -809,21 +809,6 @@ else
@@ -61,7 +61,7 @@ index ace3c3e..72dec4e 100755
  ##########################################
  # VNC TLS detection
  if test "$vnc_tls" = "yes" ; then
-@@ -1512,12 +1497,6 @@ bsd)
+@@ -1513,12 +1498,6 @@ bsd)
  esac
  
  tools=
@@ -172,7 +172,7 @@ index 0000000..022ff1a
 +
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
 new file mode 100644
-index 0000000..d279b32
+index 0000000..823a7ce
 --- /dev/null
 +++ b/mk/xen-device-model.spec.in
 @@ -0,0 +1,39 @@
@@ -195,11 +195,11 @@ index 0000000..d279b32
 +
 +%build
 +./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs
-+%{__make}
++%{__make} CONFIG_BLKTAP1=n
 +
 +%install
 +rm -rf $RPM_BUILD_ROOT
-+%{__make} install DESTDIR=$RPM_BUILD_ROOT
++%{__make} install DESTDIR=$RPM_BUILD_ROOT CONFIG_BLKTAP1=n
 +mkdir -p $RPM_BUILD_ROOT/var/xen/qemu
 +rm -f $RPM_BUILD_ROOT/usr/bin/qemu-img-xen
 +rm -f $RPM_BUILD_ROOT/etc/xen/qemu-ifup
@@ -216,10 +216,10 @@ index 0000000..d279b32
 +
 +%changelog
 diff --git a/sdl.c b/sdl.c
-index 4d063ce..ec60489 100644
+index e0cd07b..6ddaf7f 100644
 --- a/sdl.c
 +++ b/sdl.c
-@@ -388,7 +388,7 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
+@@ -353,7 +353,7 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
  
  #else
  

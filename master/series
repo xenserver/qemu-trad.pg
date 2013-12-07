@@ -11,6 +11,17 @@
 #
 
 #
+# Patches from upstream (qemu-traditional upstream)
+#
+qemu-trad-unstable-84411871262363200e70fa087d7b21647091a450.patch # allow build without blktap1
+qemu-trad-unstable-18a08a23da88863435d56a0b14ff72013ef3b003.patch # do not strip binaries during make install
+
+#
+# Build System
+#
+build-makefiles.patch
+
+#
 # reversions
 #
 revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a.patch
@@ -61,14 +72,6 @@ CP-3235.patch
 product-nr-3-blacklist.patch
 product-nr-4-blacklist.patch
 product-nr-1-blacklist.patch
-
-#
-# Build system
-#
-disable-blktap.patch
-build-makefiles.patch
-no_install-s.patch
-
 
 #
 # Compatible with upstream but not worth the effort of upstreaming

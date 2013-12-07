@@ -1,0 +1,58 @@
+From 18a08a23da88863435d56a0b14ff72013ef3b003 Mon Sep 17 00:00:00 2001
+From: Olaf Hering <olaf@aepfle.de>
+Date: Tue, 15 Oct 2013 11:42:26 +0200
+Subject: [PATCH] qemu-traditional: do not strip binaries during make install
+
+It is wrong to strip code during make install, unless explicit
+requested. Introduce a new variable INSTALL_PROG and use it along with
+an optional STRIP_OPT where currently install -s -m 755 is used.
+This is what upstream qemu offers in version 1.6.
+
+Signed-off-by: Olaf Hering <olaf@aepfle.de>
+---
+ Makefile        |    2 +-
+ Makefile.target |    2 +-
+ configure       |    1 +
+ 3 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 37c7066..ed9b28a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -243,7 +243,7 @@ endif
+ install: all $(if $(BUILD_DOCS),install-doc)
+ 	mkdir -p "$(DESTDIR)$(bindir)"
+ ifneq ($(TOOLS),)
+-	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
++	$(INSTALL_PROG) $(STRIP_OPT) $(TOOLS) "$(DESTDIR)$(bindir)"
+ endif
+ ifneq ($(BLOBS),)
+ 	mkdir -p "$(DESTDIR)$(datadir)"
+diff --git a/Makefile.target b/Makefile.target
+index 19bb0fd..3c3db2b 100644
+--- a/Makefile.target
++++ b/Makefile.target
+@@ -755,7 +755,7 @@ clean:
+ 
+ install: all install-hook
+ ifneq ($(PROGS),)
+-	$(INSTALL) -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
++	$(INSTALL_PROG) $(STRIP_OPT) $(PROGS) "$(DESTDIR)$(bindir)"
+ endif
+ 
+ # Include automatically generated dependency files
+diff --git a/configure b/configure
+index ace3c3e..4547359 100755
+--- a/configure
++++ b/configure
+@@ -1215,6 +1215,7 @@ echo "docdir=\${prefix}$docsuffix" >> $config_mak
+ echo "#define CONFIG_QEMU_SHAREDIR \"$prefix$datasuffix\"" >> $config_h
+ echo "MAKE=$make" >> $config_mak
+ echo "INSTALL=$install" >> $config_mak
++echo "INSTALL_PROG=$install -m 0755" >> $config_mak
+ echo "CC=$cc" >> $config_mak
+ echo "HOST_CC=$host_cc" >> $config_mak
+ echo "AR=$ar" >> $config_mak
+-- 
+1.7.2.5
+
