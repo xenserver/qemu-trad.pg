@@ -1,21 +1,18 @@
 #
-# Patches that went in to qemu-xen upstream
+# This is the XenServer patch queue for Qemu Traditional
 #
-#qemu-6bbff9a0b495918309074ac60375be5f9dc868b3 # Refactor aio callback allocation to use an aiocb pool (Avi Kivity)
-#qemu-c07a9008ac6985cd5a15909c2b9977d982defc12 # Convert vectored aio emulation to use a dedicated pool (Avi Kivity)
-#qemu-6512a2a7106480c19183d6466a6845bc9bdf6ec0 # Implement cancellation method for dma async I/O (Avi Kivity)
-#qemu-3fb94d56c6adc96ffc4a81b58c752cc4ccfae39c # Use vectored aiocb storage to store vector translation state (Avi Kivity)
-#qemu-37b7842c2fb405c270efdce714425c17af3c78cd # Move block dma helpers aiocb to store dma state (Avi Kivity)
-#qemu-c240b9af599d20e06a58090366be682684bd8555 # Fix vectored aio bounce handling immediate errors (Avi Kivity)
-#qemu-7403b14eeb4670d54497284b110ca3e3be4a99a4 # Fix DMA API when handling an immediate error from block layer (Avi Kivity)
-#qemu-081501daceca74d2091e798d5dcd342c14d66d1a # check for bs->drv in bdrv_flush (Christoph Hellwig)
-#qemu-fbb7b4e0804d2168f24142eebf7552adde1968dc # Improve block range checks
-#qemu-6a7ad2998ca47711eddd191caa1a95f14459793f # Call qemu_bh_delete at bdrv_aio_bh_cb.
-#qemu-36afc451599175eb8f03f1962de74e7f7a8af4db # block: Clean up after deleting BHs
-#intel-sriov-hack
-#no-pxe-roms
-#logdirty-compatibility
+# This has built up through years of neglect and hacking.  As Qemu Traditional
+# is EOL upstream, with the encouragement to move to a non-forked version of
+# ancient Qemu, this patch queue will likely stay quite large.
+#
+# Work will be done where possible to reduce its size and invasiveness, but
+# the most important aspect is to ensure that there is no breakage of migrated
+# VMs; there are many changes here which unfortunately cannot be taken out.
+#
 
+#
+# reversions
+#
 revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a.patch
 revert-additional-changes.patch
 revert-7440-f37b6dee9f16.patch
@@ -48,7 +45,6 @@ qemu-83755c173f4608764e3ee92428247d1c5e962e6a.patch # vnc_refresh: return if vd-
 #
 # to go upstream
 #
-
 fix_savevm_v1_compatibility.patch
 savevm_george_compatibility.patch
 sanify-usb-controller-setup.patch
@@ -69,16 +65,14 @@ product-nr-1-blacklist.patch
 #
 # Build system
 #
-
 disable-blktap.patch
 build-makefiles.patch
 no_install-s.patch
-# Change the buildrequires line of the spec file to allow building with mock
+
 
 #
 # Compatible with upstream but not worth the effort of upstreaming
 #
-
 qemu-3.4-fdc.patch
 hvm-late-unpause.patch
 crashdump-to-qemu.patch
@@ -118,26 +112,20 @@ qemu-use-backdev.patch
 #
 # Product specific, incompatible with Open Source
 #
-
 hvm-multicore.patch
-#marathon
 depriv_qemu.patch
 move-disable-pf-key.patch
 CA-41014-cannot-start-100th-VM.patch
-#
-## Disable firmware config (fw_cfg) port
 CA-32196-disable-fw-cfg.patch
 abort-on-bad-loadvm.patch
 savevm_dummy_handler_for_pcislots.patch
 fix-vnc-overflow.patch
 fix_term_handling_if_paused.patch # upstream does not present same problem
 vnc_checks.patch
-
 CA-86932-disable-console-for-parallel-port.patch
 CA-87350-fix-qemu-crash-on-snapshot.patch
 constant_devfn_for_nic.patch
 evtchn_io_old_xen.patch
 evtchn_compat_define.patch
 less_xs_connection.patch
-
 XOP-403-usb-blue-fix.patch
