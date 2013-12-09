@@ -2,7 +2,7 @@
 # Parent 3b4d1e084bdc0fc56594a7afccafd5f68ca73c66
 
 diff --git a/Makefile.target b/Makefile.target
-index 1cf7f34..51bcf4a 100644
+index 3c3db2b..81e6661 100644
 --- a/Makefile.target
 +++ b/Makefile.target
 @@ -503,7 +503,7 @@ endif #CONFIG_BSD_USER
@@ -233,7 +233,7 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..2b5ac63
+index 0000000..e42e13c
 --- /dev/null
 +++ b/privsep.c
 @@ -0,0 +1,1149 @@
@@ -653,7 +653,7 @@ index 0000000..2b5ac63
 +}
 +
 +static void
-+set_cd_lock_state(int id, char *state)
++set_cd_lock_state(int id, const char *state)
 +{
 +    char *locked_path;
 +    if (cd_backend_areas[id]) {
@@ -713,7 +713,7 @@ index 0000000..2b5ac63
 +}
 +
 +static int
-+xenstore_vm_write(int domid, char *key, char *value)
++xenstore_vm_write(int domid, const char *key, const char *value)
 +{
 +    char *buf, *path;
 +    int rc;
@@ -822,7 +822,7 @@ index 0000000..2b5ac63
 +static void
 +open_vm_dump(void)
 +{
-+    int fd, l;
++    int fd = -1, l;
 +    char *name = NULL;
 +
 +    must_read(parent_fd, &l, sizeof(l));
@@ -946,7 +946,7 @@ index 0000000..2b5ac63
 +    return receive_file(privsep_fd, "r");
 +}
 +
-+static void _xenstore_record_dm(char *subpath, char *state)
++static void _xenstore_record_dm(const char *subpath, const char *state)
 +{
 +    char *path = NULL;
 +
@@ -997,7 +997,7 @@ index 0000000..2b5ac63
 +    free(state);
 +}
 +
-+static char *_xenstore_read_dm(char *subpath)
++static char *_xenstore_read_dm(const char *subpath)
 +{
 +    int len;
 +    char *path = NULL;
@@ -1323,7 +1323,7 @@ index 0000000..2b5ac63
 +        err(1, "cloning cd backend path %s", path);
 +}
 +
-+void privsep_record_dm(char *subpath, char *state)
++void privsep_record_dm(const char *subpath, const char *state)
 +{
 +    enum privsep_opcode cmd;
 +    size_t l;
@@ -1360,7 +1360,7 @@ index 0000000..2b5ac63
 +    return;
 +}
 +
-+char* privsep_read_dm(char *subpath)
++char* privsep_read_dm(const char *subpath)
 +{
 +    enum privsep_opcode cmd;
 +    size_t l;
@@ -1388,7 +1388,7 @@ index 0000000..2b5ac63
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..1ced0a2
+index 0000000..41de591
 --- /dev/null
 +++ b/privsep.h
 @@ -0,0 +1,20 @@
@@ -1407,9 +1407,9 @@ index 0000000..1ced0a2
 +void privsep_set_cd_backend(int id, const char *path);
 +QEMUFile* privsep_open_vm_dump(const char *name);
 +FILE* privsep_open_keymap(const char *language);
-+void privsep_record_dm(char *subpath, char *state);
++void privsep_record_dm(const char *subpath, const char *state);
 +void privsep_write_vslots(char *vslots);
-+char* privsep_read_dm(char *subpath);
++char* privsep_read_dm(const char *subpath);
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
