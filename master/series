@@ -93,7 +93,6 @@ CA-10912-silence-parallel-msg.patch
 qemu-enforce-read-only-CA-12833.patch
 qemu-sdl-geometry.patch
 acpi-wake-timer.patch
-piix4acpi-pm-compat.patch
 qemu-keymap.patch
 vnc_clipboard.patch
 vnclisten.patch
