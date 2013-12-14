@@ -1,0 +1,25 @@
+Sadly, because of a buggy attempt to revert c/s
+ce3b7ce68426ea6249bb411f26b376d459c45450 (piix4acpi, xen: change in ACPI to
+match the change in the BIOS) "for debugging purposes" an incompatibility in
+the Qemu save record went unnoticed.
+
+The result is that save-records for Boston to Clearwater advertise a piix4acpi
+record of version 2, but with the content of version 1 record.
+
+Upstream, the version_id (will hopefully) be bumped to v3, which allows us to
+maintain this hack which allows us to distinguish the save records correctly,
+yet maintain forward compatibility with any new development upstream.
+
+diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
+index ba98ecf..8250c90 100644
+--- a/hw/piix4acpi.c
++++ b/hw/piix4acpi.c
+@@ -163,7 +163,7 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
+     qemu_get_be16s(f, &s->pm1_control);
+ 
+     pm1a_evt_address_assigned = s->pm1a_evt_blk_address;
+-    if (version_id <= 1) {
++    if (version_id <= 2) {
+         /* map to old ioport instead of the new one */
+         s->pm1a_evt_blk_address = ACPI_PM1A_EVT_BLK_ADDRESS_V0;
+     } else {

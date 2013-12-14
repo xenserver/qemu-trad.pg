@@ -1,0 +1,45 @@
+qemu-traditional: Bump piix4acpi save-record version_id
+
+Sadly, because of a buggy attempt to revert c/s
+ce3b7ce68426ea6249bb411f26b376d459c45450 (piix4acpi, xen: change in ACPI to
+match the change in the BIOS) "for debugging purposes" which has remained
+present in XenServer for several releases, an incompatibility in the Qemu save
+record went unnoticed until now when I tried to clean up the patch queue.
+
+The result is that save-records for XenServer 6.0 to 6.2 advertise a piix4acpi
+record of version 2, but with the content of version 1 record.
+
+While this can of-course be fixed by us locally, reserving version_id 3
+upstream is the only way to prevent further incompatibilities if/when the
+piix4acpi object gets further development/bugfixes which require a change to
+the save-record.
+
+As part of the change, nuke the problematic version_id check in
+piix4acpi_load.  The caller qemu_loadvm_state():
+    a) already does this for us (and reports an error to stderr)
+    b) completely ignores the -EINVAL
+
+Signed-off-by: Andrew Cooper <andrew.cooper3@citrix.com>
+
+diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
+index ddbe8e0..ba98ecf 100644
+--- a/hw/piix4acpi.c
++++ b/hw/piix4acpi.c
+@@ -157,8 +157,6 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
+     int ret;
+     uint32_t pm1a_evt_address_assigned;
+ 
+-    if (version_id > 2)
+-        return -EINVAL;
+     ret = pci_device_load(&s->dev, f);
+     if (ret < 0)
+         return ret;
+@@ -778,7 +776,7 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int devfn, uint32_t smb_io_base,
+ #endif
+     register_ioport_write(ACPI_DBG_IO_ADDR, 4, 1, acpi_dbg_writeb, d);
+ 
+-    register_savevm("piix4acpi", 0, 2, piix4acpi_save, piix4acpi_load, d);
++    register_savevm("piix4acpi", 0, 3, piix4acpi_save, piix4acpi_load, d);
+ 
+     return NULL;
+ }

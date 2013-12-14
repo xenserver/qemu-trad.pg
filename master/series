@@ -22,6 +22,20 @@ qemu-trad-unstable-18a08a23da88863435d56a0b14ff72013ef3b003.patch # do not strip
 build-makefiles.patch
 
 #
+# Patches for upstream (qemu-traditional)
+#
+piix4acpi-bump-version_id.patch
+
+#
+# Non-upstreamable patches
+#
+fix-migrate-from-Boston-thru-Clearwater.patch
+
+
+######################################################################
+# Everything below this point is technical debt of one form or another
+
+#
 # reversions
 #
 revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a.patch
