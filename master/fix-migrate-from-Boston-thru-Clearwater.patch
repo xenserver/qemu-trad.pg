@@ -1,20 +1,35 @@
+Fix for migrating from XenServer 6.0 thru 6.2 to later versions.
+
 Sadly, because of a buggy attempt to revert c/s
 ce3b7ce68426ea6249bb411f26b376d459c45450 (piix4acpi, xen: change in ACPI to
-match the change in the BIOS) "for debugging purposes" an incompatibility in
-the Qemu save record went unnoticed.
+match the change in the BIOS) "for debugging purposes" which has remained
+present in XenServer for several releases, an incompatibility in the Qemu save
+record went unnoticed until now when I tried to clean up the patch queue.
 
-The result is that save-records for Boston to Clearwater advertise a piix4acpi
+The result is that save-records for XenServer 6.0 to 6.2 advertise a piix4acpi
 record of version 2, but with the content of version 1 record.
 
-Upstream, the version_id (will hopefully) be bumped to v3, which allows us to
-maintain this hack which allows us to distinguish the save records correctly,
-yet maintain forward compatibility with any new development upstream.
+The upstream version id is very unlikely to ever change in the future, as
+qemu-traditional is in deep freeze.  We bump from v2 to v3 to tell "correct"
+XenServer qemu-trad records from "incorrect" v2 ones, which are then
+interpreted as v1 records.
+
+Signed-off-by: Andrew Cooper <andrew.cooper3@citrix.com>
 
 diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
-index ba98ecf..8250c90 100644
+index ddbe8e0..19c9016 100644
 --- a/hw/piix4acpi.c
 +++ b/hw/piix4acpi.c
-@@ -163,7 +163,7 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
+@@ -157,7 +157,7 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
+     int ret;
+     uint32_t pm1a_evt_address_assigned;
+ 
+-    if (version_id > 2)
++    if (version_id > 3)
+         return -EINVAL;
+     ret = pci_device_load(&s->dev, f);
+     if (ret < 0)
+@@ -165,7 +165,7 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
      qemu_get_be16s(f, &s->pm1_control);
  
      pm1a_evt_address_assigned = s->pm1a_evt_blk_address;
@@ -23,3 +38,12 @@ index ba98ecf..8250c90 100644
          /* map to old ioport instead of the new one */
          s->pm1a_evt_blk_address = ACPI_PM1A_EVT_BLK_ADDRESS_V0;
      } else {
+@@ -778,7 +778,7 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int devfn, uint32_t smb_io_base,
+ #endif
+     register_ioport_write(ACPI_DBG_IO_ADDR, 4, 1, acpi_dbg_writeb, d);
+ 
+-    register_savevm("piix4acpi", 0, 2, piix4acpi_save, piix4acpi_load, d);
++    register_savevm("piix4acpi", 0, 3, piix4acpi_save, piix4acpi_load, d);
+ 
+     return NULL;
+ }

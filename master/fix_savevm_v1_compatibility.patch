@@ -98,13 +98,13 @@ index cacbdd2..84068a2 100644
  typedef void (*pci_set_irq_fn)(qemu_irq *pic, int irq_num, int level);
  typedef int (*pci_map_irq_fn)(PCIDevice *pci_dev, int irq_num);
 diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
-index 8250c90..2d74ec1 100644
+index 19c9016..f3108b2 100644
 --- a/hw/piix4acpi.c
 +++ b/hw/piix4acpi.c
-@@ -157,9 +157,11 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
-     int ret;
-     uint32_t pm1a_evt_address_assigned;
+@@ -159,9 +159,11 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
  
+     if (version_id > 3)
+         return -EINVAL;
 -    ret = pci_device_load(&s->dev, f);
 -    if (ret < 0)
 -        return ret;
@@ -116,7 +116,7 @@ index 8250c90..2d74ec1 100644
      qemu_get_be16s(f, &s->pm1_control);
  
      pm1a_evt_address_assigned = s->pm1a_evt_blk_address;
-@@ -777,6 +779,7 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int devfn, uint32_t smb_io_base,
+@@ -779,6 +781,7 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int devfn, uint32_t smb_io_base,
      register_ioport_write(ACPI_DBG_IO_ADDR, 4, 1, acpi_dbg_writeb, d);
  
      register_savevm("piix4acpi", 0, 3, piix4acpi_save, piix4acpi_load, d);

@@ -24,7 +24,6 @@ build-makefiles.patch
 #
 # Patches for upstream (qemu-traditional)
 #
-piix4acpi-bump-version_id.patch
 
 #
 # Non-upstreamable patches
