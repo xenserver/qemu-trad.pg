@@ -144,3 +144,4 @@ evtchn_io_old_xen.patch
 evtchn_compat_define.patch
 less_xs_connection.patch
 XOP-403-usb-blue-fix.patch
+CA-123830-reenable-O_DIRECT.patch
