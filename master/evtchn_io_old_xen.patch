@@ -1,10 +1,11 @@
 # HG changeset patch
 # Parent dd1474d4e909c8d71ad889aad0006c72548e712c
 
-diff -r dd1474d4e909 i386-dm/helper2.c
---- a/i386-dm/helper2.c	Sun Jan 20 09:07:41 2013 +0000
-+++ b/i386-dm/helper2.c	Sun Jan 20 09:25:38 2013 +0000
-@@ -113,8 +113,13 @@ int send_vcpu = 0;
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index 5118a95..3dec4db 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
+@@ -111,8 +111,13 @@ int send_vcpu = 0;
  
  //the evtchn port for polling the notification,
  evtchn_port_t *ioreq_local_port;
@@ -19,13 +20,18 @@ diff -r dd1474d4e909 i386-dm/helper2.c
  
  CPUX86State *cpu_x86_init(const char *cpu_model)
  {
-@@ -161,17 +166,17 @@ CPUX86State *cpu_x86_init(const char *cp
+@@ -159,17 +164,17 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
          }
          rc = xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_EVTCHN,
                  &bufioreq_evtchn);
 -        if (rc < 0) {
 -            fprintf(logfile, "failed to get HVM_PARAM_BUFIOREQ_EVTCHN error=%d\n",
 -                    errno);
+-            return NULL;
+-        }
+-        rc = xc_evtchn_bind_interdomain(xce_handle, domid, (uint32_t)bufioreq_evtchn);
+-        if (rc == -1) {
+-            fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
 -            return NULL;
 +        /* here we assume if Xen version does not support this event
 +         * channel and use polling
@@ -38,16 +44,11 @@ diff -r dd1474d4e909 i386-dm/helper2.c
 +            }
 +            bufioreq_local_port = rc;
          }
--        rc = xc_evtchn_bind_interdomain(xce_handle, domid, (uint32_t)bufioreq_evtchn);
--        if (rc == -1) {
--            fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
--            return NULL;
--        }
 -        bufioreq_local_port = rc;
- #ifndef CONFIG_STUBDOM
-         if (xc_evtchn_restrict(xce_handle, domid) < 0)
-             fprintf(logfile, "xc_evtchn_restrict(): %s\n", strerror(errno));
-@@ -278,7 +283,8 @@ static ioreq_t *cpu_get_ioreq(void)
+     }
+ 
+     return env;
+@@ -279,7 +284,8 @@ static ioreq_t *cpu_get_ioreq(void)
      evtchn_port_t port;
  
      port = xc_evtchn_pending(xce_handle);
@@ -57,7 +58,7 @@ diff -r dd1474d4e909 i386-dm/helper2.c
          qemu_mod_timer(buffered_io_timer,
                  BUFFER_IO_MAX_DELAY + qemu_get_clock(rt_clock));
          return NULL;
-@@ -488,7 +494,7 @@ static int __handle_buffered_iopage(CPUS
+@@ -493,7 +499,7 @@ static int __handle_buffered_iopage(CPUState *env)
      if (!buffered_io_page)
          return 0;
  
@@ -66,7 +67,7 @@ diff -r dd1474d4e909 i386-dm/helper2.c
  
      while (buffered_io_page->read_pointer !=
             buffered_io_page->write_pointer) {
-@@ -523,7 +529,8 @@ static void handle_buffered_io(void *opa
+@@ -528,7 +534,8 @@ static void handle_buffered_io(void *opaque)
  {
      CPUState *env = opaque;
  
@@ -76,7 +77,7 @@ diff -r dd1474d4e909 i386-dm/helper2.c
          qemu_mod_timer(buffered_io_timer,
                  BUFFER_IO_MAX_DELAY + qemu_get_clock(rt_clock));
      } else {
-@@ -589,6 +596,7 @@ int main_loop(void)
+@@ -594,6 +601,7 @@ int main_loop(void)
  
      buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
  				       cpu_single_env);
