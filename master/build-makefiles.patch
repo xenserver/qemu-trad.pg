@@ -85,7 +85,7 @@ index 0cce528..2bb2b51 100644
 -	$(INSTALL_PROG) $(QEMU_ROOT)/i386-dm/qemu-ifup-$(IOEMU_OS) "$(DESTDIR)/$(configdir)/qemu-ifup"
 diff --git a/mk/Makefile b/mk/Makefile
 new file mode 100644
-index 0000000..022ff1a
+index 0000000..360a84d
 --- /dev/null
 +++ b/mk/Makefile
 @@ -0,0 +1,81 @@
@@ -94,7 +94,7 @@ index 0000000..022ff1a
 +include $(B_BASE)/common.mk
 +include $(B_BASE)/rpmbuild.mk
 +
-+REPO_NAME= qemu-xen-4.3
++REPO_NAME= qemu-xen-4.4
 +RPM_BUILD_COOKIE= $(MY_OBJ_DIR)/.rpm_build_cookie
 +REPO_STAMP = $(call git_req,$(REPO_NAME))
 +REPO = $(call git_loc,$(REPO_NAME))

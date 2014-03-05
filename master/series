@@ -13,8 +13,6 @@
 #
 # Patches from upstream (qemu-traditional upstream)
 #
-qemu-trad-unstable-84411871262363200e70fa087d7b21647091a450.patch # allow build without blktap1
-qemu-trad-unstable-18a08a23da88863435d56a0b14ff72013ef3b003.patch # do not strip binaries during make install
 
 #
 # Build System
