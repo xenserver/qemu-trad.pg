@@ -23,6 +23,7 @@ build-makefiles.patch
 # Patches for upstream (qemu-traditional)
 #
 fix-cdrom-eject.patch
+smbus-nuke-eeprom.patch
 
 #
 # Non-upstreamable patches
