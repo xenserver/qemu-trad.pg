@@ -1,0 +1,288 @@
+diff --git a/Makefile.target b/Makefile.target
+index 3c3db2b..8052bfe 100644
+--- a/Makefile.target
++++ b/Makefile.target
+@@ -586,7 +586,7 @@ ifdef CONFIG_AUDIO
+ OBJS+= $(SOUND_HW) pcspk.o
+ CPPFLAGS += -DHAS_AUDIO -DHAS_AUDIO_CHOICE
+ endif
+-OBJS+= ide.o pckbd.o ps2.o vga.o dma.o
++OBJS+= ide.o pckbd.o ps2.o vga.o vgpu_fb.o dma.o
+ OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pc.o
+ OBJS+= cirrus_vga.o apic.o parallel.o acpi.o piix_pci.o
+ OBJS+= usb-uhci.o vmmouse.o vmport.o vmware_vga.o hpet.o
+diff --git a/hw/pc.c b/hw/pc.c
+index 14747d7..721baae 100644
+--- a/hw/pc.c
++++ b/hw/pc.c
+@@ -1016,6 +1016,8 @@ vga_bios_error:
+             isa_vga_init(phys_ram_base + vga_ram_addr,
+                          vga_ram_addr, vga_ram_size);
+         }
++    } else if (vgpu_enabled) {
++        vgpu_fb_init();
+     }
+ 
+ #ifdef CONFIG_PASSTHROUGH
+diff --git a/hw/pc.h b/hw/pc.h
+index e7fc65c..f4746c2 100644
+--- a/hw/pc.h
++++ b/hw/pc.h
+@@ -153,6 +153,9 @@ void pci_cirrus_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
+ void isa_cirrus_vga_init(uint8_t *vga_ram_base,
+                          ram_addr_t vga_ram_offset, int vga_ram_size);
+ 
++/* vgpu.c */
++void vgpu_fb_init(void);
++
+ /* ide.c */
+ void isa_ide_init(int iobase, int iobase2, qemu_irq irq,
+                   BlockDriverState *hd0, BlockDriverState *hd1);
+diff --git a/hw/vgpu_fb.c b/hw/vgpu_fb.c
+new file mode 100644
+index 0000000..6a27504
+--- /dev/null
++++ b/hw/vgpu_fb.c
+@@ -0,0 +1,141 @@
++#include "hw.h"
++#include "console.h"
++#include "pc.h"
++#include "pci.h"
++
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++
++#include <sys/mman.h>
++#include "sysemu.h"
++#include "qemu-xen.h"
++#include "exec-all.h"
++
++#include "qemu-timer.h"
++
++#pragma pack(1)
++
++typedef struct shared_surface {
++    uint32_t    offset;
++    uint32_t    linesize;
++    uint32_t    width;
++    uint32_t    height;
++    uint32_t    depth;
++    uint32_t    update;
++    uint16_t    port;
++} shared_surface_t;
++
++#pragma pack(0)
++
++typedef struct vgpu_fb_state {
++    DisplayState *ds;
++    shared_surface_t *shared;
++
++    uint32_t surface_offset;
++    uint32_t surface_linesize;
++    uint32_t surface_width;
++    uint32_t surface_height;
++    uint32_t surface_depth;
++    uint32_t surface_update;
++
++    uint8_t *surface_buffer;
++
++    struct sockaddr_in server;
++    int surface_fd;
++} vgpu_fb_state;
++
++#define	P2ROUNDUP(_x, _a) -(-(_x) & -(_a))
++
++static void vgpu_fb_update(void *opaque)
++{
++    vgpu_fb_state *s = (vgpu_fb_state *)opaque;
++    char buf = 'S';
++
++    sendto(s->surface_fd, &buf, 1, MSG_DONTWAIT, &s->server, sizeof (s->server));
++
++    if (s->surface_offset != s->shared->offset ||
++        s->surface_linesize != s->shared->linesize ||
++        s->surface_width != s->shared->width ||
++        s->surface_height != s->shared->height ||
++        s->surface_depth != s->shared->depth) {
++        if (s->ds->surface != NULL)
++            qemu_free_displaysurface(s->ds);
++
++        s->surface_offset = s->shared->offset;
++        s->surface_linesize = s->shared->linesize;
++        s->surface_width = s->shared->width;
++        s->surface_height = s->shared->height;
++        s->surface_depth = s->shared->depth;
++
++        fprintf(stderr, "%s: %dx%dx%d @ %x (linesize = %x)\n", __func__,
++                s->surface_width, s->surface_height, s->surface_depth,
++                s->surface_offset, s->surface_linesize);
++
++        s->ds->surface = qemu_create_displaysurface_from(s->surface_width,
++                                                         s->surface_height,
++                                                         s->surface_depth,
++                                                         s->surface_linesize,
++                                                         s->surface_buffer + s->surface_offset);
++        dpy_resize(s->ds);
++    }
++
++    if (s->surface_update != s->shared->update) {
++        s->surface_update = s->shared->update;
++
++        dpy_update(s->ds, 0, 0,
++                   s->surface_width, s->surface_height);
++    }
++}
++
++#define SURFACE_RESERVED_ADDRESS    0xff000000
++#define SURFACE_RESERVED_SIZE       0x01000000
++
++void
++vgpu_fb_init(void)
++{
++    const int n = SURFACE_RESERVED_SIZE >> TARGET_PAGE_BITS;
++    xen_pfn_t pfn[n];
++    int i;
++    vgpu_fb_state *s;
++    int fd;
++
++    s = qemu_mallocz(sizeof(vgpu_fb_state));
++    if (!s)
++        return;
++
++    s->ds = graphic_console_init(vgpu_fb_update,
++                                 NULL,
++                                 NULL,
++                                 NULL,
++                                 s);
++
++    for (i = 0; i < n; i++)
++        pfn[i] = (SURFACE_RESERVED_ADDRESS >> TARGET_PAGE_BITS) + i;
++
++    s->surface_buffer = xc_map_foreign_pages(xc_handle, domid,
++                                             PROT_READ | PROT_WRITE,
++                                             pfn, n);
++    if (s->surface_buffer == NULL) {
++        fprintf(stderr, "mmap failed\n");
++        exit(1);
++    }
++
++    s->shared = (shared_surface_t *)(s->surface_buffer +
++                                     SURFACE_RESERVED_SIZE -
++                                     TARGET_PAGE_SIZE);
++
++    fprintf(stderr, "vgpu: port = %u\n", s->shared->port);
++
++    fd = socket(AF_INET, SOCK_DGRAM, 0);
++    if (fd < 0) {
++        fprintf(stderr, "socket failed\n");
++        exit(1);
++    }
++
++    s->surface_fd = fd;
++
++    s->server.sin_family = AF_INET;
++    s->server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++    s->server.sin_port = htons(s->shared->port);
++}
+diff --git a/sysemu.h b/sysemu.h
+index 9cbde66..de2deba 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -87,6 +87,7 @@ extern int bios_size;
+ extern int cirrus_vga_enabled;
+ extern int std_vga_enabled;
+ extern int vmsvga_enabled;
++extern int vgpu_enabled;
+ extern int gfx_passthru;
+ extern int graphic_width;
+ extern int graphic_height;
+diff --git a/vl.c b/vl.c
+index 6a4513b..adb7571 100644
+--- a/vl.c
++++ b/vl.c
+@@ -217,6 +217,7 @@ static int rtc_date_offset = -1; /* -1 means no change */
+ int cirrus_vga_enabled = 1;
+ int std_vga_enabled = 0;
+ int vmsvga_enabled = 0;
++int vgpu_enabled = 0;
+ int gfx_passthru = 0;
+ #ifdef TARGET_SPARC
+ int graphic_width = 1024;
+@@ -4088,7 +4089,7 @@ static void help(int exitcode)
+            "-disable-opengl disable OpenGL rendering, using SDL"
+ #endif
+            "-portrait       rotate graphical output 90 deg left (only PXA LCD)\n"
+-           "-vga [std|cirrus|vmware|passthrough|none]\n"
++           "-vga [std|cirrus|vmware|passthrough|vgpu|none]\n"
+            "                select video card type\n"
+            "-full-screen    start in full screen\n"
+ #if defined(TARGET_PPC) || defined(TARGET_SPARC)
+@@ -4227,6 +4228,7 @@ static void help(int exitcode)
+            "-pciemulation       name:vendorid:deviceid:command:status:revision:classcode:headertype:subvendorid:subsystemid:interruputline:interruputpin\n"
+            "-vncunused      bind the VNC server to an unused port\n"
+            "-std-vga        alias for -vga std\n"
++           "-vgpu        alias for -vga vgpu\n"
+ 	   "\n"
+            "During emulation, the following keys are useful:\n"
+            "ctrl-alt-f      toggle full screen\n"
+@@ -4323,6 +4325,7 @@ enum {
+     QEMU_OPTION_vnclisten,
+     QEMU_OPTION_videoram,
+     QEMU_OPTION_std_vga,
++    QEMU_OPTION_vgpu,
+     QEMU_OPTION_domid,
+     QEMU_OPTION_domainname,
+     QEMU_OPTION_acpi,
+@@ -4493,6 +4496,7 @@ static const QEMUOption qemu_options[] = {
+ 
+     /* Xen tree options: */
+     { "std-vga", 0, QEMU_OPTION_std_vga },
++    { "vgpu", 0, QEMU_OPTION_vgpu },
+     { "videoram", HAS_ARG, QEMU_OPTION_videoram },
+     { "d", HAS_ARG, QEMU_OPTION_domid }, /* deprecated; for xend compatibility */
+     { "domid", HAS_ARG, QEMU_OPTION_domid },
+@@ -4673,23 +4677,33 @@ static void select_vgahw (const char *p)
+         std_vga_enabled = 1;
+         cirrus_vga_enabled = 0;
+         vmsvga_enabled = 0;
++        vgpu_enabled = 0;
+     } else if (strstart(p, "cirrus", &opts)) {
+         cirrus_vga_enabled = 1;
+         std_vga_enabled = 0;
+         vmsvga_enabled = 0;
++        vgpu_enabled = 0;
+     } else if (strstart(p, "vmware", &opts)) {
+         cirrus_vga_enabled = 0;
+         std_vga_enabled = 0;
+         vmsvga_enabled = 1;
++        vgpu_enabled = 0;
+     } else if (strstart(p, "passthrough", &opts)) {
+         cirrus_vga_enabled = 0;
+         std_vga_enabled = 0;
+         vmsvga_enabled = 0;
+         gfx_passthru = 1;
++        vgpu_enabled = 0;
++    } else if (strstart(p, "vgpu", &opts)) {
++        cirrus_vga_enabled = 0;
++        std_vga_enabled = 0;
++        vmsvga_enabled = 0;
++        vgpu_enabled = 1;
+     } else if (strstart(p, "none", &opts)) {
+         cirrus_vga_enabled = 0;
+         std_vga_enabled = 0;
+         vmsvga_enabled = 0;
++        vgpu_enabled = 0;
+     } else {
+     invalid_vga:
+         fprintf(stderr, "Unknown vga type: %s\n", p);
+@@ -5451,6 +5465,9 @@ geometry_error:
+             case QEMU_OPTION_std_vga:
+                 select_vgahw("std");
+                 break;
++            case QEMU_OPTION_vgpu:
++                select_vgahw("vgpu");
++                break;
+             case QEMU_OPTION_disable_opengl:
+                 opengl_enabled = 0;
+                 break;
