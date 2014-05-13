@@ -1,0 +1,15 @@
+# HG changeset patch
+# Parent 0a8786d3668785d24dab3936240da5cb9cb43ce1
+
+diff -r 0a8786d36687 hw/usb-uhci.c
+--- a/hw/usb-uhci.c	Tue May 13 14:11:55 2014 +0100
++++ b/hw/usb-uhci.c	Tue May 13 14:14:18 2014 +0100
+@@ -63,7 +63,7 @@
+ #define UHCI_PORT_CSC   (1 << 1)
+ #define UHCI_PORT_CCS   (1 << 0)
+ 
+-#define FRAME_TIMER_FREQ 1000
++#define FRAME_TIMER_FREQ 100
+ 
+ #define FRAME_MAX_LOOPS  100
+ 
