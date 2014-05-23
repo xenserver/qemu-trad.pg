@@ -1,0 +1,141 @@
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 807e26c..235fc16 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -3358,7 +3358,7 @@ static void cirrus_pci_mmio_map(PCIDevice *d, int region_num,
+ 				 s->cirrus_mmio_io_addr);
+ }
+ 
+-void pci_cirrus_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
++void pci_cirrus_vga_init(PCIBus *bus, int devfn, uint8_t *vga_ram_base,
+                          ram_addr_t vga_ram_offset, int vga_ram_size)
+ {
+     PCICirrusVGAState *d;
+@@ -3371,7 +3371,7 @@ void pci_cirrus_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
+     /* setup PCI configuration registers */
+     d = (PCICirrusVGAState *)pci_register_device(bus, "Cirrus VGA",
+                                                  sizeof(PCICirrusVGAState),
+-                                                 -1, NULL, NULL);
++                                                 devfn, NULL, NULL);
+     pci_conf = d->dev.config;
+     pci_config_set_vendor_id(pci_conf, PCI_VENDOR_ID_CIRRUS);
+     pci_config_set_device_id(pci_conf, device_id);
+diff --git a/hw/pc.c b/hw/pc.c
+index 721baae..1b4bc8e 100644
+--- a/hw/pc.c
++++ b/hw/pc.c
+@@ -993,7 +993,7 @@ vga_bios_error:
+ 
+     if (cirrus_vga_enabled) {
+         if (pci_enabled) {
+-            pci_cirrus_vga_init(pci_bus,
++	    pci_cirrus_vga_init(pci_bus, piix3_devfn + 8,
+                                 phys_ram_base + vga_ram_addr,
+                                 vga_ram_addr, vga_ram_size);
+         } else {
+@@ -1003,14 +1003,16 @@ vga_bios_error:
+ #ifndef CONFIG_DM
+     } else if (vmsvga_enabled) {
+         if (pci_enabled)
+-            pci_vmsvga_init(pci_bus, phys_ram_base + vga_ram_addr,
++	    pci_vmsvga_init(pci_bus,
++			    phys_ram_base + vga_ram_addr,
+                             vga_ram_addr, vga_ram_size);
+         else
+             fprintf(stderr, "%s: vmware_vga: no PCI bus\n", __FUNCTION__);
+ #endif
+     } else if (std_vga_enabled) {
+         if (pci_enabled) {
+-            pci_vga_init(pci_bus, phys_ram_base + vga_ram_addr,
++	    pci_vga_init(pci_bus, piix3_devfn + 8,
++			 phys_ram_base + vga_ram_addr,
+                          vga_ram_addr, vga_ram_size, 0, 0);
+         } else {
+             isa_vga_init(phys_ram_base + vga_ram_addr,
+@@ -1058,7 +1060,7 @@ vga_bios_error:
+     if (pci_enabled) {
+         disable_pf = xenstore_parse_disable_pf_config();
+         if (disable_pf != 1) {
+-            pci_xen_platform_init(pci_bus);
++	    pci_xen_platform_init(pci_bus, piix3_devfn + (2*8));
+             platform_fixed_ioport_init();
+         }
+     }
+diff --git a/hw/pc.h b/hw/pc.h
+index f4746c2..39466e2 100644
+--- a/hw/pc.h
++++ b/hw/pc.h
+@@ -139,7 +139,7 @@ extern enum vga_retrace_method vga_retrace_method;
+ 
+ int isa_vga_init(uint8_t *vga_ram_base,
+                  unsigned long vga_ram_offset, int vga_ram_size);
+-int pci_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
++int pci_vga_init(PCIBus *bus, int devfn, uint8_t *vga_ram_base,
+                  unsigned long vga_ram_offset, int vga_ram_size,
+                  unsigned long vga_bios_offset, int vga_bios_size);
+ int isa_vga_mm_init(uint8_t *vga_ram_base,
+@@ -148,7 +148,7 @@ int isa_vga_mm_init(uint8_t *vga_ram_base,
+                     int it_shift);
+ 
+ /* cirrus_vga.c */
+-void pci_cirrus_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
++void pci_cirrus_vga_init(PCIBus *bus, int devfn, uint8_t *vga_ram_base,
+                          ram_addr_t vga_ram_offset, int vga_ram_size);
+ void isa_cirrus_vga_init(uint8_t *vga_ram_base,
+                          ram_addr_t vga_ram_offset, int vga_ram_size);
+diff --git a/hw/vga.c b/hw/vga.c
+index fed2c54..3c5fef7 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -2690,7 +2690,7 @@ static void pci_vga_write_config(PCIDevice *d,
+     vga_dirty_log_start(s);
+ }
+ 
+-int pci_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
++int pci_vga_init(PCIBus *bus, int devfn, uint8_t *vga_ram_base,
+                  unsigned long vga_ram_offset, int vga_ram_size,
+                  unsigned long vga_bios_offset, int vga_bios_size)
+ {
+@@ -2700,7 +2700,7 @@ int pci_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
+ 
+     d = (PCIVGAState *)pci_register_device(bus, "VGA",
+                                            sizeof(PCIVGAState),
+-                                           -1, NULL, pci_vga_write_config);
++                                           devfn, NULL, pci_vga_write_config);
+     if (!d)
+         return -1;
+     s = &d->vga_state;
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index 30f3544..990e0df 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
+@@ -564,14 +564,14 @@ static int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
+     return 0;
+ }
+ 
+-void pci_xen_platform_init(PCIBus *bus)
++void pci_xen_platform_init(PCIBus *bus, int devfn)
+ {
+     PCIXenPlatformState *d;
+     struct pci_config_header *pch;
+ 
+     printf("Register xen platform.\n");
+     d = (PCIXenPlatformState *)pci_register_device(
+-        bus, "xen-platform", sizeof(PCIXenPlatformState), -1, NULL, NULL);
++        bus, "xen-platform", sizeof(PCIXenPlatformState), devfn, NULL, NULL);
+     pch = (struct pci_config_header *)d->pci_dev.config;
+ 
+     xenstore_parse_pf_config(pch);
+diff --git a/hw/xen_platform.h b/hw/xen_platform.h
+index 33af766..be24dae 100644
+--- a/hw/xen_platform.h
++++ b/hw/xen_platform.h
+@@ -3,7 +3,7 @@
+ 
+ #include "pci.h"
+ 
+-void pci_xen_platform_init(PCIBus *bus);
++void pci_xen_platform_init(PCIBus *bus, int devfn);
+ void platform_fixed_ioport_init(void);
+ 
+ #endif
