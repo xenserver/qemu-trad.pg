@@ -146,3 +146,4 @@ decrease-usb-frame-frequency.patch
 vgpu.patch
 fixed-devfn.patch
 vnc-dynamically-alloc-dirty-buffers.patch
+syslog_support.patch
