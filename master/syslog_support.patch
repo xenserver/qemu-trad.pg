@@ -1,0 +1,252 @@
+diff --git a/configure b/configure
+index 0de6ea8..2e1f948 100755
+--- a/configure
++++ b/configure
+@@ -160,6 +160,7 @@ EXESUF=""
+ gdbstub="no"
+ slirp="yes"
+ vde="yes"
++syslog="yes"
+ fmod_lib=""
+ fmod_inc=""
+ oss_lib=""
+@@ -394,6 +395,8 @@ for opt do
+   ;;
+   --disable-vde) vde="no"
+   ;;
++  --disable-syslog) syslog="no"
++  ;;
+   --disable-kqemu) kqemu="no"
+   ;;
+   --disable-brlapi) brlapi="no"
+@@ -566,6 +569,7 @@ echo "  --oss-lib                path to OSS library"
+ echo "  --enable-uname-release=R Return R for uname -r in usermode emulation"
+ echo "  --sparc_cpu=V            Build qemu for Sparc architecture v7, v8, v8plus, v8plusa, v9"
+ echo "  --disable-vde            disable support for vde network"
++echo "  --disable-syslog         disable support to output to syslog"
+ echo "  --disable-aio            disable AIO support"
+ echo "  --disable-blobs          disable installing provided firmware blobs"
+ echo "  --kerneldir=PATH         look for kernel includes in PATH"
+@@ -1164,6 +1168,7 @@ echo "Documentation     $build_docs"
+ echo "uname -r          $uname_release"
+ echo "NPTL support      $nptl"
+ echo "vde support       $vde"
++echo "syslog support    $syslog"
+ echo "AIO support       $aio"
+ echo "Install blobs     $blobs"
+ echo "KVM support       $kvm"
+@@ -1368,6 +1373,9 @@ if test "$vde" = "yes" ; then
+   echo "#define CONFIG_VDE 1" >> $config_h
+   echo "VDE_LIBS=-lvdeplug" >> $config_mak
+ fi
++if test "$syslog" = "yes" ; then
++  echo "#define CONFIG_SYSLOG 1" >> $config_h
++fi
+ if ! test -z "$audio_card_list"; then
+ 	echo "CONFIG_AUDIO=yes" >> $config_mak
+ fi
+diff --git a/hw/xen_backend.h b/hw/xen_backend.h
+index b63a235..8d1263d 100644
+--- a/hw/xen_backend.h
++++ b/hw/xen_backend.h
+@@ -83,7 +83,7 @@ int xen_be_bind_evtchn(struct XenDevice *xendev);
+ void xen_be_unbind_evtchn(struct XenDevice *xendev);
+ int xen_be_send_notify(struct XenDevice *xendev);
+ void xen_be_printf(struct XenDevice *xendev, int msg_level, const char *fmt, ...)
+-    __attribute__ ((format(printf, 3, 4)));
++    __attribute__ ((format(__printf__, 3, 4)));
+ 
+ /* actual backend drivers */
+ extern struct XenDevOps xen_console_ops;      /* xen_console.c     */
+diff --git a/qemu-common.h b/qemu-common.h
+index 50dfb6b..9332395 100644
+--- a/qemu-common.h
++++ b/qemu-common.h
+@@ -209,4 +209,19 @@ void qemu_iovec_from_buffer(QEMUIOVector *qiov, const void *buf, size_t count);
+ 
+ #endif /* dyngen-exec.h hack */
+ 
++/*
++ * Redirect calls to output to internal functions to be able
++ * to redirect output to syslog directly
++ */
++#ifdef CONFIG_SYSLOG
++int out_printf(const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 1, 2)));
++#define printf out_printf
++int file_printf(FILE*, const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 2, 3)));
++#define fprintf file_printf
++int file_vprintf(FILE*, const char *fmt, va_list ap)  __attribute__ ((__format__ (__printf__, 2, 0)));
++#define vfprintf file_vprintf
++void log_perror(const char *s);
++#define perror log_perror
++#endif
++
+ #endif
+diff --git a/readline.c b/readline.c
+index 8572841..4294af9 100644
+--- a/readline.c
++++ b/readline.c
+@@ -32,6 +32,7 @@
+ #define IS_ESC  1
+ #define IS_CSI  2
+ 
++#undef printf
+ #define printf do_not_use_printf
+ 
+ static char term_cmd_buf[TERM_CMD_BUF_SIZE + 1];
+diff --git a/vl.c b/vl.c
+index a587153..c6713cc 100644
+--- a/vl.c
++++ b/vl.c
+@@ -123,6 +123,10 @@
+ #endif
+ #endif
+ 
++#ifdef CONFIG_SYSLOG
++#include <syslog.h>
++#endif
++
+ #include "qemu_socket.h"
+ 
+ #if defined(CONFIG_SLIRP)
+@@ -4365,6 +4369,9 @@ enum {
+     QEMU_OPTION_runas,
+     QEMU_OPTION_crashdump_dir,
+     QEMU_OPTION_crashdump_quota,
++#ifdef CONFIG_SYSLOG
++    QEMU_OPTION_syslog,
++#endif
+ };
+ 
+ typedef struct QEMUOption {
+@@ -4373,6 +4380,11 @@ typedef struct QEMUOption {
+     int index;
+ } QEMUOption;
+ 
++#ifdef CONFIG_SYSLOG
++static const char syslog_option[] = "syslog";
++static int use_syslog = 0;
++#endif
++
+ static const QEMUOption qemu_options[] = {
+     /* Please keep in synch with help, QEMU_OPTION_ enums, and
+        qemu-doc.texi */
+@@ -4521,6 +4533,9 @@ static const QEMUOption qemu_options[] = {
+     { "runas", HAS_ARG, QEMU_OPTION_runas },
+     { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
+     { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
++#ifdef CONFIG_SYSLOG
++    { syslog_option, 0, QEMU_OPTION_syslog },
++#endif
+     { NULL },
+ };
+ 
+@@ -4876,9 +4891,37 @@ int main(int argc, char **argv, char **envp)
+     const char *run_as = NULL;
+     char *crashdump_dir = NULL;
+     long long crashdump_quota = 0;
+-    qemu_cache_utils_init(envp);
++
+     logfile = stderr; /* initial value */
+ 
++#ifdef CONFIG_SYSLOG
++    /* --syslog option must be read ASAP */
++    for (optind = 1; optind < argc; ++optind) {
++        r = argv[optind];
++        if (r[0] != '-')
++            continue;
++
++        /* Treat --foo the same as -foo.  */
++        if (r[1] == '-')
++            r++;
++        if (strcmp(syslog_option, r + 1) != 0)
++            continue;
++
++        use_syslog = 1;
++
++        openlog(argv[0], LOG_PID, LOG_DAEMON);
++
++        fd = open("/dev/null", O_RDWR);
++        if (fd < 0) return 1;
++        dup2(fd, 1);
++        dup2(fd, 2);
++        close(fd);
++        fd = 0;
++    }
++#endif
++
++    qemu_cache_utils_init(envp);
++
+ #if !defined(__sun__) && !defined(CONFIG_STUBDOM)
+     struct rlimit rl;
+     /* Maximise rlimits. Needed where default constraints are tight (*BSD). */
+@@ -6265,3 +6308,69 @@ geometry_error:
+ 
+     return 0;
+ }
++
++#ifdef CONFIG_SYSLOG
++
++#undef fprintf
++#undef printf
++#undef vfprintf
++#undef log_perror
++
++int file_vprintf(FILE *f, const char *fmt, va_list ap)
++{
++    if (use_syslog && (f == stdout || f == stderr)) {
++        vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
++        /* just return a value to make every caller happy */
++        return 10;
++    }
++
++    return vfprintf(f, fmt, ap);
++}
++
++void log_perror(const char *s)
++{
++    if (!use_syslog) {
++        perror(s);
++        return;
++    }
++
++    char errbuf[256];
++    int err = errno;
++
++    errno = 0;
++    strerror_r(err, errbuf, sizeof(errbuf));
++    if (errno != 0)
++       return;
++
++    if (s && *s)
++        syslog(LOG_DAEMON|LOG_INFO, "%s: %s", s, errbuf);
++    else
++        syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
++}
++
++int out_printf(const char *fmt, ...)
++{
++    va_list ap;
++    int res;
++
++    va_start(ap, fmt);
++    res = file_vprintf(stdout, fmt, ap);
++    va_end(ap);
++
++    return res;
++}
++
++int file_printf(FILE* f, const char *fmt, ...)
++{
++    va_list ap;
++    int res;
++
++    va_start(ap, fmt);
++    res = file_vprintf(f, fmt, ap);
++    va_end(ap);
++
++    return res;
++}
++
++#endif
++
