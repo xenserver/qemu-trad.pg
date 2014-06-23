@@ -1,0 +1,21 @@
+name2keysym_constant.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+Make vnc name2keysym constant
+
+Array is not used for writing. This save space at run time.
+
+diff --git a/vnc_keysym.h b/vnc_keysym.h
+index 2f47365..ce355d8 100644
+--- a/vnc_keysym.h
++++ b/vnc_keysym.h
+@@ -2,7 +2,7 @@ typedef struct {
+ 	const char* name;
+ 	int keysym;
+ } name2keysym_t;
+-static name2keysym_t name2keysym[]={
++static const name2keysym_t name2keysym[]={
+ /* ascii */
+     { "space",                0x020},
+     { "exclam",               0x021},
