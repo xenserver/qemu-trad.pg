@@ -33,9 +33,14 @@ diff -r ab1e0817ce4f hw/xen_platform.c
                             PCI_ADDRESS_SPACE_IO, platform_ioport_map);
  
 diff -r ab1e0817ce4f qemu-xen.h
---- a/qemu-xen.h	Tue Aug 07 09:55:36 2012 +0100
-+++ b/qemu-xen.h	Tue Aug 07 09:55:45 2012 +0100
-@@ -67,6 +67,7 @@ void xenstore_init(void);
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -63,10 +63,12 @@ void handle_buffered_pio(void);
+ #endif
+ 
+ /* xenstore.c */
++struct pci_config_header;
+ void xenstore_init(void);
  uint32_t xenstore_read_target(void);
  void xenstore_parse_domain_config(int domid);
  int xenstore_parse_disable_pf_config(void);
@@ -44,9 +49,9 @@ diff -r ab1e0817ce4f qemu-xen.h
  void xenstore_process_event(void *opaque);
  void xenstore_record_dm(const char *subpath, const char *state);
 diff -r ab1e0817ce4f xenstore.c
---- a/xenstore.c	Tue Aug 07 09:55:36 2012 +0100
-+++ b/xenstore.c	Tue Aug 07 09:55:45 2012 +0100
-@@ -789,6 +789,61 @@ int xenstore_parse_disable_pf_config ()
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -792,6 +792,61 @@ int xenstore_parse_disable_pf_config ()
      return disable_pf;
  }
  

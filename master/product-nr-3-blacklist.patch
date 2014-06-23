@@ -22,10 +22,11 @@ we workaround this by ignoring build numbers below 256.
 
 Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
 
-diff -r 67dca6cd3fe4 xenstore.c
---- a/xenstore.c	Tue Sep 25 13:47:11 2012 +0100
-+++ b/xenstore.c	Tue Sep 25 16:11:23 2012 +0100
-@@ -789,6 +789,9 @@ int xenstore_parse_disable_pf_config ()
+diff --git a/xenstore.c b/xenstore.c
+index 9ff651f..000e0d7 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -792,6 +792,9 @@ int xenstore_parse_disable_pf_config ()
      return disable_pf;
  }
  
@@ -35,7 +36,7 @@ diff -r 67dca6cd3fe4 xenstore.c
  void xenstore_parse_pf_config(struct pci_config_header *pch)
  {
      char *node, *val;
-@@ -814,7 +817,7 @@ void xenstore_parse_pf_config(struct pci
+@@ -817,7 +820,7 @@ void xenstore_parse_pf_config(struct pci_config_header *pch)
          }
          free(node);
          if ( val == NULL )
@@ -44,7 +45,7 @@ diff -r 67dca6cd3fe4 xenstore.c
      }
  
      pch->subsystem_id = pch->device_id;
-@@ -842,6 +845,13 @@ void xenstore_parse_pf_config(struct pci
+@@ -845,6 +848,13 @@ void xenstore_parse_pf_config(struct pci_config_header *pch)
          }
          free(node);
      }
@@ -58,19 +59,19 @@ diff -r 67dca6cd3fe4 xenstore.c
  }
  
  int xenstore_fd(void)
-@@ -1011,11 +1021,8 @@ int
+@@ -1014,11 +1024,6 @@ int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
  {
 -    char *buf = NULL;
 -    char *tmp;
-     const char *product;
- 
+-    const char *product;
+-
 -    switch (product_nr) {
      /*
       * In qemu-xen-unstable, this is the master registry of product
       * numbers.  If you need a new product number allocating, please
-@@ -1029,23 +1036,51 @@ xenstore_pv_driver_build_blacklisted(uin
+@@ -1032,23 +1037,52 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
       * During development, you may use the product ID 0xffff to
       * indicate a driver which is yet to be released.
       */
@@ -84,6 +85,7 @@ diff -r 67dca6cd3fe4 xenstore.c
 +    case 0xffff: {
 +        char *buf = NULL;
 +        char *tmp;
++        const char *product = NULL;
 +
 +        switch (product_nr) {
 +        case 1: product = "xensource-windows";  break; /* Citrix */
@@ -91,7 +93,7 @@ diff -r 67dca6cd3fe4 xenstore.c
 +        case 0xffff: product = "experimental";  break;
 +        }
 +
-+        if (asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) < 0)
++        if (product == NULL || asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) < 0)
 +            return 0;
 +        tmp = xs_read(xsh, XBT_NULL, buf, NULL);
 +        free(tmp);
