@@ -58,6 +58,18 @@ index b63a235..8d1263d 100644
  
  /* actual backend drivers */
  extern struct XenDevOps xen_console_ops;      /* xen_console.c     */
+diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
+index aa4cacf..961df5a 100644
+--- a/mk/xen-device-model.spec.in
++++ b/mk/xen-device-model.spec.in
+@@ -8,6 +8,7 @@ Source0: xen-device-model-%{version}.tar.bz2
+ Patch0: xen-device-model-development.patch
+ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+ BuildRequires: SDL-devel, zlib-devel, xen-devel, xen-dom0-devel, ncurses-devel, pciutils-devel
++Provides: qemu-xen(syslog) = 1
+ 
+ %description
+ This package contains qemu-dm, the Xen device model.
 diff --git a/qemu-common.h b/qemu-common.h
 index 50dfb6b..9332395 100644
 --- a/qemu-common.h
