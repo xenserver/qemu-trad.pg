@@ -1,0 +1,200 @@
+ioport_memory.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+Reduce memory required to allocate ioports.
+To store ioport information some very huge (3.5 MB) static arrays where
+used. Although can be far these arrays consume a lot of memory.
+Using a tree help saving memory.
+New Qemu upstream use a structure which is much more complicated.
+
+diff --git a/vl.c b/vl.c
+index 0594dce..239d45c 100644
+--- a/vl.c
++++ b/vl.c
+@@ -60,6 +60,7 @@
+ #include <sys/time.h>
+ #include <zlib.h>
+ #include <err.h>
++#include <assert.h>
+ 
+ #ifndef _WIN32
+ #include <pwd.h>
+@@ -194,11 +195,29 @@ int main(int argc, char **argv)
+ /* XXX: use a two level table to limit memory usage */
+ #define MAX_IOPORTS 65536
+ 
++#undef  OLD_IOPORT
++//#define OLD_IOPORT 1
++
+ const char *bios_dir = CONFIG_QEMU_SHAREDIR;
+ const char *bios_name = NULL;
++
++#ifdef OLD_IOPORT
+ static void *ioport_opaque[MAX_IOPORTS];
+ static IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
+ static IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
++#endif
++
++typedef struct ioport_data {
++	IOPortReadFunc *read_table[3];
++	IOPortWriteFunc *write_table[3];
++	void *opaque;
++	void *res; // to align structure
++} ioport_data_t;
++#define IOPORT_PAGESIZE 4096u
++#define IOPORT_PAGE_ENTRIES (IOPORT_PAGESIZE/sizeof(ioport_data_t))
++#define IOPORT_NUM_PAGES (((MAX_IOPORTS-1)/IOPORT_PAGE_ENTRIES)+1)
++static ioport_data_t* ioport_table[IOPORT_NUM_PAGES];
++
+ /* Note: drives_table[MAX_DRIVES] is a dummy block driver if none available
+    to store the VM snapshots */
+ DriveInfo drives_table[MAX_DRIVES+1];
+@@ -296,8 +315,54 @@ PicState2 *isa_pic;
+ static IOPortReadFunc default_ioport_readb, default_ioport_readw, default_ioport_readl;
+ static IOPortWriteFunc default_ioport_writeb, default_ioport_writew, default_ioport_writel;
+ 
++static const ioport_data_t default_ioport = {
++    { default_ioport_readb, default_ioport_readw, default_ioport_readl },
++    { default_ioport_writeb, default_ioport_writew, default_ioport_writel }
++};
++
++static ioport_data_t* ioport_create_page(void)
++{
++#ifndef NDEBUG
++    static unsigned allocated = 0;
++    log_printf("allocated %u ports for ioports\n", ++allocated);
++#endif
++
++    unsigned n;
++    ioport_data_t* data = qemu_malloc(IOPORT_PAGESIZE);
++
++    for (n = 0; n < IOPORT_PAGE_ENTRIES; ++n)
++        data[n] = default_ioport;
++
++    return data;
++}
++
++static inline const ioport_data_t *get_ioport(int address)
++{
++    ioport_data_t *page;
++
++    assert(address >= 0 && address < MAX_IOPORTS);
++    page = ioport_table[address / IOPORT_PAGE_ENTRIES];
++    if (page)
++        return &page[address % IOPORT_PAGE_ENTRIES];
++    return &default_ioport;
++}
++
++static ioport_data_t *get_ioport_alloc(int address)
++{
++    ioport_data_t *page;
++
++    assert(address >= 0 && address < MAX_IOPORTS);
++    page = ioport_table[address / IOPORT_PAGE_ENTRIES];
++    if (!page)
++        ioport_table[address / IOPORT_PAGE_ENTRIES] = page = ioport_create_page();
++    return &page[address % IOPORT_PAGE_ENTRIES];
++}
++
++
+ static uint32_t ioport_read(int index, uint32_t address)
+ {
++    const ioport_data_t *port = get_ioport(address);
++#ifdef OLD_IOPORT
+     static IOPortReadFunc *default_func[3] = {
+         default_ioport_readb,
+         default_ioport_readw,
+@@ -306,11 +371,18 @@ static uint32_t ioport_read(int index, uint32_t address)
+     IOPortReadFunc *func = ioport_read_table[index][address];
+     if (!func)
+         func = default_func[index];
++    assert(func == port->read_table[index]);
++    assert(ioport_opaque[address] == port->opaque);
+     return func(ioport_opaque[address], address);
++#else
++    return port->read_table[index](port->opaque, address);
++#endif
+ }
+ 
+ static void ioport_write(int index, uint32_t address, uint32_t data)
+ {
++    const ioport_data_t *port = get_ioport(address);
++#ifdef OLD_IOPORT
+     static IOPortWriteFunc *default_func[3] = {
+         default_ioport_writeb,
+         default_ioport_writew,
+@@ -319,7 +391,12 @@ static void ioport_write(int index, uint32_t address, uint32_t data)
+     IOPortWriteFunc *func = ioport_write_table[index][address];
+     if (!func)
+         func = default_func[index];
++    assert(func == port->write_table[index]);
++    assert(ioport_opaque[address] == port->opaque);
+     func(ioport_opaque[address], address, data);
++#else
++    port->write_table[index](port->opaque, address, data);
++#endif
+ }
+ 
+ static uint32_t default_ioport_readb(void *opaque, uint32_t address)
+@@ -386,10 +463,19 @@ int register_ioport_read(int start, int length, int size,
+         return -1;
+     }
+     for(i = start; i < start + length; i += size) {
++        ioport_data_t *data = get_ioport_alloc(i);
++
++        data->read_table[bsize] = func;
++        if (data->opaque != NULL && data->opaque != opaque)
++            hw_error("register_ioport_read: invalid opaque");
++        data->opaque = opaque;
++
++#ifdef OLD_IOPORT
+         ioport_read_table[bsize][i] = func;
+         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
+             hw_error("register_ioport_read: invalid opaque");
+         ioport_opaque[i] = opaque;
++#endif
+     }
+     return 0;
+ }
+@@ -411,10 +497,19 @@ int register_ioport_write(int start, int length, int size,
+         return -1;
+     }
+     for(i = start; i < start + length; i += size) {
++        ioport_data_t *data = get_ioport_alloc(i);
++
++        data->write_table[bsize] = func;
++        if (data->opaque != NULL && data->opaque != opaque)
++            hw_error("register_ioport_read: invalid opaque");
++        data->opaque = opaque;
++
++#ifdef OLD_IOPORT
+         ioport_write_table[bsize][i] = func;
+         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
+             hw_error("register_ioport_write: invalid opaque");
+         ioport_opaque[i] = opaque;
++#endif
+     }
+     return 0;
+ }
+@@ -424,6 +519,12 @@ void isa_unassign_ioport(int start, int length)
+     int i;
+ 
+     for(i = start; i < start + length; i++) {
++        // TODO do not alloc if not required
++        ioport_data_t *data = get_ioport_alloc(i);
++
++        *data = default_ioport;
++
++#ifdef OLD_IOPORT
+         ioport_read_table[0][i] = default_ioport_readb;
+         ioport_read_table[1][i] = default_ioport_readw;
+         ioport_read_table[2][i] = default_ioport_readl;
+@@ -433,6 +534,7 @@ void isa_unassign_ioport(int start, int length)
+         ioport_write_table[2][i] = default_ioport_writel;
+ 
+         ioport_opaque[i] = NULL;
++#endif
+     }
+ }
+ 
