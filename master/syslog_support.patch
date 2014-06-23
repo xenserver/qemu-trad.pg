@@ -1,5 +1,12 @@
+syslog_support.patch
+
+Add syslog support for error reporting
+
+Add support for --syslog to redirect all output to syslog instead of
+stdout/stderr.
+
 diff --git a/configure b/configure
-index 0de6ea8..2e1f948 100755
+index 215d9b7..bb545cd 100755
 --- a/configure
 +++ b/configure
 @@ -160,6 +160,7 @@ EXESUF=""
@@ -27,7 +34,7 @@ index 0de6ea8..2e1f948 100755
  echo "  --disable-aio            disable AIO support"
  echo "  --disable-blobs          disable installing provided firmware blobs"
  echo "  --kerneldir=PATH         look for kernel includes in PATH"
-@@ -1164,6 +1168,7 @@ echo "Documentation     $build_docs"
+@@ -1179,6 +1183,7 @@ echo "Documentation     $build_docs"
  echo "uname -r          $uname_release"
  echo "NPTL support      $nptl"
  echo "vde support       $vde"
@@ -35,7 +42,7 @@ index 0de6ea8..2e1f948 100755
  echo "AIO support       $aio"
  echo "Install blobs     $blobs"
  echo "KVM support       $kvm"
-@@ -1368,6 +1373,9 @@ if test "$vde" = "yes" ; then
+@@ -1383,6 +1388,9 @@ if test "$vde" = "yes" ; then
    echo "#define CONFIG_VDE 1" >> $config_h
    echo "VDE_LIBS=-lvdeplug" >> $config_mak
  fi
@@ -83,12 +90,12 @@ index 50dfb6b..9332395 100644
 + * to redirect output to syslog directly
 + */
 +#ifdef CONFIG_SYSLOG
-+int out_printf(const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 1, 2)));
-+#define printf out_printf
-+int file_printf(FILE*, const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 2, 3)));
-+#define fprintf file_printf
-+int file_vprintf(FILE*, const char *fmt, va_list ap)  __attribute__ ((__format__ (__printf__, 2, 0)));
-+#define vfprintf file_vprintf
++int log_printf(const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 1, 2)));
++#define printf log_printf
++int log_fprintf(FILE*, const char *fmt, ...)  __attribute__ ((__format__ (__printf__, 2, 3)));
++#define fprintf log_fprintf
++int log_vfprintf(FILE*, const char *fmt, va_list ap)  __attribute__ ((__format__ (__printf__, 2, 0)));
++#define vfprintf log_vfprintf
 +void log_perror(const char *s);
 +#define perror log_perror
 +#endif
@@ -107,7 +114,7 @@ index 8572841..4294af9 100644
  
  static char term_cmd_buf[TERM_CMD_BUF_SIZE + 1];
 diff --git a/vl.c b/vl.c
-index a587153..c6713cc 100644
+index a587153..bbf7a84 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -123,6 +123,10 @@
@@ -204,7 +211,7 @@ index a587153..c6713cc 100644
 +#undef vfprintf
 +#undef log_perror
 +
-+int file_vprintf(FILE *f, const char *fmt, va_list ap)
++int log_vfprintf(FILE *f, const char *fmt, va_list ap)
 +{
 +    if (use_syslog && (f == stdout || f == stderr)) {
 +        vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
@@ -236,25 +243,25 @@ index a587153..c6713cc 100644
 +        syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
 +}
 +
-+int out_printf(const char *fmt, ...)
++int log_printf(const char *fmt, ...)
 +{
 +    va_list ap;
 +    int res;
 +
 +    va_start(ap, fmt);
-+    res = file_vprintf(stdout, fmt, ap);
++    res = log_vfprintf(stdout, fmt, ap);
 +    va_end(ap);
 +
 +    return res;
 +}
 +
-+int file_printf(FILE* f, const char *fmt, ...)
++int log_fprintf(FILE* f, const char *fmt, ...)
 +{
 +    va_list ap;
 +    int res;
 +
 +    va_start(ap, fmt);
-+    res = file_vprintf(f, fmt, ap);
++    res = log_vfprintf(f, fmt, ap);
 +    va_end(ap);
 +
 +    return res;
