@@ -26,9 +26,9 @@ diff -r 49ab480a75d6 qemu-xen.h
  /* xenfbfront.c */
  int xenfb_pv_display_init(DisplayState *ds);
 diff -r 49ab480a75d6 xenstore.c
---- a/xenstore.c	Fri Nov 19 16:16:18 2010 +0000
-+++ b/xenstore.c	Fri Nov 19 16:16:54 2010 +0000
-@@ -52,6 +52,39 @@ void xenstore_do_eject(BlockDriverState 
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -53,6 +53,39 @@ void xenstore_do_eject(BlockDriverState *bs)
          xs_write(xsh, XBT_NULL, xenbus_param_paths[i], "eject", strlen("eject"));
  }
  
@@ -37,7 +37,7 @@ diff -r 49ab480a75d6 xenstore.c
 +    int i;
 +    size_t len;
 +    char *path;
-+    char *val;
++    const char *val;
 +
 +    i = xenstore_find_device(bs);
 +    if (i == -1) {

@@ -231,22 +231,13 @@ diff --git a/vnc.c b/vnc.c
 -	   really aren't dirty */
 -	row = ds_get_data(vs->ds);
 -	old_row = vs->old_data;
-+        guest_row  = vs->guest.ds->data;
-+        server_row = vs->server.ds->data;
-+        for (y = 0; y < vs->guest.ds->height; y++) {
-+            if (vnc_and_bits(vs->guest.dirty[y], width_mask, VNC_DIRTY_WORDS)) {
-+                int x;
-+                uint8_t *guest_ptr;
-+                uint8_t *server_ptr;
- 
+-
 -	for (y = 0; y < ds_get_height(vs->ds); y++) {
 -	    if (vnc_and_bits(vs->dirty_row[y], width_mask, VNC_DIRTY_WORDS)) {
 -		int x;
 -		uint8_t *ptr;
 -		char *old_ptr;
-+                guest_ptr  = guest_row;
-+                server_ptr = server_row;
- 
+-
 -		ptr = row;
 -		old_ptr = (char*)old_row;
 -
@@ -266,7 +257,17 @@ diff --git a/vnc.c b/vnc.c
 -	    row += ds_get_linesize(vs->ds);
 -	    old_row += ds_get_linesize(vs->ds);
 -	}
--
++        guest_row  = vs->guest.ds->data;
++        server_row = vs->server.ds->data;
++        for (y = 0; y < vs->guest.ds->height; y++) {
++            if (vnc_and_bits(vs->guest.dirty[y], width_mask, VNC_DIRTY_WORDS)) {
++                int x;
++                uint8_t *guest_ptr;
++                uint8_t *server_ptr;
++
++                guest_ptr  = guest_row;
++                server_ptr = server_row;
++
 +                for (x = 0; x < vs->guest.ds->width;
 +                        x += 16, guest_ptr += cmp_bytes, server_ptr += cmp_bytes) {
 +                    if (!vnc_get_bit(vs->guest.dirty[y], (x / 16)))
@@ -282,7 +283,7 @@ diff --git a/vnc.c b/vnc.c
 +            guest_row  += ds_get_linesize(vs->ds);
 +            server_row += ds_get_linesize(vs->ds);
 +        }
-+
+ 
  	if (!has_dirty && !vs->audio_cap) {
  	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
  	    return;
@@ -338,7 +339,7 @@ diff --git a/vnc.c b/vnc.c
 +        default_allocator.free_displaysurface(vs->server.ds);
 +        qemu_free(vs->guest.ds);
          qemu_free(vs);
-   
+ 
  	return 0;
 @@ -1287,13 +1310,11 @@ static void framebuffer_update_request(V
      int i;
@@ -376,3 +377,16 @@ diff --git a/vnc.c b/vnc.c
      vnc_update_client(vs);
      reset_keys(vs);
  
+diff --git a/vnchextile.h b/vnchextile.h
+index 1455886..f5b6fcb 100644
+--- a/vnchextile.h
++++ b/vnchextile.h
+@@ -13,7 +13,7 @@ static void CONCAT(send_hextile_tile_, NAME)(VncState *vs,
+                                              void *last_fg_,
+                                              int *has_bg, int *has_fg)
+ {
+-    uint8_t *row = (vs->old_data + y * ds_get_linesize(vs->ds) + x * ds_get_bytes_per_pixel(vs->ds));
++    uint8_t *row = vs->server.ds->data + y * ds_get_linesize(vs->ds) + x * ds_get_bytes_per_pixel(vs->ds);
+     pixel_t *irow = (pixel_t *)row;
+     int j, i;
+     pixel_t *last_bg = (pixel_t *)last_bg_;

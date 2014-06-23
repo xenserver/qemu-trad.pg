@@ -17,7 +17,7 @@ diff -r 58ec7bb071a5 sysemu.h
  #define MAX_SERIAL_PORTS 4
  
  extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
-+extern char *serial_devices[MAX_SERIAL_PORTS];
++extern const char *serial_devices[MAX_SERIAL_PORTS];
  
  /* parallel ports */
  
@@ -28,7 +28,7 @@ diff -r 58ec7bb071a5 vl.c
  #endif
  int no_quit = 0;
  CharDriverState *serial_hds[MAX_SERIAL_PORTS];
-+char *serial_devices[MAX_SERIAL_PORTS];
++const char *serial_devices[MAX_SERIAL_PORTS];
  CharDriverState *parallel_hds[MAX_PARALLEL_PORTS];
  CharDriverState *virtcon_hds[MAX_VIRTIO_CONSOLES];
  #ifdef TARGET_I386
@@ -61,15 +61,17 @@ diff -r 58ec7bb071a5 xenstore.c
      int i, ret;
      unsigned int len, num, hd_index, pci_devid = 0;
      BlockDriverState *bs;
-@@ -506,6 +508,23 @@ void xenstore_parse_domain_config(int hv
+@@ -507,6 +509,25 @@ void xenstore_parse_domain_config(int hvm_domid)
      for(i = 0; i < MAX_DRIVES + 1; i++)
          media_filename[i] = NULL;
  
 +    /* read the console output filename */
 +    serial_c = xs_read(xsh, XBT_NULL, "/local/logconsole/@", NULL);
 +    if (serial_c) {
-+        serial_devices[0] = qemu_mallocz(PATH_MAX);
-+	strcpy(serial_devices[0], "file:");
++        char *device;
++
++        serial_devices[0] = device = qemu_mallocz(PATH_MAX);
++        strcpy(device, "file:");
 +	if (strstr(serial_c, "%s")) {
 +            char *name = xenstore_vm_read(domid, "uuid", NULL);
 +            /* format string exploit from xenstore?? */
@@ -77,7 +79,7 @@ diff -r 58ec7bb071a5 xenstore.c
 +            free(name);
 +	}else
 +	    snprintf(serial_temp, sizeof(serial_temp), serial_c, domid);
-+	strncat(serial_devices[0], serial_temp, sizeof(serial_temp));
++        strncat(device, serial_temp, sizeof(serial_temp));
 +	free(serial_c);
 +    }
 +    /* we don't care if it failed or not */

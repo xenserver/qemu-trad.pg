@@ -52,6 +52,18 @@ index 4547359..d7a03a8 100755
  echo "TOOLS=$tools" >> $config_mak
  
  test -f ${config_h}~ && cmp -s $config_h ${config_h}~ && mv ${config_h}~ $config_h
+diff --git a/hw/virtio-blk.c b/hw/virtio-blk.c
+index 520ad1b..fcf893a 100644
+--- a/hw/virtio-blk.c
++++ b/hw/virtio-blk.c
+@@ -252,6 +252,7 @@ static void virtio_blk_update_config(VirtIODevice *vdev, uint8_t *config)
+     stw_raw(&blkcfg.cylinders, cylinders);
+     blkcfg.heads = heads;
+     blkcfg.sectors = secs;
++    blkcfg.size_max = 0;
+     memcpy(config, &blkcfg, sizeof(blkcfg));
+ }
+ 
 diff --git a/i386-dm/hookstarget.mak b/i386-dm/hookstarget.mak
 index 0cce528..2bb2b51 100644
 --- a/i386-dm/hookstarget.mak
@@ -172,7 +184,7 @@ index 0000000..823a7ce
 +%patch0 -p1
 +
 +%build
-+./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl
++./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl --enable-werror
 +%{__make} CONFIG_BLKTAP1=n
 +
 +%install

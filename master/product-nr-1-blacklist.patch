@@ -6,22 +6,32 @@ has the new device id.
 
 Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
 
-diff -r 51e561958f11 -r 528e63732d94 xenstore.c
---- a/xenstore.c	Thu Oct 04 11:37:27 2012 +0100
-+++ b/xenstore.c	Thu Oct 04 13:12:50 2012 +0100
-@@ -1096,6 +1096,7 @@ xenstore_pv_driver_build_blacklisted(uin
+diff --git a/xenstore.c b/xenstore.c
+index 0682ffe..3497537 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -1024,6 +1024,8 @@ int
+ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
  {
-     const char *product;
 +    int blacklist = 0;
- 
++
      /*
       * In qemu-xen-unstable, this is the master registry of product
-@@ -1124,16 +1125,27 @@ xenstore_pv_driver_build_blacklisted(uin
+      * numbers.  If you need a new product number allocating, please
+@@ -1043,7 +1045,6 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+     case 2:
+     case 0xffff: {
+         char *buf = NULL;
+-        char *tmp;
+         const char *product = NULL;
+ 
+         switch (product_nr) {
+@@ -1052,16 +1053,27 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
          case 0xffff: product = "experimental";  break;
          }
  
--        if (asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) < 0)
+-        if (product == NULL || asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) < 0)
 -            return 0;
 -        tmp = xs_read(xsh, XBT_NULL, buf, NULL);
 -        free(tmp);
@@ -30,8 +40,8 @@ diff -r 51e561958f11 -r 528e63732d94 xenstore.c
 -            return 0;
 -        else
 -            return 1;
-+        if (asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) >= 0) {
-+            tmp = xs_read(xsh, XBT_NULL, buf, NULL);
++        if (product && asprintf(&buf, "/mh/driver-blacklist/%s/%d", product, build_nr) >= 0) {
++            char *tmp = xs_read(xsh, XBT_NULL, buf, NULL);
 +            free(tmp);
 +            free(buf);
 +            if (tmp != NULL)
@@ -54,7 +64,7 @@ diff -r 51e561958f11 -r 528e63732d94 xenstore.c
      case 3:
      case 4: {
          uint16_t device_id;
-@@ -1143,19 +1155,19 @@ xenstore_pv_driver_build_blacklisted(uin
+@@ -1071,19 +1083,19 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
          revision = build_nr & 0xff;
  
          if (product_nr == 3 && device_id == 0)

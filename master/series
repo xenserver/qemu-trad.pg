@@ -36,7 +36,6 @@ fix-migrate-from-Boston-thru-Clearwater.patch
 # reversions
 #
 revert-f95d202ed6444dacb15fbea4dee185eb0e048d9a.patch
-revert-additional-changes.patch
 revert-7440-f37b6dee9f16.patch
 
 #
