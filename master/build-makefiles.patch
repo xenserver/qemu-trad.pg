@@ -39,29 +39,7 @@ diff --git a/configure b/configure
 index 4547359..d7a03a8 100755
 --- a/configure
 +++ b/configure
-@@ -809,21 +809,6 @@ else
-     fi
- fi # -z $sdl
- 
--if test "$sdl" = "yes" ; then
--cat > $TMPC <<EOF
--#include <SDL.h>
--#if defined(SDL_VIDEO_DRIVER_X11)
--#include <X11/XKBlib.h>
--#else
--#error No x11 support
--#endif
--int main(void) { return 0; }
--EOF
--    if $cc $ARCH_CFLAGS -o $TMPE ${OS_CFLAGS} `$sdl_config --cflags 2> /dev/null` $TMPC `$sdl_config --libs 2> /dev/null` > /dev/null 2>&1 ; then
--	sdl_x11="yes"
--    fi
--fi
--
- ##########################################
- # VNC TLS detection
- if test "$vnc_tls" = "yes" ; then
-@@ -1513,12 +1498,6 @@ bsd)
+@@ -1513,12 +1513,6 @@ bsd)
  esac
  
  tools=
@@ -194,7 +172,7 @@ index 0000000..823a7ce
 +%patch0 -p1
 +
 +%build
-+./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs
++./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl
 +%{__make} CONFIG_BLKTAP1=n
 +
 +%install
@@ -215,19 +193,6 @@ index 0000000..823a7ce
 +%dir /var/xen/qemu
 +
 +%changelog
-diff --git a/sdl.c b/sdl.c
-index e0cd07b..6ddaf7f 100644
---- a/sdl.c
-+++ b/sdl.c
-@@ -353,7 +353,7 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
- 
- #else
- 
--#if defined(SDL_VIDEO_DRIVER_X11)
-+#if 0
- #include <X11/XKBlib.h>
- 
- static int check_for_evdev(void)
 diff --git a/xen-config-host.mak b/xen-config-host.mak
 index aea181f..853789f 100644
 --- a/xen-config-host.mak
