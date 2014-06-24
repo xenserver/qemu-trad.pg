@@ -1,0 +1,141 @@
+diff --git a/vnc.c b/vnc.c
+index 2304080..4b337ee 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -280,8 +280,7 @@ struct VncState
+     uint8_t modifiers_state[256];
+ 
+     Buffer zlib;
+-    Buffer zlib_tmp;
+-    z_stream zlib_stream[4];
++    z_stream zlib_stream;
+ 
+     VncState *next;
+ };
+@@ -384,6 +383,14 @@ static void buffer_reserve(Buffer *buffer, size_t len)
+     }
+ }
+ 
++static void buffer_free(Buffer *buffer)
++{
++    qemu_free(buffer->buffer);
++    buffer->buffer = NULL;
++    buffer->capacity = 0;
++    buffer->offset = 0;
++}
++
+ static int buffer_empty(Buffer *buffer)
+ {
+     return buffer->offset == 0;
+@@ -607,33 +614,43 @@ static void send_framebuffer_update_hextile(VncState *vs, int x, int y, int w, i
+ 
+ static void vnc_zlib_init(VncState *vs)
+ {
+-    int i;
+-    for (i=0; i<(sizeof(vs->zlib_stream) / sizeof(z_stream)); i++)
+-        vs->zlib_stream[i].opaque = NULL;
++    vs->zlib_stream.opaque = NULL;
++}
++
++static void vnc_zlib_clear(VncState *vs)
++{
++    if (vs->zlib_stream.opaque != NULL) {
++        deflateEnd(&vs->zlib_stream);
++        vs->zlib_stream.opaque = NULL;
++    }
++    buffer_free(&vs->zlib);
+ }
+ 
+ static void vnc_zlib_start(VncState *vs)
+ {
++    Buffer zlib_tmp;
+     buffer_reset(&vs->zlib);
+ 
+     // make the output buffer be the zlib buffer, so we can compress it later
+-    vs->zlib_tmp = vs->output;
++    zlib_tmp = vs->output;
+     vs->output = vs->zlib;
++    vs->zlib = zlib_tmp;
+ }
+ 
+-static int vnc_zlib_stop(VncState *vs, int stream_id)
++static int vnc_zlib_stop(VncState *vs)
+ {
+-    z_streamp zstream = &vs->zlib_stream[stream_id];
++    z_streamp zstream = &vs->zlib_stream;
+     int previous_out;
++    Buffer zlib_tmp;
+ 
+     // switch back to normal output/zlib buffers
+-    vs->zlib = vs->output;
+-    vs->output = vs->zlib_tmp;
++    zlib_tmp = vs->output;
++    vs->output = vs->zlib;
++    vs->zlib = zlib_tmp;
+ 
+     // compress the zlib buffer
+ 
+     // initialize the stream
+-    // XXX need one stream per session
+     if (zstream->opaque != vs) {
+         int err;
+ 
+@@ -653,8 +670,6 @@ static int vnc_zlib_stop(VncState *vs, int stream_id)
+         zstream->opaque = vs;
+     }
+ 
+-    // XXX what to do if tight_compression changed in between?
+-
+     // reserve memory in output buffer
+     buffer_reserve(&vs->output, vs->zlib.offset + 64);
+ 
+@@ -689,7 +704,7 @@ static void send_framebuffer_update_zlib(VncState *vs, int x, int y, int w, int
+     // compress the stream
+     vnc_zlib_start(vs);
+     send_framebuffer_update_raw(vs, x, y, w, h);
+-    bytes_written = vnc_zlib_stop(vs, 0);
++    bytes_written = vnc_zlib_stop(vs);
+ 
+     if (bytes_written == -1)
+         return;
+@@ -1152,10 +1167,6 @@ static void vnc_disconnect_start(VncState *vs)
+ 
+ static void vnc_disconnect_finish(VncState *vs)
+ {
+-    if (vs->input.buffer) qemu_free(vs->input.buffer);
+-    if (vs->output.buffer) qemu_free(vs->output.buffer);
+-    audio_del(vs);
+-
+     VncState *p, *parent = NULL;
+     for (p = vs->vd->clients; p != NULL; p = p->next) {
+         if (p == vs) {
+@@ -1170,7 +1181,12 @@ static void vnc_disconnect_finish(VncState *vs)
+     if (!vs->vd->clients)
+         dcl->idle = 1;
+ 
++    buffer_free(&vs->input);
++    buffer_free(&vs->output);
++    audio_del(vs);
++
+     vnc_remove_timer(vs->vd);
++    vnc_zlib_clear(vs);
+     qemu_free(vs->dirty.bits);
+     qemu_free(vs);
+ }
+@@ -1493,7 +1509,7 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
+     unsigned int enc = 0;
+     int is_xencenter = 0;
+ 
+-    vnc_zlib_init(vs);
++    vnc_zlib_clear(vs);
+     vs->features = 0;
+     vs->vnc_encoding = 0;
+     vs->tight_compression = 9;
+@@ -2540,6 +2556,7 @@ static void vnc_remove_timer(VncDisplay *vd)
+ static void vnc_connect(VncDisplay *vd, int csock)
+ {
+     VncState *vs = qemu_mallocz(sizeof(VncState));
++    vnc_zlib_init(vs);
+     vs->csock = csock;
+ 
+     VNC_DEBUG("New client on socket %d\n", csock);

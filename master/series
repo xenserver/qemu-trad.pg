@@ -147,3 +147,4 @@ vnc-dynamically-alloc-dirty-buffers.patch
 syslog_support.patch
 name2keysym_constant.patch
 ioport_memory.patch
+zlib_leak.patch
