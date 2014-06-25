@@ -729,10 +729,18 @@ index 18896e3..a40f6bb 100644
          qemu_get_be64(f);
      }
 diff --git a/net.c b/net.c
-index 720027c..f4a0da7 100644
+index 720027c..d41f595 100644
 --- a/net.c
 +++ b/net.c
-@@ -1987,13 +1987,36 @@ void net_client_check(void)
+@@ -1184,6 +1184,7 @@ static void net_socket_send(void *opaque)
+     eoc:
+         qemu_set_fd_handler(s->fd, NULL, NULL, NULL);
+         closesocket(s->fd);
++        s->fd = -1;
+         return;
+     }
+     buf = buf1;
+@@ -1987,13 +1988,40 @@ void net_client_check(void)
      }
  }
  
@@ -740,25 +748,29 @@ index 720027c..f4a0da7 100644
 +{
 +    VLANClientState *vc = tap->vc;
 +
++    if (tap->fd < 0)
++        return;
++
 +    fprintf(stderr, "%s: model=%s,name=%s\n", __func__, vc->model, vc->name);
 +
 +    qemu_set_fd_handler2(tap->fd, 0,0,0,0);
 +    close(tap->fd);
++    tap->fd = -1;
 +}
 +
  void net_tap_shutdown_all(void)
  {
 -    struct IOHandlerRecord **pioh, *ioh;
 +    struct TAPState *tap;
-+
-+    for (tap = head_net_tap; tap; tap = tap->next)
-+        net_tap_shutdown(tap);
-+}
  
 -    while (head_net_tap) {
 -        qemu_set_fd_handler2(head_net_tap->fd, 0,0,0,0);
 -        close(head_net_tap->fd);
 -        head_net_tap = head_net_tap->next;
++    for (tap = head_net_tap; tap; tap = tap->next)
++        net_tap_shutdown(tap);
++}
++
 +void net_tap_shutdown_vlan(int id)
 +{
 +    struct TAPState *tap;
