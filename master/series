@@ -124,7 +124,6 @@ qemu-use-backdev.patch
 #
 # Product specific, incompatible with Open Source
 #
-hvm-multicore.patch
 move-disable-pf-key.patch
 CA-41014-cannot-start-100th-VM.patch
 CA-32196-disable-fw-cfg.patch
@@ -147,3 +146,4 @@ fixed-devfn.patch
 vnc-dynamically-alloc-dirty-buffers.patch
 syslog_support.patch
 name2keysym_constant.patch
+ioport_memory.patch
