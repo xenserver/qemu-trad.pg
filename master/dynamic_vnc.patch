@@ -1,0 +1,283 @@
+dynamic_vnc.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+Reduce memory usage for VNC.
+VNC require the allocation of the entire framebuffer in order to send
+the differences instead of the full image.
+However this memory is allocated always even if there is no VNC
+connection. This patch avoid such allocation if not needed.
+Memory is allocated on demand if requested.
+The surface is marked with a specific flag (QEMU_LAZY_FLAG) to tell that
+the default allocator is used.
+
+diff --git a/console.c b/console.c
+index 09d9a62..451a094 100644
+--- a/console.c
++++ b/console.c
+@@ -1527,11 +1527,11 @@ DisplaySurface* defaultallocator_create_displaysurface(int width, int height)
+     surface->linesize = width * 4;
+     surface->pf = qemu_default_pixelformat(32);
+ #ifdef WORDS_BIGENDIAN
+-    surface->flags = QEMU_ALLOCATED_FLAG | QEMU_BIG_ENDIAN_FLAG;
++    surface->flags = QEMU_BIG_ENDIAN_FLAG | QEMU_LAZY_FLAG;
+ #else
+-    surface->flags = QEMU_ALLOCATED_FLAG;
++    surface->flags = QEMU_LAZY_FLAG;
+ #endif
+-    surface->data = (uint8_t*) qemu_mallocz(surface->linesize * surface->height);
++    surface->data = NULL;
+ 
+     return surface;
+ }
+@@ -1544,18 +1544,26 @@ DisplaySurface* defaultallocator_resize_displaysurface(DisplaySurface *surface,
+     surface->linesize = width * 4;
+     surface->pf = qemu_default_pixelformat(32);
+     if (surface->flags & QEMU_ALLOCATED_FLAG)
+-        surface->data = (uint8_t*) qemu_realloc(surface->data, surface->linesize * surface->height);
+-    else
+-        surface->data = (uint8_t*) qemu_malloc(surface->linesize * surface->height);
++        qemu_free(surface->data);
++    surface->data = NULL;
+ #ifdef WORDS_BIGENDIAN
+-    surface->flags = QEMU_ALLOCATED_FLAG | QEMU_BIG_ENDIAN_FLAG;
++    surface->flags = QEMU_BIG_ENDIAN_FLAG | QEMU_LAZY_FLAG;
+ #else
+-    surface->flags = QEMU_ALLOCATED_FLAG;
++    surface->flags = QEMU_LAZY_FLAG;
+ #endif
+ 
+     return surface;
+ }
+ 
++uint8_t *surface_get_data_lazy(DisplaySurface *ds)
++{
++    if (!ds->data && (ds->flags & QEMU_LAZY_FLAG)) {
++        ds->data = (uint8_t*) qemu_mallocz(ds->linesize * ds->height);
++        ds->flags |= QEMU_ALLOCATED_FLAG;
++    }
++    return ds->data;
++}
++
+ DisplaySurface* qemu_create_displaysurface_from(int width, int height, int bpp,
+                                               int linesize, uint8_t *data)
+ {
+diff --git a/console.h b/console.h
+index 28ef65f..63ebe30 100644
+--- a/console.h
++++ b/console.h
+@@ -70,6 +70,7 @@ void kbd_put_keysym(int keysym);
+ #define QEMU_BIG_ENDIAN_FLAG    0x01
+ #define QEMU_ALLOCATED_FLAG     0x02
+ #define QEMU_REALPIXELS_FLAG    0x04
++#define QEMU_LAZY_FLAG    0x08
+ 
+ struct PixelFormat {
+     uint8_t bits_per_pixel;
+@@ -247,8 +248,19 @@ static inline int ds_get_linesize(DisplayState *ds)
+     return ds->surface->linesize;
+ }
+ 
++uint8_t *surface_get_data_lazy(DisplaySurface *ds);
++
++static inline uint8_t* surface_get_data(DisplaySurface *ds)
++{
++    if (unlikely(ds->data == NULL))
++        return surface_get_data_lazy(ds);
++    return ds->data;
++}
++
+ static inline uint8_t* ds_get_data(DisplayState *ds)
+ {
++    if (unlikely(ds->surface->data == NULL))
++        return surface_get_data_lazy(ds->surface);
+     return ds->surface->data;
+ }
+ 
+diff --git a/hw/vga.c b/hw/vga.c
+index 3c5fef7..26b5768 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -2774,7 +2774,7 @@ int ppm_save(const char *filename, struct DisplaySurface *ds)
+         return -1;
+     fprintf(f, "P6\n%d %d\n%d\n",
+             ds->width, ds->height, 255);
+-    d1 = ds->data;
++    d1 = surface_get_data(ds);
+     for(y = 0; y < ds->height; y++) {
+         d = d1;
+         for(x = 0; x < ds->width; x++) {
+diff --git a/vnc.c b/vnc.c
+index 4b337ee..4ba677c 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -341,6 +341,9 @@ static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
+     VncDisplay *vd = ds->opaque;
+     struct VncSurface *s = &vd->guest;
+ 
++    if (!vd->server)
++        return;
++
+     h += y;
+ 
+     /* round x down to ensure the loop only spans one 16-pixel block per,
+@@ -412,11 +415,35 @@ static void buffer_append(Buffer *buffer, const void *data, size_t len)
+     buffer->offset += len;
+ }
+ 
+-static void vnc_dpy_resize(DisplayState *ds)
++static void vnc_clean_surface(VncDisplay *vd, int data)
++{
++    if (vd->server) {
++        qemu_free(vd->server->data);
++        qemu_free(vd->server);
++        vd->server = NULL;
++    }
++
++    qemu_free(vd->guest.ds);
++    vd->guest.ds = NULL;
++
++    /* if we are using the default allocator and buffer is allocated
++     * free and allocate lazily
++     */
++    if (data && (vd->ds->surface->flags & (QEMU_ALLOCATED_FLAG|QEMU_LAZY_FLAG|QEMU_REALPIXELS_FLAG))
++        == (QEMU_ALLOCATED_FLAG|QEMU_LAZY_FLAG)) {
++        qemu_free(vd->ds->surface->data);
++        vd->ds->surface->data = NULL;
++        vd->ds->surface->flags &= ~QEMU_ALLOCATED_FLAG;
++    }
++}
++
++static int vnc_update_surface(VncDisplay *vd)
+ {
+     int size_changed;
+-    VncDisplay *vd = ds->opaque;
+-    VncState *vs = vd->clients;
++    DisplayState *ds = vd->ds;
++
++    /* assure we have data */
++    ds_get_data(ds);
+ 
+     /* server surface */
+     if (!vd->server)
+@@ -438,6 +465,27 @@ static void vnc_dpy_resize(DisplayState *ds)
+     dirty_resize(&vd->guest.dirty, ds_get_width(ds), ds_get_height(ds));
+     dirty_set_all(&vd->guest.dirty);
+ 
++    return size_changed;
++}
++
++static inline void vnc_create_surface(VncDisplay *vd)
++{
++    if (!vd->server)
++        vnc_update_surface(vd);
++}
++
++static void vnc_dpy_resize(DisplayState *ds)
++{
++    int size_changed;
++    VncDisplay *vd = ds->opaque;
++    VncState *vs;
++
++    if (!vd->server)
++        return;
++
++    size_changed = vnc_update_surface(vd);
++
++    vs = vd->clients;
+     while (vs != NULL) {
+         vnc_colordepth(vs);
+         if (size_changed) {
+@@ -754,6 +802,9 @@ static void vnc_dpy_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int
+     int i,x,y,pitch,depth,inc,w_lim,s;
+     int cmp_bytes;
+ 
++    if (!vd->server)
++        return;
++
+     vnc_refresh_server_surface(vd);
+     for (vs = vd->clients; vs != NULL; vs = vn) {
+         vn = vs->next;
+@@ -1167,6 +1218,8 @@ static void vnc_disconnect_start(VncState *vs)
+ 
+ static void vnc_disconnect_finish(VncState *vs)
+ {
++    VncDisplay *vd = vs->vd;
++
+     VncState *p, *parent = NULL;
+     for (p = vs->vd->clients; p != NULL; p = p->next) {
+         if (p == vs) {
+@@ -1178,17 +1231,20 @@ static void vnc_disconnect_finish(VncState *vs)
+         }
+         parent = p;
+     }
+-    if (!vs->vd->clients)
++    if (!vd->clients)
+         dcl->idle = 1;
+ 
+     buffer_free(&vs->input);
+     buffer_free(&vs->output);
+     audio_del(vs);
+ 
+-    vnc_remove_timer(vs->vd);
++    vnc_remove_timer(vd);
+     vnc_zlib_clear(vs);
+     qemu_free(vs->dirty.bits);
+     qemu_free(vs);
++
++    if (!vd->clients)
++        vnc_clean_surface(vd, 1);
+ }
+ 
+ #ifdef CONFIG_VNC_TLS
+@@ -2462,6 +2518,9 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
+     VncState *vs = NULL;
+     int has_dirty = 0;
+ 
++    if (!vd->server)
++        return 0;
++
+     /*
+      * Walk through the guest dirty map.
+      * Check and copy modified bits from guest to server surface.
+@@ -2507,6 +2566,9 @@ static void vnc_refresh(void *opaque)
+     VncState *vs = NULL, *vn = NULL;
+     int has_dirty = 0, rects = 0;
+ 
++    if (!vd->server)
++        return;
++
+     vga_hw_update();
+ 
+     has_dirty = vnc_refresh_server_surface(vd);
+@@ -2556,6 +2618,10 @@ static void vnc_remove_timer(VncDisplay *vd)
+ static void vnc_connect(VncDisplay *vd, int csock)
+ {
+     VncState *vs = qemu_mallocz(sizeof(VncState));
++    if (!vs) {
++        closesocket(csock);
++        return;
++    }
+     vnc_zlib_init(vs);
+     vs->csock = csock;
+ 
+@@ -2564,6 +2630,9 @@ static void vnc_connect(VncDisplay *vd, int csock)
+     socket_set_nonblock(vs->csock);
+     qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, NULL, vs);
+ 
++    /* here we must be sure we have a surface */
++    vnc_create_surface(vd);
++
+     vs->vd = vd;
+     vs->ds = vd->ds;
+     vs->last_x = -1;
+@@ -2598,7 +2667,8 @@ static void vnc_listen_read(void *opaque)
+     socklen_t addrlen = sizeof(addr);
+ 
+     /* Catch-up */
+-    vga_hw_update();
++    if (vs->server)
++       vga_hw_update();
+ 
+     int csock = accept(vs->lsock, (struct sockaddr *)&addr, &addrlen);
+     if (csock != -1) {
