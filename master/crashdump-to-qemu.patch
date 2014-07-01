@@ -1,13 +1,12 @@
 Provide a device model for Windows to use to stream crashdump data
 out to dom0.
-* * *
 
 diff --git a/hw/crashdump.c b/hw/crashdump.c
 new file mode 100644
-index 0000000..0b40edc
+index 0000000..ae563b3
 --- /dev/null
 +++ b/hw/crashdump.c
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,274 @@
 +/* Stupid driver to make it easy to get kernel crashdumps out of
 +   Windows guests */
 +#include <sys/types.h>
@@ -78,6 +77,7 @@ index 0000000..0b40edc
 +        }
 +
 +        free(path);
++        path = NULL;
 +    }
 +    closedir(d);
 +    d = NULL;
@@ -109,7 +109,9 @@ index 0000000..0b40edc
 +        }
 +
 +        free(path);
++        path = NULL;
 +    }
++
 +    if (e == nr_files * 2 + 1) {
 +        fprintf(logfile, "cannot find a place to dump to in %s\n",
 +                crashdump_dir);
@@ -130,6 +132,12 @@ index 0000000..0b40edc
 +        closedir(d);
 +        d = NULL;
 +    }
++}
++
++int
++crashdump_enabled(void)
++{
++    return (crashdump_fd >= 0);
 +}
 +
 +static void
@@ -202,7 +210,6 @@ index 0000000..0b40edc
 +        break;
 +    case 0x01:
 +        fprintf(logfile, "Starting crashdump.\n");
-+        open_crashdump();
 +        break;
 +    case 0x02:
 +        fprintf(logfile, "Completing crashdump (%s).\n", crashdump_path);
@@ -243,14 +250,10 @@ index 0000000..0b40edc
 +    free(crashdump_path);
 +}
 +
-+void setup_crashdump(const char *dir, long long quota)
++void register_crashdump(void)
 +{
-+    crashdump_dir = dir;
-+
-+    /* Set an initial value for available crashdump quota */
-+    crashdump_quota = (quota >= 0) ?
-+                      quota * 1024 * 1024 :
-+                      LONG_LONG_MAX;
++    if (crashdump_dir == NULL)
++        return;
 +
 +    register_ioport_read(CRASHDUMP_CONTROL_PORT, 1, 1,
 +                         control_port_read, NULL);
@@ -263,23 +266,50 @@ index 0000000..0b40edc
 +                          data_port_write, NULL);
 +
 +    fprintf(logfile, "crashdump ports enabled\n");
++}
++
++void provision_crashdump(const char *dir, long long quota)
++{
++    crashdump_dir = dir;
++
++    /* Set an initial value for available crashdump quota */
++    crashdump_quota = (quota > 0) ?
++                      quota * 1024 * 1024 :
++                      LONG_LONG_MAX;
++
++    open_crashdump();
 +
 +    atexit(tidy_up);
 +}
+diff --git a/hw/pc.c b/hw/pc.c
+index 3e33694..e57fbd0 100644
+--- a/hw/pc.c
++++ b/hw/pc.c
+@@ -1201,6 +1201,8 @@ vga_bios_error:
+         }
+     }
+ #endif
++
++    register_crashdump();
+ }
+ 
+ static void pc_init_pci(ram_addr_t ram_size, int vga_ram_size,
 diff --git a/qemu-xen.h b/qemu-xen.h
-index ed4545e..3dd6ac2 100644
+index b2ba188..d0c90af 100644
 --- a/qemu-xen.h
 +++ b/qemu-xen.h
-@@ -144,4 +144,7 @@ int has_tpm_device_danger(void);
+@@ -145,4 +145,9 @@ int has_tpm_device_danger(void);
  static void vga_dirty_log_start(void *s) { }
  static void vga_dirty_log_stop(void *s) { }
  
 +/* crashdump.c */
-+void setup_crashdump(const char *crashdump_dir, long long crashdump_quota);
++void provision_crashdump(const char *crashdump_dir, long long crashdump_quota);
++void register_crashdump(void);
++int crashdump_enabled(void);
 +
  #endif /*QEMU_XEN_H*/
 diff --git a/vl.c b/vl.c
-index 66b961a..3c9cab5 100644
+index 66b961a..73773f8 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -59,6 +59,7 @@
@@ -318,22 +348,20 @@ index 66b961a..3c9cab5 100644
      qemu_cache_utils_init(envp);
      logfile = stderr; /* initial value */
  
-@@ -5596,6 +5602,14 @@ int main(int argc, char **argv, char **envp)
+@@ -5596,6 +5602,12 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_gfx_passthru:
                  select_vgahw("passthrough");
                  break;
 +            case QEMU_OPTION_crashdump_dir:
 +                crashdump_dir = (char *) optarg;
-+                fprintf(logfile, "qemu: crashdump dir is %s\n", crashdump_dir);
 +                break;
 +            case QEMU_OPTION_crashdump_quota:
 +                crashdump_quota = strtoll(optarg, NULL, 0);
-+                fprintf(logfile, "qemu: crashdump quota is %lldMB\n", crashdump_quota);
 +                break;
              }
          }
      }
-@@ -5872,6 +5886,15 @@ int main(int argc, char **argv, char **envp)
+@@ -5872,6 +5884,15 @@ int main(int argc, char **argv, char **envp)
      register_savevm("timer", 0, 2, timer_save, timer_load, NULL);
      register_savevm_live("ram", 0, 3, ram_save_live, NULL, ram_load, NULL);
  
@@ -343,14 +371,14 @@ index 66b961a..3c9cab5 100644
 +    }
 +
 +    if (crashdump_dir) {
-+        setup_crashdump(crashdump_dir, crashdump_quota);
++        provision_crashdump(crashdump_dir, crashdump_quota);
 +    }
 +
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
 diff --git a/xen-hooks.mak b/xen-hooks.mak
-index 00f9ac1..042fd20 100644
+index b91400e..746d06c 100644
 --- a/xen-hooks.mak
 +++ b/xen-hooks.mak
 @@ -25,6 +25,7 @@ LDFLAGS := $(CFLAGS) $(LDFLAGS)
