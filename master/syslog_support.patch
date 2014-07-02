@@ -209,7 +209,7 @@ index a587153..bbf7a84 100644
 +#undef fprintf
 +#undef printf
 +#undef vfprintf
-+#undef log_perror
++#undef perror
 +
 +int log_vfprintf(FILE *f, const char *fmt, va_list ap)
 +{
