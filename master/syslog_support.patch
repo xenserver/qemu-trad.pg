@@ -5,6 +5,21 @@ Add syslog support for error reporting
 Add support for --syslog to redirect all output to syslog instead of
 stdout/stderr.
 
+diff --git a/Makefile b/Makefile
+index 74ef4f8..b170ed1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -265,6 +265,10 @@ endif
+ test speed: all
+ 	$(MAKE) -C tests $@
+ 
++.PHONY: unittests
++unittests:
++	$(MAKE) -C unittests $@
++
+ TAGS:
+ 	etags *.[ch] tests/*.[ch]
+ 
 diff --git a/Makefile.target b/Makefile.target
 index 8052bfe..85cea08 100644
 --- a/Makefile.target
@@ -79,17 +94,27 @@ index b63a235..8d1263d 100644
  /* actual backend drivers */
  extern struct XenDevOps xen_console_ops;      /* xen_console.c     */
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index 6538aa0..c7e490d 100644
+index 6538aa0..4325681 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
-@@ -8,6 +8,7 @@ Source0: xen-device-model-%{version}.tar.bz2
+@@ -7,7 +7,8 @@ Group: System/Hypervisor
+ Source0: xen-device-model-%{version}.tar.bz2
  Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
- BuildRequires: SDL-devel, zlib-devel, xen-devel, xen-dom0-devel, ncurses-devel, pciutils-devel
+-BuildRequires: SDL-devel, zlib-devel, xen-devel, xen-dom0-devel, ncurses-devel, pciutils-devel
++BuildRequires: SDL-devel, zlib-devel, xen-devel, xen-dom0-devel, ncurses-devel, pciutils-devel, check-devel
 +Provides: qemu-xen(syslog) = 1
  
  %description
  This package contains qemu-dm, the Xen device model.
+@@ -18,6 +19,7 @@ This package contains qemu-dm, the Xen device model.
+ %build
+ ./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl --enable-werror
+ %{__make} CONFIG_BLKTAP1=n
++%{__make} unittests
+ 
+ %install
+ rm -rf $RPM_BUILD_ROOT
 diff --git a/qemu-common.h b/qemu-common.h
 index 50dfb6b..52e7fa7 100644
 --- a/qemu-common.h
@@ -235,6 +260,165 @@ index 0000000..ed085af
 +}
 +
 +#endif
++
+diff --git a/unittests/Makefile b/unittests/Makefile
+new file mode 100644
+index 0000000..c91e17c
+--- /dev/null
++++ b/unittests/Makefile
+@@ -0,0 +1,19 @@
++QEMU_ROOT ?= ..
++-include ../config-host.mak
++VPATH=$(SRC_PATH)/tests
++
++CFLAGS=-Wall -O2 -g -fno-strict-aliasing
++LDFLAGS=
++
++TESTS=xen-tests
++
++all: $(TESTS)
++
++xen-tests: xen-tests.c ../syslog.c
++	$(CC) $(CFLAGS) -I.. $(LDFLAGS) -Wl,--wrap,syslog -Wl,--wrap,vsyslog -o $@ $^ -lcheck
++
++unittests: $(TESTS)
++	./xen-tests
++
++clean:
++	rm -f *~ *.o $(TESTS)
+diff --git a/unittests/xen-tests.c b/unittests/xen-tests.c
+new file mode 100644
+index 0000000..fc8104d
+--- /dev/null
++++ b/unittests/xen-tests.c
+@@ -0,0 +1,128 @@
++#include <check.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <errno.h>
++#include <syslog.h>
++
++#include <qemu-common.h>
++
++static int  syslog_called = 0;
++static char syslog_buf[512];
++
++void __wrap_vsyslog(int priority, const char *format, va_list ap)
++{
++    memset(syslog_buf, 0, sizeof(syslog_buf));
++    vsnprintf(syslog_buf, sizeof(syslog_buf), format, ap);
++    ++syslog_called;
++}
++
++void __wrap_syslog(int priority, const char *format, ...)
++{
++    va_list ap;
++
++    va_start(ap, format);
++    __wrap_vsyslog(LOG_INFO, format, ap);
++    va_end(ap);
++}
++
++static void syslog_check(const char *expected)
++{
++    fail_if(syslog_called != use_syslog);
++    if (use_syslog)
++        fail_if(strstr(syslog_buf, expected) == NULL, "output: %s", syslog_buf);
++
++    /* reset back to original state */
++    syslog_called = 0;
++    memset(syslog_buf, 0, sizeof(syslog_buf));
++}
++
++static void call_vfprintf(FILE *f, const char *format, ...)
++{
++    va_list ap;
++
++    va_start(ap, format);
++    vfprintf(f, format, ap);
++    va_end(ap);
++}
++
++START_TEST (syslog_redirect)
++{
++    FILE *out = fopen("out.txt", "w+");
++    fail_if(out == NULL);
++
++    for (use_syslog = 0; use_syslog < 2; ++use_syslog) {
++
++        /* for all these functions output should be
++         * redirected to syslog
++         */
++        printf("check\n");
++        syslog_check("check");
++
++        errno = EINVAL;
++        perror("errno");
++        syslog_check(strerror(EINVAL));
++
++        fprintf(stderr, "check %d\n", 7654);
++        syslog_check("7654");
++
++        fprintf(stdout, "check %d\n", 12345);
++        syslog_check("12345");
++
++        call_vfprintf(stdout, "%d\n", -456);
++        syslog_check("-456");
++
++        call_vfprintf(stderr, "%d\n", -62243);
++        syslog_check("-62243");
++
++        /* These functions should just write to the file
++         * No output to syslog
++         */
++        fprintf(out, "line one\n");
++        fail_if(syslog_called != 0);
++
++        call_vfprintf(out, "line %d\n", 876);
++        fail_if(syslog_called != 0);
++    }
++
++    /* check content of the file */
++    fail_if(fseek(out, 0L, SEEK_SET) != 0);
++    for (use_syslog = 0; use_syslog < 2; ++use_syslog) {
++        fail_if(fgets(syslog_buf, sizeof(syslog_buf), out) == NULL);
++        fail_if(strcmp(syslog_buf, "line one\n") != 0);
++
++        fail_if(fgets(syslog_buf, sizeof(syslog_buf), out) == NULL);
++        fail_if(strcmp(syslog_buf, "line 876\n") != 0);
++    }
++    fail_if(fgets(syslog_buf, sizeof(syslog_buf), out) != NULL);
++
++    /* cleanup */
++    fclose(out);
++    unlink("out.txt");
++}
++END_TEST
++ 
++static Suite *
++xen_suite (void)
++{
++    Suite *s = suite_create ("Xen");
++
++    /* Core test case */
++    TCase *tc_syslog = tcase_create ("Syslog");
++    tcase_add_test (tc_syslog, syslog_redirect);
++    suite_add_tcase (s, tc_syslog);
++
++    return s;
++}
++
++int main(void)
++{
++    int number_failed;
++    Suite *s = xen_suite ();
++    SRunner *sr = srunner_create (s);
++    srunner_run_all (sr, CK_NORMAL);
++    number_failed = srunner_ntests_failed (sr);
++    srunner_free (sr);
++    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
++}
 +
 diff --git a/vl.c b/vl.c
 index b7a0cd0..8738e73 100644
