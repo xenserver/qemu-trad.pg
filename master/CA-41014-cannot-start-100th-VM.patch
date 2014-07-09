@@ -1,7 +1,8 @@
-diff -r 9aca121a18c9 vl.c
---- a/vl.c	Fri Apr 30 11:21:33 2010 +0100
-+++ b/vl.c	Fri Apr 30 11:52:55 2010 +0100
-@@ -6016,8 +6016,8 @@
+diff --git a/vl.c b/vl.c
+index 1eaedd4..a0fe73d 100644
+--- a/vl.c
++++ b/vl.c
+@@ -6095,9 +6095,10 @@ geometry_error:
  		    xenstore_read_vncpasswd(domid, password, sizeof(password));
  		    vnc_display_password(ds, password);
                      if (vncunused) {
@@ -10,5 +11,7 @@ diff -r 9aca121a18c9 vl.c
 +                        char *display = malloc(strlen(vnc_display) + 10);
 +                        snprintf(display, strlen(vnc_display) + 10, "%s,to=99999", vnc_display);
                          vnc_display_port = vnc_display_open(ds, display);
++                        free(display);
                      } else
                          vnc_display_port = vnc_display_open(ds, vnc_display);
+ 		    if (vnc_display_port < 0)
