@@ -1,0 +1,27 @@
+In 64bit builds, setting sival_int to 0 doesn't clear the upper half of the
+sival_ptr pointer.
+
+Signed-off-by: Andrew Cooper <andrew.cooper3@citrix.com>
+
+
+diff --git a/vl.c b/vl.c
+index d93d2bb..88c55c4 100644
+--- a/vl.c
++++ b/vl.c
+@@ -1677,7 +1677,7 @@ static void rtc_stop_timer(struct qemu_alarm_timer *t)
+ 
+ static int dynticks_start_timer(struct qemu_alarm_timer *t)
+ {
+-    struct sigevent ev;
++    struct sigevent ev = { { 0 } };
+     timer_t host_timer;
+     struct sigaction act;
+ 
+@@ -1687,7 +1687,6 @@ static int dynticks_start_timer(struct qemu_alarm_timer *t)
+ 
+     sigaction(SIGALRM, &act, NULL);
+ 
+-    ev.sigev_value.sival_int = 0;
+     ev.sigev_notify = SIGEV_SIGNAL;
+     ev.sigev_signo = SIGALRM;
+ 

@@ -24,6 +24,7 @@ build-makefiles.patch
 #
 fix-cdrom-eject.patch
 smbus-nuke-eeprom.patch
+clear-dynticks-sigevent.patch
 
 #
 # Non-upstreamable patches
