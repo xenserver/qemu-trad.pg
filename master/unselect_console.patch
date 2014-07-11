@@ -11,7 +11,7 @@ Deselecting it if we don't have any VNC connection cause to not allocate
 and update this memory.
 
 diff --git a/console.c b/console.c
-index 451a094..c7b6dd0 100644
+index 451a094..b85fa5b 100644
 --- a/console.c
 +++ b/console.c
 @@ -167,7 +167,7 @@ void vga_hw_update(void)
@@ -23,7 +23,7 @@ index 451a094..c7b6dd0 100644
          active_console->hw_invalidate(active_console->hw);
  }
  
-@@ -1027,8 +1027,10 @@ void console_select(unsigned int index)
+@@ -1027,14 +1027,17 @@ void console_select(unsigned int index)
  
      if (index >= MAX_CONSOLES)
          return;
@@ -36,13 +36,25 @@ index 451a094..c7b6dd0 100644
      s = consoles[index];
      if (s) {
          DisplayState *ds = s->ds;
-@@ -1044,6 +1046,16 @@ void console_select(unsigned int index)
+         active_console = s;
+         if (ds_get_bits_per_pixel(s->ds)) {
+-            ds->surface = qemu_resize_displaysurface(ds, s->g_width, s->g_height);
++            if (s->console_type != GRAPHIC_CONSOLE)
++                ds->surface = qemu_resize_displaysurface(ds, s->g_width, s->g_height);
+         } else {
+             s->ds->surface->width = s->width;
+             s->ds->surface->height = s->height;
+@@ -1044,6 +1047,20 @@ void console_select(unsigned int index)
      }
  }
  
 +void console_unselect(void)
 +{
-+    active_console = NULL;
++    if (active_console) {
++        active_console->g_width = ds_get_width(active_console->ds);
++        active_console->g_height = ds_get_height(active_console->ds);
++        active_console = NULL;
++    }
 +}
 +
 +int is_console_selected(void)
