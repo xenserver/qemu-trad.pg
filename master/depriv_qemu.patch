@@ -86,7 +86,7 @@ index 55a48b0..177f266 100644
      /* signal the CP ACPI hot insert done */
      xenstore_record_dm_state("pci-inserted");
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index 427b34b..f07f9df 100644
+index 427b34b..96922b8 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
 @@ -44,6 +44,7 @@
@@ -105,19 +105,21 @@ index 427b34b..f07f9df 100644
  
  //#define DEBUG_MMU
  
-@@ -177,6 +179,11 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -177,6 +179,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
              }
              bufioreq_local_port = rc;
          }
 +
 +#ifndef CONFIG_STUBDOM
-+        if (xc_evtchn_restrict(xce_handle, domid) < 0)
++        if (xc_evtchn_restrict(xce_handle, domid) < 0) {
 +            fprintf(logfile, "xc_evtchn_restrict(): %s\n", strerror(errno));
++            return NULL;
++        }
 +#endif
      }
  
      return env;
-@@ -186,26 +193,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -186,26 +195,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
  void cpu_reset(CPUX86State *env)
  {
      extern int s3_shutdown_flag;
@@ -152,7 +154,7 @@ index 427b34b..f07f9df 100644
  }
  
  void cpu_x86_close(CPUX86State *env)
-@@ -458,14 +458,11 @@ void timeoffset_get(void)
+@@ -458,14 +460,11 @@ void timeoffset_get(void)
  
  static void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
  {
@@ -168,7 +170,7 @@ index 427b34b..f07f9df 100644
  }
  
  static void __handle_ioreq(CPUState *env, ioreq_t *req)
-@@ -661,19 +658,12 @@ int main_loop(void)
+@@ -661,19 +660,12 @@ int main_loop(void)
  
  void destroy_hvm_domain(void)
  {
@@ -231,10 +233,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..f1ffe68
+index 0000000..ba82912
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,1152 @@
+@@ -0,0 +1,1167 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -310,6 +312,7 @@ index 0000000..f1ffe68
 +#include <sys/prctl.h>
 +#endif
 +#include <dirent.h>
++#include <sys/ioctl.h>
 +
 +#include "qemu-common.h"
 +#include "hw/hw.h"
@@ -1382,8 +1385,22 @@ index 0000000..f1ffe68
 +    return 0;
 +}
 +
++#define IOCTL_EVTCHN_RESTRICT_DOMID                    \
++    _IOC(_IOC_NONE, 'E', 100, sizeof(struct ioctl_evtchn_restrict_domid))
++struct ioctl_evtchn_restrict_domid {
++    domid_t domid;
++};
++
 +int xc_evtchn_restrict(xc_interface *xce_handle, int domid)
 +{
++    int fd;
++    struct ioctl_evtchn_restrict_domid restrict_domid = { domid };
++
++    fd = xc_evtchn_fd(xce_handle);
++    if (fd < 0)
++        return -1;
++    if (ioctl(fd, IOCTL_EVTCHN_RESTRICT_DOMID, &restrict_domid) < 0)
++        return -1;
 +    return 0;
 +}
 +
