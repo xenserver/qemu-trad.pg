@@ -141,7 +141,6 @@ less_xs_connection.patch
 XOP-403-usb-blue-fix.patch
 CA-123830-reenable-O_DIRECT.patch
 CA-127361.patch
-decrease-usb-frame-frequency.patch
 vgpu.patch
 fixed-devfn.patch
 vnc-dynamically-alloc-dirty-buffers.patch
