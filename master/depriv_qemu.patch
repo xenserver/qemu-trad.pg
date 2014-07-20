@@ -266,10 +266,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..ee03381
+index 0000000..7291a99
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,1174 @@
+@@ -0,0 +1,1135 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -482,8 +482,11 @@ index 0000000..ee03381
 +        msg.msg_iov = &vec;
 +        msg.msg_iovlen = 1;
 +
-+        if ((n = sendmsg(sock, &msg, 0)) == -1)
++        while ((n = sendmsg(sock, &msg, 0)) == -1) {
++                if (errno == EINTR) continue;
 +                warn("%s: sendmsg(%d)", "send_fd", sock);
++                break;
++        }
 +        if (n != sizeof(int))
 +                warnx("%s: sendmsg: expected sent 1 got %ld",
 +                    "send_fd", (long)n);
@@ -510,8 +513,11 @@ index 0000000..ee03381
 +        msg.msg_control = tmp;
 +        msg.msg_controllen = sizeof(tmp);
 +
-+        if ((n = recvmsg(sock, &msg, 0)) == -1)
++        while ((n = recvmsg(sock, &msg, 0)) == -1) {
++                if (errno == EINTR) continue;
 +                warn("%s: recvmsg", "receive_fd");
++                break;
++        }
 +        if (n != sizeof(int))
 +                warnx("%s: recvmsg: expected received 1 got %zd",
 +                      "receive_fd", n);
@@ -622,8 +628,8 @@ index 0000000..ee03381
 +        send_fd(parent_fd, fd);
 +        if (fd >= 0)
 +            close(fd);
-+        free(path);
 +    }
++    free(path);
 +}
 +#endif
 +
@@ -746,24 +752,27 @@ index 0000000..ee03381
 +
 +    path = xs_get_domain_path(priv_xsh, domid);
 +    if (path == NULL) {
-+        fprintf(logfile, "xs_get_domain_path: error\n");
 +        return 0;
 +    }
 +
-+    asprintf(&buf, "%s/vm", path);
++    rc = asprintf(&buf, "%s/vm", path);
 +    free(path);
++    if (rc < 0)
++        return 0;
++
 +    path = xs_read(priv_xsh, XBT_NULL, buf, NULL);
 +    free(buf);
 +    if (path == NULL) {
-+        fprintf(logfile, "xs_read(%s): read error\n", buf);
 +        return 0;
 +    }
 +
-+    asprintf(&buf, "%s/%s", path, key);
++    rc = asprintf(&buf, "%s/%s", path, key);
++    free(path);
++    if (rc < 0)
++        return 0;
++
 +    rc = xs_write(priv_xsh, XBT_NULL, buf, value, strlen(value));
 +    free(buf);
-+    if (!rc)
-+        fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
 +    return rc;
 +}
 +
@@ -801,7 +810,6 @@ index 0000000..ee03381
 +    path = xs_get_domain_path(priv_xsh, domid);
 +    if (path) {
 +        if (asprintf(&active_path, "%s/logdirty/active", path) >= 0) {
-+            fprintf(logfile, "active_path %s\n", active_path);
 +            xs_write(priv_xsh, XBT_NULL, active_path, act, l);
 +            free(active_path);
 +        }
@@ -813,16 +821,13 @@ index 0000000..ee03381
 +ack_logdirty_switch(void)
 +{
 +    size_t l;
-+    char *act;
++    char act[257];
 +
 +    must_read(parent_fd, &l, sizeof(l));
-+    act = malloc(l);
-+    if (!act)
++    if (l > 256)
 +        return;
 +    must_read(parent_fd, act, l);
-+    fprintf(logfile, "ack2 logdirty %.*s\n", (int) l, act);
 +    do_ack_logdirty_switch(act, l);
-+    free(act);
 +}
 +
 +void
@@ -848,24 +853,14 @@ index 0000000..ee03381
 +static void
 +open_vm_dump(void)
 +{
-+    int fd = -1, l;
-+    char *name = NULL;
++    int fd;
++    char name[128];
 +
-+    must_read(parent_fd, &l, sizeof(l));
-+    if (l == 0 || l > 256) {
-+        errno = EINVAL;
-+        goto done;
-+    }
-+    name = malloc(l+1);
-+    if (!name)
-+        goto done;
-+    must_read(parent_fd, name, l);
-+    name[l] = 0;
++    sprintf(name, "/var/lib/xen/qemu-save.%d", domid);
 +
 +    fd = open(name, O_RDWR|O_CREAT|O_TRUNC, 0600);
-+done:
++
 +    send_fd(parent_fd, fd);
-+    free(name);
 +    if (fd >= 0)
 +        close(fd);
 +}
@@ -884,9 +879,7 @@ index 0000000..ee03381
 +    }
 +    cmd = privsep_op_open_vm_dump;
 +    must_write(privsep_fd, &cmd, sizeof(cmd));
-+    l = strlen(name);
-+    must_write(privsep_fd, &l, sizeof(l));
-+    must_write(privsep_fd, name, l);
++    /* ignore name is always constant */
 +
 +    return receive_qemufile(privsep_fd, "wb");
 +}
@@ -920,7 +913,7 @@ index 0000000..ee03381
 +open_keymap(void)
 +{
 +    size_t l;
-+    char *language = NULL;
++    char language[257];
 +    int fd = -1;
 +
 +    must_read(parent_fd, &l, sizeof(l));
@@ -928,16 +921,12 @@ index 0000000..ee03381
 +        errno = EINVAL;
 +        goto done;
 +    }
-+    language = malloc(l+1);
-+    if (!language)
-+        goto done;
 +    must_read(parent_fd, language, l);
 +    language[l] = 0;
 +
 +    fd = _open_keymap(language);
 +done:
 +    send_fd(parent_fd, fd);
-+    free(language);
 +    if (fd >= 0)
 +        close(fd);
 +}
@@ -977,80 +966,68 @@ index 0000000..ee03381
 +    char *path = NULL;
 +
 +    if (asprintf(&path, 
-+                "/local/domain/0/device-model/%u/%s", domid, subpath) <= 0) {
-+        fprintf(logfile, "out of memory recording dm \n");
-+        goto out;
++                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
++        return;
 +    }
-+    if (!xs_write(priv_xsh, XBT_NULL, path, state, strlen(state)))
-+        fprintf(logfile, "error recording dm \n");
-+
-+out:
++    xs_write(priv_xsh, XBT_NULL, path, state, strlen(state));
 +    free(path);
 +}
 +
 +static void xenstore_record_dm(void)
 +{
 +    size_t l;
-+    char *subpath = NULL;
-+    char *state = NULL;
++    char subpath[257];
++    char state[257];
 +
 +    must_read(parent_fd, &l, sizeof(l));
 +    if (l == 0 || l > 256) {
 +        errno = EINVAL;
-+        goto done;
++        return;
 +    }
-+    subpath = malloc(l+1);
-+    if (!subpath)
-+        goto done;
 +    must_read(parent_fd, subpath, l);
 +    subpath[l] = 0;
 +
 +    must_read(parent_fd, &l, sizeof(l));
 +    if (l == 0 || l > 256) {
 +        errno = EINVAL;
-+        goto done;
++        return;
 +    }
-+    state = malloc(l+1);
-+    if (!state)
-+        goto done;
 +    must_read(parent_fd, state, l);
 +    state[l] = 0;
 +
-+    _xenstore_record_dm(subpath, state);
++    /* these are the only values allowed, return to avoid
++     * filling xenstore */
++    if (strcmp(subpath, "parameter") != 0 && strcmp(subpath, "state") != 0)
++        return;
 +
-+done:
-+    free(subpath);
-+    free(state);
++    _xenstore_record_dm(subpath, state);
 +}
 +
 +static char *_xenstore_read_dm(const char *subpath)
 +{
 +    int len;
-+    char *path = NULL;
++    char *path = NULL, *res;
 +
 +    if (asprintf(&path, 
-+                "/local/domain/0/device-model/%u/%s", domid, subpath) <= 0) {
-+        fprintf(logfile, "out of memory recording dm \n");
-+        free(path);
++                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
 +        return NULL;
 +    }
-+    return xs_read(priv_xsh, XBT_NULL, path, &len);
++    res = xs_read(priv_xsh, XBT_NULL, path, &len);
++    free(path);
++    return res;
 +}
 +
 +static void xenstore_read_dm(void)
 +{
 +    size_t l;
-+    char *subpath = NULL;
-+    char *value = NULL;
++    char subpath[257];
++    char *value;
 +
 +    must_read(parent_fd, &l, sizeof(l));
 +    if (l == 0 || l > 256) {
 +        errno = EINVAL;
-+        goto done;
++        return;
 +    }
-+    subpath = malloc(l+1);
-+    if (!subpath)
-+        goto done;
 +    must_read(parent_fd, subpath, l);
 +    subpath[l] = 0;
 +
@@ -1061,48 +1038,32 @@ index 0000000..ee03381
 +    must_write(parent_fd, &l, sizeof(l));
 +    if (l) must_write(parent_fd, value, l);
 +
-+done:
-+    free(subpath);
 +    free(value);
 +}
 +
 +static void _xenstore_write_vslots(char *vslots)
 +{
-+    char *path = NULL;
++    char path[128];
 +    int pci_devid = 0;
 +
-+    if (asprintf(&path, 
-+                "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid) == -1) {
-+        fprintf(logfile, "out of memory when updating vslots.\n");
-+        goto out;
-+    }
-+    if (!xs_write(priv_xsh, XBT_NULL, path, vslots, strlen(vslots)))
-+        fprintf(logfile, "error updating vslots \n");
-+
-+out:
-+    free(path);
++    sprintf(path, "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid);
++    xs_write(priv_xsh, XBT_NULL, path, vslots, strlen(vslots));
 +}
 +
 +static void xenstore_write_vslots(void)
 +{
 +    size_t l;
-+    char *vslots = NULL;
++    char vslots[257];
 +
 +    must_read(parent_fd, &l, sizeof(l));
 +    if (l == 0 || l > 256) {
 +        errno = EINVAL;
-+        goto done;
++        return;
 +    }
-+    vslots = malloc(l+1);
-+    if (!vslots)
-+        goto done;
 +    must_read(parent_fd, vslots, l);
 +    vslots[l] = 0;
 +
 +    _xenstore_write_vslots(vslots);
-+
-+done:
-+    free(vslots);
 +}
 + 
 +#ifndef CONFIG_STUBDOM
@@ -1224,10 +1185,10 @@ index 0000000..ee03381
 +           to avoid embarrassing bugs if someone tries to fprintf to
 +           stderr and crashes xenstored. */
 +        open("/dev/null", O_RDONLY);
-+        open("/dev/null", O_RDONLY);
-+        open("/dev/null", O_RDONLY);
++        open("/dev/null", O_WRONLY);
++        open("/dev/null", O_WRONLY);
 +
-+        logfile = NULL;
++        logfile = stderr;
 +
 +        priv_xsh = xs_daemon_open();
 +        if (!priv_xsh) {
