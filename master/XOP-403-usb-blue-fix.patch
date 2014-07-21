@@ -4,18 +4,48 @@ of time so Windows believe that usb controller is not working properly.
 This patch prevent this detecting that timer function was not run and run it.
 
 diff --git a/hw/usb-uhci.c b/hw/usb-uhci.c
-index 746a1f5..4ab91f8 100644
+index c6b2a3b..18425f5 100644
 --- a/hw/usb-uhci.c
 +++ b/hw/usb-uhci.c
-@@ -129,6 +129,7 @@ typedef struct UHCIState {
+@@ -65,7 +65,14 @@
+ 
+ #define FRAME_TIMER_FREQ 1000
+ 
+-#define FRAME_MAX_LOOPS  100
++#define FRAME_MAX_LOOPS  256
++
++/* Must be large enough to handle 10 frame delay for initial isoc requests */
++#define QH_VALID         32
++
++#define MAX_FRAMES_PER_TICK    (QH_VALID / 2)
++
++#define MAX_FRAMES 128
+ 
+ #define NB_PORTS 2
+ 
+@@ -120,6 +127,12 @@ typedef struct UHCIPort {
+     uint16_t ctrl;
+ } UHCIPort;
+ 
++enum {
++    diff_stopped = 0,
++    diff_starting = 1,
++    diff_in_timer = 2,
++};
++
+ typedef struct UHCIState {
+     PCIDevice dev;
+     uint16_t cmd; /* cmd register */
+@@ -129,6 +142,8 @@ typedef struct UHCIState {
      uint32_t fl_base_addr; /* frame list base address */
      uint8_t sof_timing;
      uint8_t status2; /* bit 0 and 1 are used to generate UHCI_STS_USBINT */
++    uint8_t timer_diff;
 +    int64_t expire_time;
      QEMUTimer *frame_timer;
      UHCIPort ports[NB_PORTS];
  
-@@ -166,6 +167,8 @@ static UHCIAsync *uhci_async_alloc(UHCIState *s)
+@@ -166,6 +181,8 @@ static UHCIAsync *uhci_async_alloc(UHCIState *s)
      return async;
  }
  
@@ -24,16 +54,93 @@ index 746a1f5..4ab91f8 100644
  static void uhci_async_free(UHCIState *s, UHCIAsync *async)
  {
      qemu_free(async);
-@@ -406,6 +409,8 @@ static int uhci_load(QEMUFile *f, void *opaque, int version_id)
+@@ -334,6 +351,7 @@ static void uhci_reset(UHCIState *s)
+     s->cmd = 0;
+     s->status = 0;
+     s->status2 = 0;
++    s->timer_diff = diff_stopped;
+     s->intr = 0;
+     s->fl_base_addr = 0;
+     s->sof_timing = 64;
+@@ -352,12 +370,19 @@ static void uhci_save(QEMUFile *f, void *opaque)
+ {
+     UHCIState *s = opaque;
+     uint8_t num_ports = NB_PORTS;
++    uint8_t status2;
+     int i;
+ 
+     uhci_async_cancel_all(s);
+ 
+     pci_device_save(&s->dev, f);
+ 
++    /* use status2 to store additional timer_diff
++     * This is possible as only bit 0 and 1 of status2 are used
++     * and status2 cannot be written by the guest
++     */
++    status2 = (s->status2 & 3) | (s->timer_diff << 6);
++
+     qemu_put_8s(f, &num_ports);
+     for (i = 0; i < num_ports; ++i)
+         qemu_put_be16s(f, &s->ports[i].ctrl);
+@@ -367,8 +392,11 @@ static void uhci_save(QEMUFile *f, void *opaque)
+     qemu_put_be16s(f, &s->frnum);
+     qemu_put_be32s(f, &s->fl_base_addr);
+     qemu_put_8s(f, &s->sof_timing);
+-    qemu_put_8s(f, &s->status2);
+-    qemu_put_timer(f, s->frame_timer);
++    qemu_put_8s(f, &status2);
++    if (qemu_timer_pending(s->frame_timer))
++        qemu_put_be64(f, s->expire_time);
++    else
++        qemu_put_be64(f, -1);
+ }
+ 
+ static int uhci_load(QEMUFile *f, void *opaque, int version_id)
+@@ -376,6 +404,7 @@ static int uhci_load(QEMUFile *f, void *opaque, int version_id)
+     UHCIState *s = opaque;
+     uint8_t num_ports;
+     int i, ret;
++    int64_t expire;
+ 
+     if (version_id > 1)
+         return -EINVAL;
+@@ -400,12 +429,34 @@ static int uhci_load(QEMUFile *f, void *opaque, int version_id)
+     qemu_get_be32s(f, &s->fl_base_addr);
+     qemu_get_8s(f, &s->sof_timing);
+     qemu_get_8s(f, &s->status2);
++    s->timer_diff = (s->status2 >> 6) & 3;
++    s->status2 &= 3;
+ 
+     if (loadvm_version_id == 1)
+         for(i = 0; i < NB_PORTS; i++)
              qemu_get_be16s(f, &s->ports[i].ctrl);
  
-     qemu_get_timer(f, s->frame_timer);
-+    s->expire_time = qemu_get_clock(vm_clock) +
-+        (ticks_per_sec / FRAME_TIMER_FREQ);
+-    qemu_get_timer(f, s->frame_timer);
++    qemu_del_timer(s->frame_timer);
++
++    expire = qemu_get_be64(f);
++    if (expire == -1)
++        s->timer_diff = diff_stopped;
++    switch (s->timer_diff) {
++    case diff_stopped:
++        s->expire_time = qemu_get_clock(vm_clock) +
++            (ticks_per_sec / FRAME_TIMER_FREQ);
++        break;
++    case diff_starting:
++        s->expire_time = expire;
++        expire -= ticks_per_sec / FRAME_TIMER_FREQ;
++        break;
++    default:
++        s->timer_diff = diff_in_timer;
++        s->expire_time = expire;
++        break;
++    }
++    if (expire != -1)
++        qemu_mod_timer(s->frame_timer, expire);
  
      return 0;
  }
-@@ -449,8 +454,11 @@ static void uhci_ioport_writew(void *opaque, uint32_t addr, uint32_t val)
+@@ -449,8 +500,12 @@ static void uhci_ioport_writew(void *opaque, uint32_t addr, uint32_t val)
      switch(addr) {
      case 0x00:
          if ((val & UHCI_CMD_RS) && !(s->cmd & UHCI_CMD_RS)) {
@@ -43,10 +150,11 @@ index 746a1f5..4ab91f8 100644
 +            s->expire_time = t_now +
 +                (ticks_per_sec / FRAME_TIMER_FREQ);
 +            qemu_mod_timer(s->frame_timer, t_now);
++            s->timer_diff = diff_starting;
              s->status &= ~UHCI_STS_HCHALTED;
          } else if (!(val & UHCI_CMD_RS)) {
              s->status |= UHCI_STS_HCHALTED;
-@@ -536,6 +544,10 @@ static uint32_t uhci_ioport_readw(void *opaque, uint32_t addr)
+@@ -536,6 +591,10 @@ static uint32_t uhci_ioport_readw(void *opaque, uint32_t addr)
          val = s->intr;
          break;
      case 0x06:
@@ -57,23 +165,88 @@ index 746a1f5..4ab91f8 100644
          val = s->frnum;
          break;
      case 0x10 ... 0x1f:
-@@ -1028,7 +1040,6 @@ static void uhci_process_frame(UHCIState *s)
+@@ -1022,46 +1081,68 @@ static void uhci_process_frame(UHCIState *s)
+         /* go to the next entry */
+     }
+ 
+-    s->pending_int_mask = int_mask;
++    s->pending_int_mask |= int_mask;
+ }
+ 
  static void uhci_frame_timer(void *opaque)
  {
      UHCIState *s = opaque;
 -    int64_t expire_time;
++    uint64_t t_now, t_last_run;
++    int i, frames;
++    const uint64_t frame_t = ticks_per_sec / FRAME_TIMER_FREQ;
  
      if (!(s->cmd & UHCI_CMD_RS)) {
          /* Full stop */
-@@ -1059,9 +1070,9 @@ static void uhci_frame_timer(void *opaque)
-     uhci_async_validate_end(s);
+         qemu_del_timer(s->frame_timer);
+         /* set hchalted bit in status - UHCI11D 2.1.2 */
+         s->status |= UHCI_STS_HCHALTED;
++        s->timer_diff = diff_stopped;
+ 
+         dprintf("uhci: halted\n");
+         return;
+     }
+ 
+-    /* Complete the previous frame */
+-    if (s->pending_int_mask) {
+-        s->status2 |= s->pending_int_mask;
+-        s->status  |= UHCI_STS_USBINT;
+-        uhci_update_irq(s);
++    /* We still store expire_time in our state, for migration */
++    t_last_run = s->expire_time - frame_t;
++    t_now = qemu_get_clock(vm_clock);
++
++    /* Process up to MAX_FRAMES_PER_TICK frames */
++    frames = (t_now - t_last_run) / frame_t;
++    if (frames > MAX_FRAMES) {
++        int skipped = frames - MAX_FRAMES;
++        s->expire_time += skipped * frame_t;
++        s->frnum = (s->frnum + skipped) & 0x7ff;
++        frames -= skipped;
++    }
++    if (frames > MAX_FRAMES_PER_TICK) {
++        frames = MAX_FRAMES_PER_TICK;
+     }
+ 
+-    /* Start new frame */
+-    s->frnum = (s->frnum + 1) & 0x7ff;
++    for (i = 0; i < frames; i++) {
++        dprintf("uhci: new frame #%u\n" , s->frnum);
+ 
+-    dprintf("uhci: new frame #%u\n" , s->frnum);
++        uhci_async_validate_begin(s);
++        uhci_process_frame(s);
++        uhci_async_validate_end(s);
+ 
+-    uhci_async_validate_begin(s);
++        /* The spec says frnum is the frame currently being processed, and
++         * the guest must look at frnum - 1 on interrupt, so inc frnum now */
++        s->frnum = (s->frnum + 1) & 0x7ff;
++        s->expire_time += frame_t;
++    }
+ 
+-    uhci_process_frame(s);
++    /* Complete the previous frame(s) */
++    if (s->pending_int_mask) {
++        s->status2 |= s->pending_int_mask;
++        s->status  |= UHCI_STS_USBINT;
++        uhci_update_irq(s);
++    }
++    s->pending_int_mask = 0;
+ 
+-    uhci_async_validate_end(s);
++    s->timer_diff = diff_in_timer;
  
      /* prepare the timer for the next frame */
 -    expire_time = qemu_get_clock(vm_clock) +
-+    s->expire_time = qemu_get_clock(vm_clock) +
-         (ticks_per_sec / FRAME_TIMER_FREQ);
+-        (ticks_per_sec / FRAME_TIMER_FREQ);
 -    qemu_mod_timer(s->frame_timer, expire_time);
-+    qemu_mod_timer(s->frame_timer, s->expire_time);
++    qemu_mod_timer(s->frame_timer, t_now + frame_t * 9);
  }
  
  static void uhci_map(PCIDevice *pci_dev, int region_num,
