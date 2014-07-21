@@ -1646,7 +1646,7 @@ index b65c0f1..e2d8d2a 100644
      /* ??? Should this occur after vm_stop?  */
      qemu_aio_flush();
 diff --git a/xenstore.c b/xenstore.c
-index c7ca228..974a698 100644
+index c7ca228..1ef66a1 100644
 --- a/xenstore.c
 +++ b/xenstore.c
 @@ -14,6 +14,7 @@
@@ -1947,3 +1947,76 @@ index c7ca228..974a698 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
+@@ -2157,62 +2052,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+     free(buf);
+ }
+ 
+-#ifndef CONFIG_STUBDOM
+-
+-void xenstore_dom_chmod(int domid, const char *key, const char *perms)
+-{
+-    char *buf = NULL, *path = NULL;
+-    int rc = -1;
+-	struct xs_permissions p;
+-
+-    if (xsh == NULL)
+-        goto out;
+-
+-    path = xs_get_domain_path(xsh, domid);
+-    if (path == NULL) {
+-        fprintf(logfile, "xs_get_domain_path: error\n");
+-        goto out;
+-    }
+-
+-    pasprintf(&buf, "%s/%s", path, key);
+-
+-	xs_strings_to_perms(&p, 1, perms);
+-	xs_set_permissions(xsh, XBT_NULL, buf, &p, 1);
+-
+- out:
+-    free(path);
+-    free(buf);
+-}
+-
+-#endif /*CONFIG_STUBDOM*/
+-
+-int xenstore_dom_write(int domid, const char *key, const char *value)
+-{
+-    char *buf = NULL, *path = NULL;
+-    int rc = -1;
+-
+-    if (xsh == NULL)
+-        goto out;
+-
+-    path = xs_get_domain_path(xsh, domid);
+-    if (path == NULL) {
+-        fprintf(logfile, "xs_get_domain_path: error\n");
+-        goto out;
+-    }
+-
+-    pasprintf(&buf, "%s/%s", path, key);
+-    rc = xs_write(xsh, XBT_NULL, buf, value, strlen(value));
+-    if (rc == 0) {
+-        fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
+-        goto out;
+-    }
+-
+- out:
+-    free(path);
+-    free(buf);
+-    return rc;
+-}
+-
+ char *xenstore_read(const char *path)
+ {
+     char *value = NULL;
+@@ -2223,9 +2062,3 @@ char *xenstore_read(const char *path)
+     return xs_read(xsh, XBT_NULL, path, &len);
+ }
+ 
+-int xenstore_write(const char *path, const char *val)
+-{
+-    if (xsh == NULL)
+-        return 1;
+-    return xs_write(xsh, XBT_NULL, path, val, strlen(val));
+-}
