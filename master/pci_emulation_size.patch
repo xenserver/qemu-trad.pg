@@ -1,0 +1,86 @@
+pci_emulation_size.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+Reduce size required for pci_emulation_config_text.
+optarg can be safely saved for later reuse instead of copying the content.
+
+diff --git a/hw/pci_emulation.c b/hw/pci_emulation.c
+index a7fdfb1..16a9ede 100644
+--- a/hw/pci_emulation.c
++++ b/hw/pci_emulation.c
+@@ -12,9 +12,9 @@ typedef struct {
+     PCIDevice dev;
+ }   PCI_EMULATION_State;
+ 
+-void parse_pci_emulation_info(char *config_text, PCI_EMULATION_INFO *pci_emulation_info)
++void parse_pci_emulation_info(const char *config_text, PCI_EMULATION_INFO *pci_emulation_info)
+ {
+-    char *p;
++    const char *p;
+     int i;
+     int ret;
+     for (p = config_text, i = 0; *p != '\0'; p++) {
+diff --git a/hw/pci_emulation.h b/hw/pci_emulation.h
+index 85b24da..543183c 100644
+--- a/hw/pci_emulation.h
++++ b/hw/pci_emulation.h
+@@ -21,7 +21,7 @@ typedef struct PCI_EMULATION_INFO_t {
+     unsigned int interruputpin;
+ }   PCI_EMULATION_INFO;
+     
+-void parse_pci_emulation_info(char *config_text, PCI_EMULATION_INFO *pci_emulation_info);
++void parse_pci_emulation_info(const char *config_text, PCI_EMULATION_INFO *pci_emulation_info);
+ void pci_emulation_init(PCIBus *bus, PCI_EMULATION_INFO *pci_emulation_info);
+ 
+ extern PCI_EMULATION_INFO *PciEmulationInfoHead;
+diff --git a/sysemu.h b/sysemu.h
+index eb2accd..d30cbff 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -45,7 +45,7 @@ void do_delvm(const char *name);
+ void do_info_snapshots(void);
+ 
+ #ifdef CONFIG_PASSTHROUGH
+-int pci_emulation_add(char *config_text);
++int pci_emulation_add(const char *config_text);
+ #endif
+ 
+ void qemu_announce_self(void);
+diff --git a/vl.c b/vl.c
+index 5376b8a..3d8f475 100644
+--- a/vl.c
++++ b/vl.c
+@@ -5587,9 +5587,7 @@ geometry_error:
+                     fprintf(stderr, "Too many PCI emulations\n");
+                     exit(1);
+                 }
+-                pstrcpy(pci_emulation_config_text[nb_pci_emulation],
+-                        sizeof(pci_emulation_config_text[0]),
+-                        optarg);
++                pci_emulation_config_text[nb_pci_emulation] = optarg;
+                 nb_pci_emulation++;
+                 break;
+             case QEMU_OPTION_domid: /* depricated, use -xen-* instead */
+diff --git a/xen-vl-extra.c b/xen-vl-extra.c
+index 8921629..b65c0f1 100644
+--- a/xen-vl-extra.c
++++ b/xen-vl-extra.c
+@@ -20,7 +20,7 @@ int opengl_enabled = 0;
+ #endif
+ static const char *direct_pci;
+ static int nb_pci_emulation = 0;
+-static char pci_emulation_config_text[MAX_PCI_EMULATION][256];
++static const char *pci_emulation_config_text[MAX_PCI_EMULATION];
+ PCI_EMULATION_INFO *PciEmulationInfoHead = NULL;
+ 
+ int vncunused;
+@@ -132,7 +132,7 @@ void do_pci_add(char *devname)
+     acpi_php_add(devfn);
+ }
+ 
+-int pci_emulation_add(char *config_text)
++int pci_emulation_add(const char *config_text)
+ {
+     PCI_EMULATION_INFO *new;
+     if ((new = qemu_mallocz(sizeof(PCI_EMULATION_INFO))) == NULL) {

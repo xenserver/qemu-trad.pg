@@ -151,3 +151,9 @@ ioport_memory.patch
 zlib_leak.patch
 dynamic_vnc.patch
 unselect_console.patch
+cpu_ticks_static.patch
+vga_const.patch
+no_icount.patch
+pci_emulation_size.patch
+main_loop.patch
+cache_get_clock.patch

@@ -1,0 +1,72 @@
+vga_const.patch
+
+Consification for some VGA code.
+Improve memory sharing among processes.
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+diff --git a/cpu-all.h b/cpu-all.h
+index 60e0ac3..b9c6385 100644
+--- a/cpu-all.h
++++ b/cpu-all.h
+@@ -912,8 +912,8 @@ ram_addr_t cpu_get_physical_page_desc(target_phys_addr_t addr);
+ ram_addr_t qemu_ram_alloc(ram_addr_t);
+ void qemu_ram_free(ram_addr_t addr);
+ int cpu_register_io_memory(int io_index,
+-                           CPUReadMemoryFunc **mem_read,
+-                           CPUWriteMemoryFunc **mem_write,
++                           CPUReadMemoryFunc *const *mem_read,
++                           CPUWriteMemoryFunc *const *mem_write,
+                            void *opaque);
+ void cpu_unregister_io_memory(int table_address);
+ CPUWriteMemoryFunc **cpu_get_io_memory_write(int io_index);
+diff --git a/exec.c b/exec.c
+index 3746839..53c10db 100644
+--- a/exec.c
++++ b/exec.c
+@@ -2845,8 +2845,8 @@ static void io_mem_init(void)
+    value can be used with cpu_register_physical_memory(). (-1) is
+    returned if error. */
+ int cpu_register_io_memory(int io_index,
+-                           CPUReadMemoryFunc **mem_read,
+-                           CPUWriteMemoryFunc **mem_write,
++                           CPUReadMemoryFunc *const *mem_read,
++                           CPUWriteMemoryFunc *const *mem_write,
+                            void *opaque)
+ {
+     int i, subwidth = 0;
+diff --git a/hw/vga.c b/hw/vga.c
+index 26b5768..0d41ccd 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -2127,13 +2127,13 @@ static void vga_update_text(void *opaque, console_ch_t *chardata)
+     dpy_update(s->ds, 0, 0, s->last_width, height);
+ }
+ 
+-static CPUReadMemoryFunc *vga_mem_read[3] = {
++static CPUReadMemoryFunc *const vga_mem_read[3] = {
+     vga_mem_readb,
+     vga_mem_readw,
+     vga_mem_readl,
+ };
+ 
+-static CPUWriteMemoryFunc *vga_mem_write[3] = {
++static CPUWriteMemoryFunc *const vga_mem_write[3] = {
+     vga_mem_writeb,
+     vga_mem_writew,
+     vga_mem_writel,
+diff --git a/i386-dm/exec-dm.c b/i386-dm/exec-dm.c
+index 96274d9..cc3a199 100644
+--- a/i386-dm/exec-dm.c
++++ b/i386-dm/exec-dm.c
+@@ -331,8 +331,8 @@ static int get_free_io_mem_idx(void)
+    allocated. The return value can be used with
+    cpu_register_physical_memory(). (-1) is returned if error. */
+ int cpu_register_io_memory(int io_index,
+-                           CPUReadMemoryFunc **mem_read,
+-                           CPUWriteMemoryFunc **mem_write,
++                           CPUReadMemoryFunc *const *mem_read,
++                           CPUWriteMemoryFunc *const *mem_write,
+                            void *opaque)
+ {
+     int i;

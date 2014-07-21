@@ -1,0 +1,96 @@
+cache_get_clock.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+Cache get_clock result to make it faster.
+This safe more than 50% clock_gettime syscalls.
+
+diff --git a/vl.c b/vl.c
+index 6b93354..2012f14 100644
+--- a/vl.c
++++ b/vl.c
+@@ -886,13 +886,25 @@ static void init_get_clock(void)
+ #endif
+ }
+ 
++static int64_t old_get_clock = 0;
++
++static inline void update_get_clock(void)
++{
++    old_get_clock = 0;
++}
++
+ static int64_t get_clock(void)
+ {
+ #if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+     if (use_rt_clock) {
+         struct timespec ts;
++
++        if (old_get_clock)
++            return old_get_clock;
++
+         clock_gettime(CLOCK_MONOTONIC, &ts);
+-        return ts.tv_sec * 1000000000LL + ts.tv_nsec;
++        old_get_clock = ts.tv_sec * 1000000000LL + ts.tv_nsec;
++        return old_get_clock;
+     } else
+ #endif
+     {
+@@ -964,6 +976,7 @@ static int64_t cpu_get_clock(void)
+ static void cpu_enable_ticks(void)
+ {
+     if (!cpu_ticks_enabled) {
++        update_get_clock();
+         cpu_ticks_offset -= cpu_get_real_ticks();
+         cpu_clock_offset -= get_clock();
+         cpu_ticks_enabled = 1;
+@@ -3094,6 +3107,7 @@ static void vm_state_notify(int running, int reason)
+ 
+ void vm_start(void)
+ {
++    update_get_clock();
+     if (!vm_running) {
+         cpu_enable_ticks();
+         vm_running = 1;
+@@ -3103,6 +3117,7 @@ void vm_start(void)
+ 
+ void vm_stop(int reason)
+ {
++    update_get_clock();
+     if (vm_running) {
+         cpu_disable_ticks();
+         vm_running = 0;
+@@ -3268,6 +3283,8 @@ void main_loop_wait(int timeout)
+     struct timeval tv;
+     uint64_t delta_us;
+ 
++    update_get_clock();
++
+     qemu_bh_update_timeout(&timeout);
+ 
+     host_main_loop_wait(&timeout);
+@@ -3308,6 +3325,7 @@ void main_loop_wait(int timeout)
+     }
+ #endif
+     ret = select(nfds + 1, &rfds, &wfds, &xfds, &tv);
++    update_get_clock();
+     if (ret > 0) {
+         IOHandlerRecord **pioh;
+ 
+@@ -3332,6 +3350,7 @@ void main_loop_wait(int timeout)
+         }
+     }
+ #if defined(CONFIG_SLIRP)
++    update_get_clock();
+     if (slirp_is_inited()) {
+         if (ret < 0) {
+             FD_ZERO(&rfds);
+@@ -3348,6 +3367,8 @@ void main_loop_wait(int timeout)
+         exit(0);
+     }
+ 
++    update_get_clock();
++
+     /* vm time timers */
+     if (vm_running && likely(!(cur_cpu->singlestep_enabled & SSTEP_NOTIMER)))
+         qemu_run_timers(&active_timers[QEMU_TIMER_VIRTUAL],

@@ -1,0 +1,70 @@
+Do not use use icount with Xen
+
+icount is mainly the instruction count which is not really
+useful with Xen which handle the CPU for Qemu.
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+diff --git a/cpu-all.h b/cpu-all.h
+index b9c6385..9292b1c 100644
+--- a/cpu-all.h
++++ b/cpu-all.h
+@@ -758,7 +758,11 @@ void QEMU_NORETURN cpu_abort(CPUState *env, const char *fmt, ...)
+ extern CPUState *first_cpu;
+ extern CPUState *cpu_single_env;
+ extern int64_t qemu_icount;
++#ifdef CONFIG_DM
++enum { use_icount = 0 };
++#else
+ extern int use_icount;
++#endif
+ 
+ #define CPU_INTERRUPT_EXIT   0x01 /* wants exit from main loop */
+ #define CPU_INTERRUPT_HARD   0x02 /* hardware interrupt pending */
+diff --git a/i386-dm/exec-dm.c b/i386-dm/exec-dm.c
+index cc3a199..4ed2b2e 100644
+--- a/i386-dm/exec-dm.c
++++ b/i386-dm/exec-dm.c
+@@ -69,7 +69,6 @@ uint8_t code_gen_buffer[CODE_GEN_BUFFER_SIZE];
+ uint8_t *code_gen_ptr;
+ #endif /* !CONFIG_DM */
+ 
+-int use_icount = 0;
+ int64_t qemu_icount;
+ ram_addr_t phys_ram_size;
+ int phys_ram_fd;
+diff --git a/vl.c b/vl.c
+index 2a5dbc4..5376b8a 100644
+--- a/vl.c
++++ b/vl.c
+@@ -5802,12 +5802,14 @@ geometry_error:
+                     tb_size = 0;
+                 break;
+             case QEMU_OPTION_icount:
++#ifndef CONFIG_DM
+                 use_icount = 1;
+                 if (strcmp(optarg, "auto") == 0) {
+                     icount_time_shift = -1;
+                 } else {
+                     icount_time_shift = strtol(optarg, NULL, 0);
+                 }
++#endif
+                 break;
+             case QEMU_OPTION_incoming:
+                 incoming = optarg;
+@@ -5944,6 +5946,7 @@ geometry_error:
+         fprintf(stderr, "could not initialize alarm timer\n");
+         exit(1);
+     }
++#ifndef CONFIG_DM
+     if (use_icount && icount_time_shift < 0) {
+         use_icount = 2;
+         /* 125MIPS seems a reasonable initial guess at the guest speed.
+@@ -5951,6 +5954,7 @@ geometry_error:
+         icount_time_shift = 3;
+         init_icount_adjust();
+     }
++#endif
+ 
+ #ifdef _WIN32
+     socket_init();
