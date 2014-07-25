@@ -295,10 +295,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..9328c14
+index 0000000..0108be9
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2028 @@
+@@ -0,0 +1,2098 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -448,6 +448,7 @@ index 0000000..9328c14
 +static char root_directory[64];
 +static int termsig;
 +static char *domain_path = NULL;
++static char *vm_path = NULL;
 +static privsep_state_t state;
 +#define MAX_XS_CONN 4
 +static int xs_conns[MAX_XS_CONN] = { -1, -1, -1, -1 };
@@ -1563,6 +1564,7 @@ index 0000000..9328c14
 +    if (child == 0) {
 +        int i;
 +        struct rlimit limit;
++        char *path;
 +
 +        /* Child of privilege. */
 +
@@ -1606,6 +1608,17 @@ index 0000000..9328c14
 +            send_int(parent_fd, errno);
 +            exit(1);
 +        }
++        if (asprintf(&path, "%s/vm", domain_path) < 0) {
++            send_int(parent_fd, ENOMEM);
++            exit(1);
++        }
++        vm_path = xs_read(priv_xsh, XBT_NULL, path, NULL);
++        if (!vm_path) {
++            send_int(parent_fd, errno);
++            exit(1);
++        }
++        free(path);
++
 +        send_int(parent_fd, 0);
 +        send_string(parent_fd, domain_path);
 +
@@ -1947,15 +1960,72 @@ index 0000000..9328c14
 +    return n;
 +}
 +
++static inline bool
++path_starts_with(const char *path, const char *s)
++{
++    size_t l = strlen(s);
++    return strncmp(path, s, l) == 0 && (path[l] == 0 || path[l] == '/');
++}
++
 +static bool
 +check_xs_path(const char *path, check_type_t check)
 +{
++    static const char backend_d0[] = "/local/domain/0/backend";
++    const char *s;
++    char dom_num[64];
++
 +    if (state != privsep_started)
 +        return true;
 +
++    if (path_starts_with(path, domain_path)) {
++        if (check == CHECK_READ)
++            return true;
++        if (check != CHECK_WRITE)
++            goto fail;
++        s = path + strlen(domain_path);
++        if (*s++ != '/')
++            return false;
++        /*
++         * removed "device" as used only by Qemu as backend
++         * (not used in XenServer)
++         */
++        if (strcmp(s, "data/report_clipboard") == 0
++            || strcmp(s, "data/set_clipboard") == 0
++            || strcmp(s, "console/vnc-port") == 0
++            || strcmp(s, "device-misc/dm-ready") == 0)
++            return true;
++    }
++
++    if (check != CHECK_READ)
++        goto fail;
++
++    if (path_starts_with(path, backend_d0)) {
++        s = path + strlen(backend_d0);
++        if (s[0] != '/' || s[1] == 0 || s[1] == '/')
++            return false;
++        s = strchr(s+2, '/');
++        if (!s) goto fail;
++        sprintf(dom_num, "%u", domid);
++        if (path_starts_with(s+1, dom_num))
++            return true;
++    }
++
++    if (vm_path && path_starts_with(path, vm_path))
++        return true;
++
++    if (path_starts_with(path, "/local/logconsole"))
++        return true;
++
++    if (path_starts_with(path, "/mh/driver-blacklist"))
++        return true;
++
++    if (strcmp(path, "@releaseDomain") == 0)
++        return true;
++
++fail:
 +    /* NOTE: if returns false should set errno to EACCES */
-+    /* TODO */
-+    return true;
++    errno = EACCES;
++    return false;
 +}
 +
 +char *
@@ -2592,10 +2662,10 @@ index 0000000..de45ecd
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..2f6c59e
+index 0000000..ee80ff0
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,442 @@
+@@ -0,0 +1,555 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2863,6 +2933,8 @@ index 0000000..2f6c59e
 +
 +    /* must be done before the prepare */
 +    with_return(xs_get_domain_path, strdup("/local/domain/123"));
++    with_return_num(xs_read, 12);
++    with_return(xs_read, strdup("/vm/b78b8aba-9b19-1ce0-b977-3efb98a5fcbc"));
 +
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("foo123"));
@@ -2948,6 +3020,115 @@ index 0000000..2f6c59e
 +}
 +END_TEST
 +
++#define path_ok(path,ck) fail_if(!check_xs_path(path, CHECK_ ## ck))
++#define path_fail(path,ck) fail_if(check_xs_path(path, CHECK_ ## ck))
++
++START_TEST(sep_check_paths)
++{
++    domain_path = "/local/domain/123";
++    vm_path = "/vm/vmpathX";
++
++    state = privsep_started;
++
++    path_fail("", READ);
++    path_fail("", WRITE);
++
++    path_fail("/", READ);
++    path_fail("/", WRITE);
++
++    path_fail("/test", READ);
++    path_fail("/foo", WRITE);
++
++    path_fail("test", READ);
++    path_fail("foo", WRITE);
++
++    path_ok  ("/local/domain/0/backend/vbd3/123/5696/params", READ);
++    path_fail("/local/domain/0/backend/vbd3/1234/5696/params", READ);
++    path_fail("/local/domain/0/backend/vbd3/123/5696/params", WRITE);
++
++    path_ok  ("/local/domain/123/data/report_clipboard", READ);
++    path_ok  ("/local/domain/123/data/report_clipboard", WRITE);
++    path_ok  ("/local/domain/123/data/set_clipboard", READ);
++    path_ok  ("/local/domain/123/data/set_clipboard", WRITE);
++
++    path_ok  ("/local/domain/123/data/report_clipboard/x", READ);
++    path_fail("/local/domain/123/data/report_clipboard/x", WRITE);
++    path_ok  ("/local/domain/123/data/set_clipboard/x", READ);
++    path_fail("/local/domain/123/data/set_clipboard/x", WRITE);
++
++    path_fail("/local/domain/1231/data/report_clipboard", READ);
++    path_fail("/local/domain/1231/data/report_clipboard", WRITE);
++    path_fail("/local/domain/1231/data/set_clipboard", READ);
++    path_fail("/local/domain/1231/data/set_clipboard", WRITE);
++
++    path_fail("/local/domain/123", WRITE);
++    path_fail("/local/domain/1234", WRITE);
++    path_fail("/local/domain/123/", WRITE);
++    path_fail("/local/domain/123/vm", WRITE);
++
++    /* paths removed as used only by Qemu as backend (not used in XenServer) */
++#if 0
++    path_ok  ("/local/domain/123/device", WRITE);
++    path_ok  ("/local/domain/123/device/", WRITE);
++    path_ok  ("/local/domain/123/device/foo", WRITE);
++#endif
++    path_fail("/local/domain/1234/device", WRITE);
++    path_fail("/local/domain/123/deviceX", WRITE);
++    path_fail("/local/domain/1234/deviceX", WRITE);
++    path_fail("/local/domain/1234/device/", WRITE);
++    path_fail("/local/domain/1234/device/foo", WRITE);
++    path_fail("/local/domain/12/device", WRITE);
++    path_fail("/local/domain/12/deviceX", WRITE);
++    path_fail("/local/domain/12/device/", WRITE);
++    path_fail("/local/domain/12/device/foo", WRITE);
++
++    /* backend */
++    path_fail("/local/domain/0/backend", READ);
++    path_fail("/local/domain/0/backend//123", READ);
++    path_fail("/local/domain/0/backend//12", READ);
++    path_fail("/local/domain/0/backend//1234", READ);
++    path_ok  ("/local/domain/0/backend/x/123", READ);
++    path_fail("/local/domain/0/backend/x/12", READ);
++    path_fail("/local/domain/0/backend/x/1234", READ);
++    path_fail("/local/domain/0/backend/x/ 123", READ);
++    path_fail("/local/domain/0/backend/x/123 ", READ);
++
++    path_fail("/local/domain/17/keymap", READ);
++    path_ok  ("/local/domain/123/keymap", READ);
++
++    path_ok  ("/mh/driver-blacklist/xensource-windows/86451", READ);
++    path_fail("/mh/driver-blacklist/xensource-windows/86451", WRITE);
++    path_ok  ("/mh/driver-blacklist", READ);
++    path_fail("/mh/driver-blacklist", WRITE);
++    path_fail("/mh/driver-blacklistX", READ);
++    path_fail("/mh/driver-blacklistX", WRITE);
++    path_fail("/mh/", READ);
++    path_fail("/mh/", WRITE);
++    path_fail("/mh", READ);
++    path_fail("/mh", WRITE);
++    path_fail("/m", READ);
++    path_fail("/m", WRITE);
++
++    path_ok  ("/vm/vmpathX", READ);
++    path_fail("/vm/vmpathXY", READ);
++    path_ok  ("/vm/vmpathX/x", READ);
++    path_fail("/vm/vmpath", READ);
++    path_ok  ("/vm/vmpathX/", READ);
++    path_fail("/vm/vmpathXY/", READ);
++
++    path_fail("/vm/vmpathX", WRITE);
++    path_fail("/vm/vmpathXY", WRITE);
++    path_fail("/vm/vmpathX/x", WRITE);
++    path_fail("/vm/vmpath", WRITE);
++    path_fail("/vm/vmpathX/", WRITE);
++    path_fail("/vm/vmpathXY/", WRITE);
++
++    path_ok  ("/local/logconsole", READ);
++    path_ok  ("/local/logconsole/x", READ);
++    path_ok  ("@releaseDomain", READ);
++}
++END_TEST
++
 +struct xs_handle *xs_daemon_open(void)
 +{
 +    return (void *) (intptr_t) 0x1;
@@ -2967,7 +3148,8 @@ index 0000000..2f6c59e
 +void *xs_read(struct xs_handle *h, xs_transaction_t t,
 +		   const char *path, unsigned int *len)
 +{
-+    *len = mock_num();
++    unsigned n = mock_num();
++    if (len) *len = n;
 +    return (void*) mock();
 +}
 +
@@ -3032,8 +3214,9 @@ index 0000000..2f6c59e
 +sep_tc (void)
 +{
 +    TCase *tc = tcase_create ("Privsep");
-+    tcase_add_exit_test (tc, sep_data, 125);
-+    tcase_add_exit_test( tc, sep_test, 125);
++    tcase_add_exit_test(tc, sep_data, 125);
++    tcase_add_exit_test(tc, sep_test, 125);
++    tcase_add_test(tc, sep_check_paths);
 +
 +    return tc;
 +}
