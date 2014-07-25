@@ -295,10 +295,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..2547828
+index 0000000..9328c14
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,1945 @@
+@@ -0,0 +1,2028 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -427,6 +427,8 @@ index 0000000..2547828
 +    max_len_subpath = 256,
 +    max_len_act = 256,
 +    max_len_token = 256,
++    /* define limit of the dump file */
++    max_len_dump = (64*1024),
 +    /* define limit of data written by xs_write */
 +    max_len_xs_data = (64*1024),
 +};
@@ -460,7 +462,7 @@ index 0000000..2547828
 +    OPCODE(set_rtc) \
 +    OPCODE(ack_logdirty_switch) \
 +    OPCODE(read_logdirty) \
-+    OPCODE(open_vm_dump) \
++    OPCODE(save_vm_dump) \
 +    OPCODE(open_keymap) \
 +    OPCODE(record_dm) \
 +    OPCODE(write_vslots) \
@@ -567,8 +569,8 @@ index 0000000..2547828
 +
 +/* Write data with the assertion that it all has to be written, or
 + * else abort the process.  Based on atomicio() from openssh. */
-+static void
-+must_write(int fd, const void *buf, size_t n)
++static ssize_t
++write_all(int fd, const void *buf, size_t n)
 +{
 +        const char *s = buf;
 +        ssize_t res, pos = 0;
@@ -580,11 +582,19 @@ index 0000000..2547828
 +                        if (errno == EINTR || errno == EAGAIN)
 +                                continue;
 +                case 0:
-+                        clean_exit(0);
++                        return -1;
 +                default:
 +                        pos += res;
 +                }
 +        }
++        return pos;
++}
++
++static void
++must_write(int fd, const void *buf, size_t n)
++{
++    if (write_all(fd, buf, n) < 0)
++        clean_exit(0);
 +}
 +
 +#ifndef CONFIG_STUBDOM
@@ -1095,38 +1105,111 @@ index 0000000..2547828
 +
 +#ifndef CONFIG_STUBDOM
 +static void
-+open_vm_dump(void)
++save_vm_dump(void)
 +{
-+    int fd;
++    int fd, e;
 +    char name[128];
++    char *dump = NULL;
++    unsigned len;
 +
 +    sprintf(name, "/var/lib/xen/qemu-save.%d", domid);
 +
-+    fd = open(name, O_RDWR|O_CREAT|O_TRUNC, 0600);
++    dump = receive_string_limited(parent_fd, &len, max_len_dump);
++    if (!dump)
++        clean_exit(1);
 +
-+    send_fd(parent_fd, fd);
++    fd = open(name, O_RDWR|O_CREAT|O_TRUNC, 0600);
++    e = errno;
++    if (fd < 0)
++        goto done;
++
++    if (write_all(fd, dump, len) >= 0) {
++        e = 0;
++    } else {
++        e = errno;
++        unlink(name);
++    }
++
++done:
 +    if (fd >= 0)
 +        close(fd);
++    free(dump);
++    send_int(parent_fd, e);
 +}
 +#endif
++
++typedef struct {
++    char *buf;
++    uint32_t len, capacity;
++    int has_error;
++} vm_dump_t;
++
++static int
++dump_put_buffer(void *opaque, const uint8_t *buf,
++                int64_t pos, int size)
++{
++    vm_dump_t *dump = (vm_dump_t *) opaque;
++
++    if (pos < 0 || size < 0 || pos + size > max_len_dump)
++        dump->has_error = 1;
++    if (dump->has_error)
++        return -1;
++
++    /* resize buf if needed */
++    uint32_t s = pos + size;
++    s += 1023;
++    s -= s % 1024;
++    if (s > dump->capacity) {
++        char *p = (char *) realloc(dump->buf, s);
++        if (!p) {
++            dump->has_error = 1;
++            return -1;
++        }
++        dump->buf = p;
++        dump->capacity = s;
++    }
++
++    memcpy(dump->buf + pos, buf, size);
++    s = pos + size;
++    if (s > dump->len)
++        dump->len = s;
++    return size;
++}
++
++
++static int
++dump_close(void *opaque)
++{
++    vm_dump_t *dump = (vm_dump_t *) opaque;
++    int ret = -1;
++
++    if (dump->has_error || dump->len > max_len_dump || !dump->buf)
++        goto cleanup;
++
++    send_command(privsep_fd, privsep_op_save_vm_dump);
++    send_buf(privsep_fd, dump->buf, dump->len);
++
++    ret = receive_int(privsep_fd);
++
++cleanup:
++    free(dump->buf);
++    free(dump);
++    return ret;
++}
 +
 +QEMUFile *
 +privsep_open_vm_dump(const char *name)
 +{
-+    int fd;
-+
-+    if (privsep_fd < 0) {
-+       fd = open(name, O_RDWR|O_CREAT|O_TRUNC, 0600);
-+    } else {
-+        send_command(privsep_fd, privsep_op_open_vm_dump);
-+        /* ignore name is always constant */
-+
-+        fd = receive_fd(privsep_fd);
-+    }
-+
-+    if (fd < 0)
++    vm_dump_t *dump = (vm_dump_t *) calloc(1, sizeof(*dump));
++    if (!dump)
 +        return NULL;
-+    return qemu_fdopen(fd, "wb");
++
++    QEMUFile *res = qemu_fopen_ops(dump, dump_put_buffer, NULL, dump_close, NULL);
++    if (!res) {
++        free(dump);
++        return NULL;
++    }
++    return res;
 +}
 +
 +static int
@@ -2509,10 +2592,10 @@ index 0000000..de45ecd
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..8c8a0e1
+index 0000000..2f6c59e
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,433 @@
+@@ -0,0 +1,442 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2547,6 +2630,15 @@ index 0000000..8c8a0e1
 +int xc_evtchn_fd(xc_interface *xc)
 +{
 +    return -1;
++}
++
++QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
++                         QEMUFileGetBufferFunc *get_buffer,
++                         QEMUFileCloseFunc *close,
++                         QEMUFileRateLimit *rate_limit)
++{
++    exit(1);
++    return NULL;
 +}
 +
 +static void
@@ -3049,7 +3141,7 @@ index 2012f14..bed7d54 100644
      net_cleanup();
  
 diff --git a/xen-vl-extra.c b/xen-vl-extra.c
-index b65c0f1..e2d8d2a 100644
+index b65c0f1..d1323e1 100644
 --- a/xen-vl-extra.c
 +++ b/xen-vl-extra.c
 @@ -8,6 +8,7 @@
@@ -3060,15 +3152,30 @@ index b65c0f1..e2d8d2a 100644
  
  /* Max number of PCI emulation */
  #define MAX_PCI_EMULATION 32
-@@ -33,7 +34,7 @@ void do_savevm(const char *name)
+@@ -31,9 +32,9 @@ int vncunused;
+ void do_savevm(const char *name)
+ {
      QEMUFile *f;
-     int saved_vm_running, ret;
+-    int saved_vm_running, ret;
++    int saved_vm_running, ret, ret2;
  
 -    f = qemu_fopen(name, "wb");
 +    f = privsep_open_vm_dump(name);
      
      /* ??? Should this occur after vm_stop?  */
      qemu_aio_flush();
+@@ -47,9 +48,9 @@ void do_savevm(const char *name)
+     }
+     
+     ret = qemu_savevm_state(f);
+-    qemu_fclose(f);
++    ret2 = qemu_fclose(f);
+ 
+-    if (ret < 0)
++    if (ret < 0 || ret2)
+         fprintf(logfile, "Error %d while writing VM to savevm file '%s'\n",
+                 ret, name);
+ 
 diff --git a/xenstore.c b/xenstore.c
 index c7ca228..ab13518 100644
 --- a/xenstore.c
