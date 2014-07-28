@@ -2527,6 +2527,18 @@ index e3c4045..60f3a60 100644
  typedef struct QEMUFileBdrv
  {
      BlockDriverState *bs;
+diff --git a/sysemu.h b/sysemu.h
+index d30cbff..b342b58 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -41,6 +41,7 @@ void qemu_system_reset(void);
+ 
+ void do_savevm(const char *name);
+ void do_loadvm(const char *name);
++void do_loadvm_file(QEMUFile *f, const char *name);
+ void do_delvm(const char *name);
+ void do_info_snapshots(void);
+ 
 diff --git a/unittests/Makefile b/unittests/Makefile
 index c91e17c..623caa2 100644
 --- a/unittests/Makefile
@@ -3243,7 +3255,7 @@ index fc8104d..87e02eb 100644
      return s;
  }
 diff --git a/vl.c b/vl.c
-index 2012f14..bed7d54 100644
+index 2012f14..5258d21 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -48,6 +48,7 @@
@@ -3270,7 +3282,7 @@ index 2012f14..bed7d54 100644
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -4410,6 +4413,7 @@ int main(int argc, char **argv, char **envp)
+@@ -4410,9 +4413,11 @@ int main(int argc, char **argv, char **envp)
      int fd = 0;
      struct passwd *pwd = NULL;
      const char *chroot_dir = NULL;
@@ -3278,7 +3290,11 @@ index 2012f14..bed7d54 100644
      const char *run_as = NULL;
      char *crashdump_dir = NULL;
      long long crashdump_quota = 0;
-@@ -5220,6 +5224,9 @@ geometry_error:
++    QEMUFile *load_f = NULL;
+ 
+     logfile = stderr; /* initial value */
+ 
+@@ -5220,6 +5225,9 @@ geometry_error:
              case QEMU_OPTION_chroot:
                  chroot_dir = optarg;
                  break;
@@ -3288,7 +3304,7 @@ index 2012f14..bed7d54 100644
              case QEMU_OPTION_runas:
                  run_as = optarg;
                  break;
-@@ -5308,6 +5315,9 @@ geometry_error:
+@@ -5308,6 +5316,9 @@ geometry_error:
      }
  #endif
  
@@ -3298,7 +3314,7 @@ index 2012f14..bed7d54 100644
      if (pid_file && qemu_create_pidfile(pid_file) != 0) {
          if (daemonize) {
              uint8_t status = 1;
-@@ -5515,6 +5525,8 @@ geometry_error:
+@@ -5515,6 +5526,8 @@ geometry_error:
          provision_crashdump(crashdump_dir, crashdump_quota);
      }
  
@@ -3307,24 +3323,68 @@ index 2012f14..bed7d54 100644
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-@@ -5821,6 +5833,15 @@ geometry_error:
-         close(fd);
+@@ -5614,11 +5627,13 @@ geometry_error:
+         }
      }
  
+-    if (loadvm)
+-        do_loadvm(loadvm);
+-
+-    fprintf(logfile, "releasing VM\n");
+-    xenstore_dm_finished_startup();
++    if (loadvm) {
++        load_f = qemu_fopen(loadvm, "rb");
++        if (!load_f) {
++            fprintf(logfile, "Could not open VM state file\n");
++            abort();
++        }
++    }
+ 
+     /* init USB devices */
+     if (usb_enabled) {
+@@ -5757,6 +5772,30 @@ geometry_error:
+         qemu_start_incoming_migration(incoming);
+     }
+ 
++    if (daemonize) {
++        TFR(fd = open("/dev/null", O_RDWR));
++        if (fd == -1)
++            exit(1);
++    }
++
 +#ifdef __linux__
 +    if (!priv) {
 +        if (xc_interface_restrict(xc_handle, domid) < 0)
 +            fprintf(stderr, "xc_interface_restrict(): %s\n", strerror(errno));
 +
 +        init_privsep();
++
++        run_as = NULL;
++        chroot_dir = NULL;
 +    }
 +#endif
 +
-     main_loop();
-     net_cleanup();
++    if (load_f)
++        do_loadvm_file(load_f, loadvm);
++
++    fprintf(logfile, "releasing VM\n");
++    xenstore_dm_finished_startup();
++
+     if (autostart)
+         vm_start();
  
+@@ -5773,9 +5812,6 @@ geometry_error:
+ 	    exit(1);
+ 
+ 	chdir("/");
+-	TFR(fd = open("/dev/null", O_RDWR));
+-	if (fd == -1)
+-	    exit(1);
+     }
+ 
+ #ifndef CONFIG_STUBDOM
 diff --git a/xen-vl-extra.c b/xen-vl-extra.c
-index b65c0f1..d1323e1 100644
+index b65c0f1..37d01c8 100644
 --- a/xen-vl-extra.c
 +++ b/xen-vl-extra.c
 @@ -8,6 +8,7 @@
@@ -3359,6 +3419,40 @@ index b65c0f1..d1323e1 100644
          fprintf(logfile, "Error %d while writing VM to savevm file '%s'\n",
                  ret, name);
  
+@@ -59,9 +60,19 @@ void do_savevm(const char *name)
+ 
+     return;
+ }
++
+ void do_loadvm(const char *name)
+ {
+-    QEMUFile *f;
++    QEMUFile *f = qemu_fopen(name, "rb");
++    if (!f) {
++        fprintf(logfile, "Could not open VM state file\n");
++        abort();
++    }
++    do_loadvm_file(f, name);
++}
++
++void do_loadvm_file(QEMUFile *f, const char *name)
++{
+     int saved_vm_running, ret;
+ 
+     /* Flush all IO requests so they don't interfere with the new state.  */
+@@ -71,12 +82,6 @@ void do_loadvm(const char *name)
+     vm_stop(0);
+ 
+     /* restore the VM state */
+-    f = qemu_fopen(name, "rb");
+-    if (!f) {
+-        fprintf(logfile, "Could not open VM state file\n");
+-        abort();
+-    }
+-
+     ret = qemu_loadvm_state(f);
+     qemu_fclose(f);
+     if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
 index c7ca228..ab13518 100644
 --- a/xenstore.c
