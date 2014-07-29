@@ -231,7 +231,7 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..94e61d1
+index 0000000..58f1336
 --- /dev/null
 +++ b/privsep.c
 @@ -0,0 +1,1142 @@
@@ -642,7 +642,7 @@ index 0000000..94e61d1
 +}
 +
 +static void
-+set_cd_lock_state(int id, char *state)
++set_cd_lock_state(int id, const char *state)
 +{
 +    char *locked_path;
 +    if (cd_backend_areas[id]) {
@@ -702,7 +702,7 @@ index 0000000..94e61d1
 +}
 +
 +static int 
-+xenstore_vm_write(int domid, char *key, char *value)
++xenstore_vm_write(int domid, const char *key, const char *value)
 +{
 +    char *buf, *path;
 +    int rc;
@@ -783,7 +783,7 @@ index 0000000..94e61d1
 +    if (!act)
 +        return;
 +    must_read(parent_fd, act, l);
-+    fprintf(logfile, "ack2 logdirty %.*s\n", l, act);
++    fprintf(logfile, "ack2 logdirty %.*s\n", (int) l, act);
 +    do_ack_logdirty_switch(act, l);
 +    free(act);
 +}
@@ -811,7 +811,7 @@ index 0000000..94e61d1
 +static void
 +open_vm_dump(void)
 +{
-+    int fd, l;
++    int fd = -1, l;
 +    char *name = NULL;
 +
 +    must_read(parent_fd, &l, sizeof(l));
@@ -935,7 +935,7 @@ index 0000000..94e61d1
 +    return receive_file(privsep_fd, "r");
 +}
 +
-+static void _xenstore_record_dm(char *subpath, char *state)
++static void _xenstore_record_dm(const char *subpath, const char *state)
 +{
 +    char *path = NULL;
 +
@@ -986,7 +986,7 @@ index 0000000..94e61d1
 +    free(state);
 +}
 +
-+static char *_xenstore_read_dm(char *subpath)
++static char *_xenstore_read_dm(const char *subpath)
 +{
 +    int len;
 +    char *path = NULL;
@@ -1314,7 +1314,7 @@ index 0000000..94e61d1
 +        err(1, "cloning cd backend path %s", path);
 +}
 +
-+void privsep_record_dm(char *subpath, char *state)
++void privsep_record_dm(const char *subpath, const char *state)
 +{
 +    enum privsep_opcode cmd;
 +    size_t l;
@@ -1351,7 +1351,7 @@ index 0000000..94e61d1
 +    return;
 +}
 +
-+char* privsep_read_dm(char *subpath)
++char* privsep_read_dm(const char *subpath)
 +{
 +    enum privsep_opcode cmd;
 +    size_t l;
@@ -1379,7 +1379,7 @@ index 0000000..94e61d1
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..1ced0a2
+index 0000000..41de591
 --- /dev/null
 +++ b/privsep.h
 @@ -0,0 +1,20 @@
@@ -1398,9 +1398,9 @@ index 0000000..1ced0a2
 +void privsep_set_cd_backend(int id, const char *path);
 +QEMUFile* privsep_open_vm_dump(const char *name);
 +FILE* privsep_open_keymap(const char *language);
-+void privsep_record_dm(char *subpath, char *state);
++void privsep_record_dm(const char *subpath, const char *state);
 +void privsep_write_vslots(char *vslots);
-+char* privsep_read_dm(char *subpath);
++char* privsep_read_dm(const char *subpath);
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
@@ -1470,7 +1470,7 @@ index e3c4045..60f3a60 100644
  {
      BlockDriverState *bs;
 diff --git a/vl.c b/vl.c
-index d93d2bb..2136022 100644
+index 2012f14..667dbf1 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -48,6 +48,7 @@
@@ -1481,7 +1481,7 @@ index d93d2bb..2136022 100644
  #include "qemu-xen.h"
  
  #include <xen/hvm/hvm_info_table.h>
-@@ -4471,6 +4472,7 @@ enum {
+@@ -3878,6 +3879,7 @@ enum {
      QEMU_OPTION_tb_size,
      QEMU_OPTION_incoming,
      QEMU_OPTION_chroot,
@@ -1489,7 +1489,7 @@ index d93d2bb..2136022 100644
      QEMU_OPTION_runas,
      QEMU_OPTION_crashdump_dir,
      QEMU_OPTION_crashdump_quota,
-@@ -4635,6 +4637,7 @@ static const QEMUOption qemu_options[] = {
+@@ -4042,6 +4044,7 @@ static const QEMUOption qemu_options[] = {
      { "tb-size", HAS_ARG, QEMU_OPTION_tb_size },
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
@@ -1497,7 +1497,7 @@ index d93d2bb..2136022 100644
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -5003,6 +5006,7 @@ int main(int argc, char **argv, char **envp)
+@@ -4410,6 +4413,7 @@ int main(int argc, char **argv, char **envp)
      int fd = 0;
      struct passwd *pwd = NULL;
      const char *chroot_dir = NULL;
@@ -1505,7 +1505,7 @@ index d93d2bb..2136022 100644
      const char *run_as = NULL;
      char *crashdump_dir = NULL;
      long long crashdump_quota = 0;
-@@ -5816,6 +5820,9 @@ geometry_error:
+@@ -5220,6 +5224,9 @@ geometry_error:
              case QEMU_OPTION_chroot:
                  chroot_dir = optarg;
                  break;
@@ -1515,7 +1515,7 @@ index d93d2bb..2136022 100644
              case QEMU_OPTION_runas:
                  run_as = optarg;
                  break;
-@@ -6113,6 +6120,8 @@ geometry_error:
+@@ -5515,6 +5522,8 @@ geometry_error:
          provision_crashdump(crashdump_dir, crashdump_quota);
      }
  
@@ -1524,7 +1524,7 @@ index d93d2bb..2136022 100644
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-@@ -6418,6 +6427,17 @@ geometry_error:
+@@ -5821,6 +5830,17 @@ geometry_error:
          close(fd);
      }
  
@@ -1540,10 +1540,10 @@ index d93d2bb..2136022 100644
 +#endif
 +
      main_loop();
-     quit_timers();
      net_cleanup();
+ 
 diff --git a/xen-vl-extra.c b/xen-vl-extra.c
-index 8921629..7b3a0d0 100644
+index b65c0f1..e2d8d2a 100644
 --- a/xen-vl-extra.c
 +++ b/xen-vl-extra.c
 @@ -8,6 +8,7 @@
