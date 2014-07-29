@@ -231,10 +231,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..58f1336
+index 0000000..f1ffe68
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,1142 @@
+@@ -0,0 +1,1152 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -1377,12 +1377,22 @@ index 0000000..58f1336
 +        return NULL;
 +}
 +
++int xc_interface_restrict_qemu(xc_interface *xc_handle, int domid)
++{
++    return 0;
++}
++
++int xc_evtchn_restrict(xc_interface *xce_handle, int domid)
++{
++    return 0;
++}
++
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..41de591
+index 0000000..c5656f6
 --- /dev/null
 +++ b/privsep.h
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,23 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
 +
@@ -1401,6 +1411,9 @@ index 0000000..41de591
 +void privsep_record_dm(const char *subpath, const char *state);
 +void privsep_write_vslots(char *vslots);
 +char* privsep_read_dm(const char *subpath);
++int xc_interface_restrict_qemu(xc_interface *xc_handle, int domid);
++#define xc_interface_restrict(h,d) xc_interface_restrict_qemu(h,d)
++int xc_evtchn_restrict(xc_interface *xce_handle, int domid);
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
