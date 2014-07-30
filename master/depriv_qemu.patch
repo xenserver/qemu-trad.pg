@@ -2674,10 +2674,10 @@ index 0000000..de45ecd
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..ee80ff0
+index 0000000..41cb63e
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,555 @@
+@@ -0,0 +1,601 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2945,12 +2945,16 @@ index 0000000..ee80ff0
 +
 +    /* must be done before the prepare */
 +    with_return(xs_get_domain_path, strdup("/local/domain/123"));
++    with_return(xs_read, NULL);
 +    with_return_num(xs_read, 12);
 +    with_return(xs_read, strdup("/vm/b78b8aba-9b19-1ce0-b977-3efb98a5fcbc"));
 +
++    with_return(xs_read, NULL);
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("foo123"));
 +
++    with_return(xs_write, "/test2");
++    with_return(xs_write, NULL);
 +    with_return_num(xs_write, true);
 +
 +    with_return_num(xs_watch, true);
@@ -2962,8 +2966,33 @@ index 0000000..ee80ff0
 +    with_return(xs_unwatch, "foo");
 +    with_return_num(xs_unwatch, true);
 +
++    with_return(xs_read, NULL);
 +    with_return_num(xs_read, 10);
 +    with_return(xs_read, strdup("test_watch"));
++
++    with_return(xs_write, "/local/domain/0/device-model/123/logdirty/ret");
++    with_return(xs_write, "enable");
++    with_return_num(xs_write, true);
++
++    with_return(xs_read, "/local/domain/0/device-model/123/logdirty/cmd");
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state1"));
++
++    with_return(xs_write, "/local/domain/0/device-model/123/logdirty/ret");
++    with_return(xs_write, "disable");
++    with_return_num(xs_write, false);
++
++    with_return(xs_read, "/local/domain/0/device-model/123/logdirty/cmd");
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state2"));
++
++    with_return(xs_write, "/local/domain/0/device-model/123/a/b/c");
++    with_return(xs_write, NULL);
++    with_return_num(xs_write, true);
++
++    with_return(xs_read, "/local/domain/0/device-model/123/xyz/etc");
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state3"));
 +
 +    privsep_prepare();
 +
@@ -3024,6 +3053,14 @@ index 0000000..ee80ff0
 +    s = privsep_read(xsh, XBT_NULL, "/test1", &l);
 +    fail_if(strcmp(s, "test_watch") != 0);
 +    free(s);
++
++    privsep_ack_logdirty_switch("enable");
++    fail_if(strcmp(privsep_read_logdirty(&l), "state1") != 0);
++    privsep_ack_logdirty_switch("disable");
++    fail_if(strcmp(privsep_read_logdirty(&l), "state2") != 0);
++
++    privsep_record_dm("a/b/c", "value");
++    fail_if(strcmp(privsep_read_dm("xyz/etc"), "state3") != 0);
 +
 +    close(privsep_fd);
 +    wait(&fd);
@@ -3160,6 +3197,9 @@ index 0000000..ee80ff0
 +void *xs_read(struct xs_handle *h, xs_transaction_t t,
 +		   const char *path, unsigned int *len)
 +{
++    char *s = (char *) mock();
++    if (s && strcmp(s, path) != 0)
++        exit(1);
 +    unsigned n = mock_num();
 +    if (len) *len = n;
 +    return (void*) mock();
@@ -3168,6 +3208,12 @@ index 0000000..ee80ff0
 +bool xs_write(struct xs_handle *h, xs_transaction_t t,
 +		   const char *path, const void *data, unsigned int len)
 +{
++    char *s = (char *) mock();
++    if (s && strcmp(s, path) != 0)
++        exit(1);
++    s = (char *) mock();
++    if (s && strcmp(s, data) != 0)
++        exit(1);
 +    return (bool) mock_num();
 +}
 +
