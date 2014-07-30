@@ -1,0 +1,61 @@
+usb_timer.patch
+
+From: Frediano Ziglio <frediano.ziglio@citrix.com>
+
+diff --git a/hw/usb-uhci.c b/hw/usb-uhci.c
+index 18425f5..4e622c6 100644
+--- a/hw/usb-uhci.c
++++ b/hw/usb-uhci.c
+@@ -753,7 +753,7 @@ static int uhci_complete_td(UHCIState *s, UHCI_TD *td, UHCIAsync *async, uint32_
+ 
+     ret = async->packet.len;
+ 
+-    if (td->ctrl & TD_CTRL_IOC)
++    if (ret != USB_RET_NAK && td->ctrl & TD_CTRL_IOC)
+         *int_mask |= 0x01;
+ 
+     if (td->ctrl & TD_CTRL_IOS)
+@@ -826,7 +826,7 @@ out:
+         if (err == 0) {
+             td->ctrl &= ~TD_CTRL_ACTIVE;
+             s->status |= UHCI_STS_USBERR;
+-            uhci_update_irq(s);
++            *int_mask |= 0x4;
+         }
+     }
+     td->ctrl = (td->ctrl & ~(3 << TD_CTRL_ERROR_SHIFT)) |
+@@ -841,8 +841,15 @@ static int uhci_handle_td(UHCIState *s, uint32_t addr, UHCI_TD *td, uint32_t *in
+     uint8_t pid;
+ 
+     /* Is active ? */
+-    if (!(td->ctrl & TD_CTRL_ACTIVE))
++    if (!(td->ctrl & TD_CTRL_ACTIVE)) {
++        /*
++         * ehci11d spec page 22: "Even if the Active bit in the TD is already
++         * cleared when the TD is fetched ... an IOC interrupt is generated"
++         */
++        if (td->ctrl & TD_CTRL_IOC)
++            *int_mask |= 0x01;
+         return 1;
++    }
+ 
+     async = uhci_async_find_td(s, addr, td->token);
+     if (async) {
+@@ -893,7 +900,7 @@ static int uhci_handle_td(UHCIState *s, uint32_t addr, UHCI_TD *td, uint32_t *in
+         /* invalid pid : frame interrupted */
+         uhci_async_free(s, async);
+         s->status |= UHCI_STS_HCPERR;
+-        uhci_update_irq(s);
++        *int_mask |= 0x4;
+         return -1;
+     }
+  
+@@ -1133,7 +1140,7 @@ static void uhci_frame_timer(void *opaque)
+ 
+     /* Complete the previous frame(s) */
+     if (s->pending_int_mask) {
+-        s->status2 |= s->pending_int_mask;
++        s->status2 |= s->pending_int_mask & 0x3;
+         s->status  |= UHCI_STS_USBINT;
+         uhci_update_irq(s);
+     }
