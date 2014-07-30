@@ -295,7 +295,7 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..0108be9
+index 0000000..3001873
 --- /dev/null
 +++ b/privsep.c
 @@ -0,0 +1,2098 @@
@@ -1759,7 +1759,7 @@ index 0000000..0108be9
 +{
 +    int id = receive_int(parent_fd);
 +    receive_string_buf(parent_fd, cd_path);
-+    if (id >= 0 && id < MAX_CDS)
++    if (state == privsep_prepared && id >= 0 && id < MAX_CDS)
 +        do_set_cd_backend(id, cd_path);
 +}
 +
