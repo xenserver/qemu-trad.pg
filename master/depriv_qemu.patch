@@ -295,10 +295,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..3001873
+index 0000000..a4dcac1
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2098 @@
+@@ -0,0 +1,2102 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -2311,6 +2311,10 @@ index 0000000..3001873
 +
 +    /* wait other end close */
 +    errno = receive_int(privsep_fd);
++
++    privsep_handle_t *h = (privsep_handle_t*) xsh;
++    close(h->watch_fd);
++    free(h);
 +}
 +
 +static void
