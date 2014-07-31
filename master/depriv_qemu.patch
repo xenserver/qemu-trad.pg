@@ -2576,10 +2576,10 @@ index c91e17c..623caa2 100644
  	./xen-tests
 diff --git a/unittests/mock.c b/unittests/mock.c
 new file mode 100644
-index 0000000..642f3c5
+index 0000000..02683f3
 --- /dev/null
 +++ b/unittests/mock.c
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,91 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2656,12 +2656,27 @@ index 0000000..642f3c5
 +    return ret;
 +}
 +
++int mock_check_left(void)
++{
++    int found = 0;
++    func_t *f;
++    value_t *v;
++
++    for (f = funcs; f; f = f->next)
++        for (v = f->first; v; v = v->next) {
++            found = 1;
++            fprintf(stderr, "Value %p still present for %s\n", v->value, f->name);
++        }
++
++    return !found;
++}
++
 diff --git a/unittests/mock.h b/unittests/mock.h
 new file mode 100644
-index 0000000..de45ecd
+index 0000000..1d48502
 --- /dev/null
 +++ b/unittests/mock.h
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,16 @@
 +#ifndef _QEMU_MOCK_H_
 +#define _QEMU_MOCK_H_
 +
@@ -2675,13 +2690,15 @@ index 0000000..de45ecd
 +#define mock_num() ((long) _mock(__func__, __FILE__, __LINE__))
 +const void *_mock(const char *f, const char *fn, int ln);
 +
++int mock_check_left(void);
++
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..41cb63e
+index 0000000..9dc5993
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,601 @@
+@@ -0,0 +1,621 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2820,6 +2837,7 @@ index 0000000..41cb63e
 +    s = receive_string(socks[0], &l);
 +    fail_if(strcmp(s, "foo 123") != 0);
 +    fail_if(l != 7);
++    free(s);
 +    end_test();
 +
 +    /* send/receive normal string with terminator */
@@ -2835,6 +2853,7 @@ index 0000000..41cb63e
 +    s = receive_string(socks[0], &l);
 +    fail_if(memcmp(s, "foo\0\0duck\0", 10) != 0);
 +    fail_if(l != 9);
++    free(s);
 +    end_test();
 +
 +    /* send/receive NULL string. This happen if xs_read has not data */
@@ -2990,13 +3009,17 @@ index 0000000..41cb63e
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("state2"));
 +
-+    with_return(xs_write, "/local/domain/0/device-model/123/a/b/c");
++    with_return(xs_write, "/local/domain/0/device-model/123/state");
 +    with_return(xs_write, NULL);
 +    with_return_num(xs_write, true);
 +
 +    with_return(xs_read, "/local/domain/0/device-model/123/xyz/etc");
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("state3"));
++
++    with_return(xs_write, NULL);
++    with_return(xs_write, "mock_check");
++    with_return_num(xs_write, false);
 +
 +    privsep_prepare();
 +
@@ -3054,20 +3077,31 @@ index 0000000..41cb63e
 +    /* close should delete automatically the remain watch */
 +    privsep_daemon_close(xsh);
 +
++    xsh = privsep_daemon_open();
 +    s = privsep_read(xsh, XBT_NULL, "/test1", &l);
 +    fail_if(strcmp(s, "test_watch") != 0);
 +    free(s);
++    privsep_daemon_close(xsh);
 +
 +    privsep_ack_logdirty_switch("enable");
-+    fail_if(strcmp(privsep_read_logdirty(&l), "state1") != 0);
++    fail_if(strcmp(s=privsep_read_logdirty(&l), "state1") != 0);
++    free(s);
 +    privsep_ack_logdirty_switch("disable");
-+    fail_if(strcmp(privsep_read_logdirty(&l), "state2") != 0);
++    fail_if(strcmp(s=privsep_read_logdirty(&l), "state2") != 0);
++    free(s);
 +
 +    privsep_record_dm("a/b/c", "value");
-+    fail_if(strcmp(privsep_read_dm("xyz/etc"), "state3") != 0);
++    privsep_record_dm("state", "value");
++    fail_if(strcmp(s=privsep_read_dm("xyz/etc"), "state3") != 0);
++    free(s);
 +
++    /* check other process eat all data queued in mock */
++    privsep_ack_logdirty_switch("mock_check");
 +    close(privsep_fd);
-+    wait(&fd);
++    int status;
++    wait(&status);
++    fail_if(!WIFEXITED(status));
++    fail_if(WEXITSTATUS(status) != 189);
 +
 +    exit(125);
 +}
@@ -3216,9 +3250,12 @@ index 0000000..41cb63e
 +    if (s && strcmp(s, path) != 0)
 +        exit(1);
 +    s = (char *) mock();
++    bool res = (bool) mock_num();
++    if (s && strcmp(s, "mock_check") == 0 && mock_check_left())
++        exit(189);
 +    if (s && strcmp(s, data) != 0)
 +        exit(1);
-+    return (bool) mock_num();
++    return res;
 +}
 +
 +bool xs_rm(struct xs_handle *h, xs_transaction_t t,
