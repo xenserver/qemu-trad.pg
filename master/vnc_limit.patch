@@ -1,0 +1,105 @@
+diff --git a/vnc.c b/vnc.c
+index a41e549..13d405f 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -31,6 +31,9 @@
+ #include "audio/audio.h"
+ #include <zlib.h>
+ 
++/* output limit to stop handling requests */
++#define VNC_OUTPUT_LIMIT (2u*1024u*1024u)
++
+ #define VNC_REFRESH_INTERVAL_BASE 30
+ #define VNC_REFRESH_INTERVAL_INC  50
+ #define VNC_REFRESH_INTERVAL_MAX  2000
+@@ -1059,6 +1062,7 @@ static void vnc_client_write(void *opaque)
+ {
+     long ret;
+     VncState *vs = opaque;
++    size_t orig_offset = vs->output.offset;
+ 
+ #ifdef CONFIG_VNC_TLS
+     if (vs->tls_session) {
+@@ -1081,7 +1085,9 @@ static void vnc_client_write(void *opaque)
+     vs->output.offset -= ret;
+ 
+     if (vs->output.offset == 0) {
+-	qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, NULL, vs);
++        qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, NULL, vs);
++    } else if (orig_offset >= VNC_OUTPUT_LIMIT && vs->output.offset < VNC_OUTPUT_LIMIT) {
++        qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, vnc_client_write, vs);
+     }
+ }
+ 
+@@ -1091,11 +1097,46 @@ static void vnc_read_when(VncState *vs, VncReadEvent *func, size_t expecting)
+     vs->read_handler_expect = expecting;
+ }
+ 
++static bool vnc_consume_input(VncState *vs)
++{
++    bool res = false;
++
++    while (vs->read_handler && vs->input.offset >= vs->read_handler_expect) {
++        size_t len = vs->read_handler_expect;
++        int ret;
++
++        res = true;
++        ret = vs->read_handler(vs, vs->input.buffer, len);
++        if (vs->csock == -1) {
++            vnc_disconnect_finish(vs);
++            break;
++        }
++
++        if (!ret) {
++            memmove(vs->input.buffer, vs->input.buffer + len, (vs->input.offset - len));
++            vs->input.offset -= len;
++        } else {
++            vs->read_handler_expect = ret;
++        }
++
++        // check output buffer for limit
++        if (vs->output.offset >= VNC_OUTPUT_LIMIT) {
++            qemu_set_fd_handler2(vs->csock, NULL, NULL, vnc_client_write, vs);
++            break;
++        }
++    }
++    return res;
++}
++
+ static void vnc_client_read(void *opaque)
+ {
+     VncState *vs = opaque;
+     long ret;
+ 
++    // consume input if possible and exit if consumed
++    if (vnc_consume_input(vs))
++        return;
++
+     buffer_reserve(&vs->input, 4096);
+ 
+ #ifdef CONFIG_VNC_TLS
+@@ -1120,23 +1161,7 @@ static void vnc_client_read(void *opaque)
+ 
+     vs->input.offset += ret;
+ 
+-    while (vs->read_handler && vs->input.offset >= vs->read_handler_expect) {
+-	size_t len = vs->read_handler_expect;
+-	int ret;
+-
+-	ret = vs->read_handler(vs, vs->input.buffer, len);
+-	if (vs->csock == -1) {
+-            vnc_disconnect_finish(vs);
+-	    return;
+-        }
+-
+-	if (!ret) {
+-	    memmove(vs->input.buffer, vs->input.buffer + len, (vs->input.offset - len));
+-	    vs->input.offset -= len;
+-	} else {
+-	    vs->read_handler_expect = ret;
+-	}
+-    }
++    vnc_consume_input(vs);
+ }
+ 
+ static void vnc_write(VncState *vs, const void *data, size_t len)
