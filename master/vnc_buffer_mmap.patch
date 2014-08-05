@@ -1,0 +1,154 @@
+diff --git a/vnc.c b/vnc.c
+index 13d405f..38beaa2 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -30,6 +30,7 @@
+ #include "qemu-timer.h"
+ #include "audio/audio.h"
+ #include <zlib.h>
++#include <sys/mman.h>
+ 
+ /* output limit to stop handling requests */
+ #define VNC_OUTPUT_LIMIT (2u*1024u*1024u)
+@@ -72,6 +73,17 @@ static void vnc_debug_gnutls_log(int level, const char* str) {
+     } \
+ }
+ 
++/*
++ * maximum buffer size, if bigger is requested a failure is returned.
++ * This is actually sufficient and should at least contains enough memory
++ * to handle a full screen frame.
++ */
++#define VNC_BUFFER_MAX_SIZE ((size_t) 32*1024*1024)
++/* minimum size, buffer is not shrunk below this limit */
++#define VNC_BUFFER_MIN_SIZE ((size_t) 64*1024)
++
++static size_t host_page_size = 4096;
++
+ typedef struct Buffer
+ {
+     size_t capacity;
+@@ -377,21 +389,54 @@ static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
+     vnc_write_s32(vs, encoding);
+ }
+ 
+-static void buffer_reserve(Buffer *buffer, size_t len)
++static bool buffer_reserve(Buffer *buffer, size_t len)
+ {
+-    if ((buffer->capacity - buffer->offset) < len) {
+-	buffer->capacity += (len + 1024);
+-	buffer->buffer = qemu_realloc(buffer->buffer, buffer->capacity);
+-	if (buffer->buffer == NULL) {
+-	    fprintf(stderr, "vnc: out of memory\n");
+-	    exit(1);
+-	}
++    uint8_t *p;
++    size_t s;
++
++    if ((buffer->capacity - buffer->offset) >= len)
++        return true;
++
++    s = buffer->capacity + len;
++    s += host_page_size - 1;
++    s &= -host_page_size;
++
++    /* too much */
++    if (s > VNC_BUFFER_MAX_SIZE) {
++        buffer->offset = 0;
++        return false;
+     }
++
++    p = buffer->buffer;
++    /* allocate virtual space if not allocated before */
++    if (!p) {
++        p = mmap(NULL, VNC_BUFFER_MAX_SIZE, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
++        if (p == MAP_FAILED)
++            goto fail;
++        buffer->buffer = p;
++    }
++
++    /* allocate real memory */
++    p = mmap(p + buffer->capacity, s - buffer->capacity, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED, -1, 0);
++    if (p == MAP_FAILED)
++        goto fail;
++
++    buffer->capacity = s;
++    return true;
++
++fail:
++    if (buffer->capacity < VNC_BUFFER_MIN_SIZE) {
++        fprintf(stderr, "vnc: out of memory\n");
++        exit(1);
++    }
++    buffer->offset = 0;
++    return false;
+ }
+ 
+ static void buffer_free(Buffer *buffer)
+ {
+-    qemu_free(buffer->buffer);
++    if (buffer->buffer)
++        munmap(buffer->buffer, VNC_BUFFER_MAX_SIZE);
+     buffer->buffer = NULL;
+     buffer->capacity = 0;
+     buffer->offset = 0;
+@@ -409,7 +454,11 @@ static uint8_t *buffer_end(Buffer *buffer)
+ 
+ static void buffer_reset(Buffer *buffer)
+ {
+-	buffer->offset = 0;
++    buffer->offset = 0;
++    if (buffer->capacity > VNC_BUFFER_MIN_SIZE) {
++        if (mmap(buffer->buffer + VNC_BUFFER_MIN_SIZE, buffer->capacity - VNC_BUFFER_MIN_SIZE, PROT_NONE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) != MAP_FAILED)
++            buffer->capacity = VNC_BUFFER_MIN_SIZE;
++    }
+ }
+ 
+ static void buffer_append(Buffer *buffer, const void *data, size_t len)
+@@ -725,7 +774,8 @@ static int vnc_zlib_stop(VncState *vs)
+     }
+ 
+     // reserve memory in output buffer
+-    buffer_reserve(&vs->output, vs->zlib.offset + 64);
++    if (!buffer_reserve(&vs->output, vs->zlib.offset + 64))
++        vnc_disconnect_start(vs);
+ 
+     // set pointers
+     zstream->next_in = vs->zlib.buffer;
+@@ -1085,6 +1135,7 @@ static void vnc_client_write(void *opaque)
+     vs->output.offset -= ret;
+ 
+     if (vs->output.offset == 0) {
++        buffer_reset(&vs->output);
+         qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, NULL, vs);
+     } else if (orig_offset >= VNC_OUTPUT_LIMIT && vs->output.offset < VNC_OUTPUT_LIMIT) {
+         qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, vnc_client_write, vs);
+@@ -1137,7 +1188,8 @@ static void vnc_client_read(void *opaque)
+     if (vnc_consume_input(vs))
+         return;
+ 
+-    buffer_reserve(&vs->input, 4096);
++    if (!buffer_reserve(&vs->input, 4096))
++        vnc_disconnect_start(vs);
+ 
+ #ifdef CONFIG_VNC_TLS
+     if (vs->tls_session) {
+@@ -1166,7 +1218,8 @@ static void vnc_client_read(void *opaque)
+ 
+ static void vnc_write(VncState *vs, const void *data, size_t len)
+ {
+-    buffer_reserve(&vs->output, len);
++    if (!buffer_reserve(&vs->output, len))
++        vnc_disconnect_start(vs);
+ 
+     if (vs->csock != -1 && buffer_empty(&vs->output)) {
+ 	qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, vnc_client_write, vs);
+@@ -2734,6 +2787,8 @@ void vnc_display_init(DisplayState *ds)
+ {
+     VncDisplay *vs = qemu_mallocz(sizeof(*vs));
+ 
++    host_page_size = sysconf(_SC_PAGESIZE);
++
+     dcl = qemu_mallocz(sizeof(DisplayChangeListener));
+ 
+     ds->opaque = vs;
