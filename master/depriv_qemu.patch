@@ -148,18 +148,10 @@ index ca781bb..3ae21e3 100644
  struct buffer {
      uint8_t *data;
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index 427b34b..96922b8 100644
+index 427b34b..886635a 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
-@@ -44,6 +44,7 @@
- #include <signal.h>
- #include <assert.h>
- #include <sys/select.h>
-+#include <err.h>
- 
- #include <limits.h>
- #include <fcntl.h>
-@@ -62,6 +63,7 @@
+@@ -62,6 +62,7 @@
  #include "qemu-xen.h"
  #include "hw/pc.h"
  #include "net.h"
@@ -167,7 +159,7 @@ index 427b34b..96922b8 100644
  
  //#define DEBUG_MMU
  
-@@ -177,6 +179,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -177,6 +178,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
              }
              bufioreq_local_port = rc;
          }
@@ -181,7 +173,7 @@ index 427b34b..96922b8 100644
      }
  
      return env;
-@@ -186,26 +195,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -186,26 +194,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
  void cpu_reset(CPUX86State *env)
  {
      extern int s3_shutdown_flag;
@@ -216,7 +208,7 @@ index 427b34b..96922b8 100644
  }
  
  void cpu_x86_close(CPUX86State *env)
-@@ -458,14 +460,11 @@ void timeoffset_get(void)
+@@ -458,14 +459,11 @@ void timeoffset_get(void)
  
  static void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
  {
@@ -232,7 +224,7 @@ index 427b34b..96922b8 100644
  }
  
  static void __handle_ioreq(CPUState *env, ioreq_t *req)
-@@ -661,19 +660,12 @@ int main_loop(void)
+@@ -661,19 +659,12 @@ int main_loop(void)
  
  void destroy_hvm_domain(void)
  {
@@ -295,10 +287,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..e407dac
+index 0000000..7ea1e89
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2121 @@
+@@ -0,0 +1,2022 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -421,11 +413,9 @@ index 0000000..e407dac
 +enum {
 +    max_len_xs_path = 256,
 +    max_len_cd_path = 1024,
-+    max_len_vslots = 256,
 +    max_len_state = 256,
 +    max_len_language = 256,
 +    max_len_subpath = 256,
-+    max_len_act = 256,
 +    max_len_token = 256,
 +    /* define limit of the dump file */
 +    max_len_dump = (64*1024),
@@ -461,12 +451,9 @@ index 0000000..e407dac
 +    OPCODE(unlock_cd) \
 +    OPCODE(set_cd_backend) \
 +    OPCODE(set_rtc) \
-+    OPCODE(ack_logdirty_switch) \
-+    OPCODE(read_logdirty) \
 +    OPCODE(save_vm_dump) \
 +    OPCODE(open_keymap) \
 +    OPCODE(record_dm) \
-+    OPCODE(write_vslots) \
 +    OPCODE(read_dm) \
 +    OPCODE(read_xs) \
 +    OPCODE(write_xs) \
@@ -1042,68 +1029,6 @@ index 0000000..e407dac
 +    }
 +}
 +
-+static void
-+do_ack_logdirty_switch(const char *act)
-+{
-+    char active_path[128];
-+
-+    sprintf(active_path, "/local/domain/0/device-model/%u/logdirty/ret", domid);
-+    xs_write(priv_xsh, XBT_NULL, active_path, act, strlen(act));
-+}
-+
-+static void
-+ack_logdirty_switch(void)
-+{
-+    receive_string_buf(parent_fd, act);
-+    do_ack_logdirty_switch(act);
-+}
-+
-+void
-+privsep_ack_logdirty_switch(const char *act)
-+{
-+    if (privsep_fd < 0) {
-+        do_ack_logdirty_switch(act);
-+        return;
-+    }
-+
-+    if (!check_len(act)) {
-+        errno = EINVAL;
-+        return;
-+    }
-+    send_command(privsep_fd, privsep_op_ack_logdirty_switch);
-+    send_string(privsep_fd, act);
-+}
-+
-+static char *
-+do_read_logdirty(unsigned int *p_len)
-+{
-+    char path[128];
-+
-+    sprintf(path, "/local/domain/0/device-model/%u/logdirty/cmd", domid);
-+    return xs_read(priv_xsh, XBT_NULL, path, p_len);
-+}
-+
-+static void
-+read_logdirty(void)
-+{
-+    unsigned len;
-+    char *value = do_read_logdirty(&len);
-+
-+    send_buf(parent_fd, value, len);
-+}
-+
-+char*
-+privsep_read_logdirty(unsigned int *p_len)
-+{
-+    if (privsep_fd < 0)
-+        return do_read_logdirty(p_len);
-+
-+    send_command(privsep_fd, privsep_op_read_logdirty);
-+
-+    return receive_string(privsep_fd, p_len);
-+}
-+
-+
 +#ifndef CONFIG_STUBDOM
 +static void
 +save_vm_dump(void)
@@ -1342,24 +1267,6 @@ index 0000000..e407dac
 +    free(value);
 +}
 +
-+static void
-+do_write_vslots(const char *vslots)
-+{
-+    char path[128];
-+    int pci_devid = 0;
-+
-+    sprintf(path, "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid);
-+    xs_write(priv_xsh, XBT_NULL, path, vslots, strlen(vslots));
-+}
-+
-+static void
-+write_vslots(void)
-+{
-+    receive_string_buf(parent_fd, vslots);
-+
-+    do_write_vslots(vslots);
-+}
-+ 
 +#ifndef CONFIG_STUBDOM
 +static void
 +sigxfsz_handler_f(int num)
@@ -1792,20 +1699,6 @@ index 0000000..e407dac
 +    send_command(privsep_fd, privsep_op_record_dm);
 +    send_string(privsep_fd, subpath);
 +    send_string(privsep_fd, state);
-+}
-+
-+void
-+privsep_write_vslots(const char *vslots)
-+{
-+    if (privsep_fd < 0) {
-+        do_write_vslots(vslots);
-+        return;
-+    }
-+
-+    if (!check_len(vslots))
-+        return;
-+    send_command(privsep_fd, privsep_op_write_vslots);
-+    send_string(privsep_fd, vslots);
 +}
 +
 +char*
@@ -2422,10 +2315,10 @@ index 0000000..e407dac
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..8d1b83f
+index 0000000..0eedb14
 --- /dev/null
 +++ b/privsep.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,52 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
 +
@@ -2438,14 +2331,11 @@ index 0000000..8d1b83f
 +void privsep_lock_cd(int id);
 +void privsep_unlock_cd(int id);
 +void privsep_set_rtc_timeoffset(long offset);
-+void privsep_ack_logdirty_switch(const char *act);
 +void privsep_set_cd_backend(int id, const char *path);
 +QEMUFile* privsep_open_vm_dump(const char *name);
 +FILE* privsep_open_keymap(const char *language);
 +void privsep_record_dm(const char *subpath, const char *state);
-+void privsep_write_vslots(const char *vslots);
 +char* privsep_read_dm(const char *subpath);
-+char *privsep_read_logdirty(unsigned int *p_len);
 +
 +/* redirections */
 +char *privsep_get_domain_path(struct xs_handle *xsh, unsigned int domid);
@@ -2714,10 +2604,10 @@ index 0000000..1d48502
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..9dc5993
+index 0000000..887000b
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,621 @@
+@@ -0,0 +1,630 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -2982,6 +2872,9 @@ index 0000000..9dc5993
 + */
 +START_TEST (sep_test)
 +{
++    static const char logdirty_ret[] = "/local/domain/0/device-model/123/logdirty/ret";
++    static const char logdirty_cmd[] = "/local/domain/0/device-model/123/logdirty/cmd";
++
 +    if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, watch_socks) < -1)
 +        err(1, "socketpair() failed");
 +
@@ -3012,19 +2905,19 @@ index 0000000..9dc5993
 +    with_return_num(xs_read, 10);
 +    with_return(xs_read, strdup("test_watch"));
 +
-+    with_return(xs_write, "/local/domain/0/device-model/123/logdirty/ret");
++    with_return(xs_write, logdirty_ret);
 +    with_return(xs_write, "enable");
 +    with_return_num(xs_write, true);
 +
-+    with_return(xs_read, "/local/domain/0/device-model/123/logdirty/cmd");
++    with_return(xs_read, logdirty_cmd);
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("state1"));
 +
-+    with_return(xs_write, "/local/domain/0/device-model/123/logdirty/ret");
++    with_return(xs_write, logdirty_ret);
 +    with_return(xs_write, "disable");
 +    with_return_num(xs_write, false);
 +
-+    with_return(xs_read, "/local/domain/0/device-model/123/logdirty/cmd");
++    with_return(xs_read, logdirty_cmd);
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("state2"));
 +
@@ -3036,7 +2929,7 @@ index 0000000..9dc5993
 +    with_return_num(xs_read, 6);
 +    with_return(xs_read, strdup("state3"));
 +
-+    with_return(xs_write, NULL);
++    with_return(xs_write, logdirty_ret);
 +    with_return(xs_write, "mock_check");
 +    with_return_num(xs_write, false);
 +
@@ -3100,13 +2993,14 @@ index 0000000..9dc5993
 +    s = privsep_read(xsh, XBT_NULL, "/test1", &l);
 +    fail_if(strcmp(s, "test_watch") != 0);
 +    free(s);
-+    privsep_daemon_close(xsh);
 +
-+    privsep_ack_logdirty_switch("enable");
-+    fail_if(strcmp(s=privsep_read_logdirty(&l), "state1") != 0);
++    send_command(privsep_fd, privsep_op_restrict_paths);
++
++    privsep_write(xsh, XBT_NULL, logdirty_ret, "enable", 6);
++    fail_if(strcmp(s=privsep_read(xsh, XBT_NULL, logdirty_cmd, &l), "state1") != 0);
 +    free(s);
-+    privsep_ack_logdirty_switch("disable");
-+    fail_if(strcmp(s=privsep_read_logdirty(&l), "state2") != 0);
++    privsep_write(xsh, XBT_NULL, logdirty_ret, "disable", 7);
++    fail_if(strcmp(s=privsep_read(xsh, XBT_NULL, logdirty_cmd, &l), "state2") != 0);
 +    free(s);
 +
 +    privsep_record_dm("a/b/c", "value");
@@ -3115,12 +3009,13 @@ index 0000000..9dc5993
 +    free(s);
 +
 +    /* check other process eat all data queued in mock */
-+    privsep_ack_logdirty_switch("mock_check");
++    fail_if(!privsep_write(xsh, XBT_NULL, logdirty_ret, "mock_check", 10));
++    privsep_daemon_close(xsh);
 +    close(privsep_fd);
 +    int status;
 +    wait(&status);
 +    fail_if(!WIFEXITED(status));
-+    fail_if(WEXITSTATUS(status) != 189);
++    fail_if(WEXITSTATUS(status) != 0);
 +
 +    exit(125);
 +}
@@ -3232,6 +3127,10 @@ index 0000000..9dc5993
 +    path_ok  ("/local/logconsole", READ);
 +    path_ok  ("/local/logconsole/x", READ);
 +    path_ok  ("@releaseDomain", READ);
++
++    path_ok  ("/local/domain/0/device-model/123/logdirty/ret", WRITE);
++    path_ok  ("/local/domain/0/device-model/123/logdirty/cmd", WRITE);
++    path_fail("/local/domain/0/device-model/123/a/b", WRITE);
 +}
 +END_TEST
 +
@@ -3270,8 +3169,8 @@ index 0000000..9dc5993
 +        exit(1);
 +    s = (char *) mock();
 +    bool res = (bool) mock_num();
-+    if (s && strcmp(s, "mock_check") == 0 && mock_check_left())
-+        exit(189);
++    if (s && strcmp(s, "mock_check") == 0)
++        return mock_check_left();
 +    if (s && strcmp(s, data) != 0)
 +        exit(1);
 +    return res;
@@ -3560,18 +3459,10 @@ index b65c0f1..37d01c8 100644
      qemu_fclose(f);
      if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
-index c7ca228..7691848 100644
+index c7ca228..f6ff2ed 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -14,6 +14,7 @@
- #include "block_int.h"
- #include <unistd.h>
- #include <assert.h>
-+#include <err.h>
- 
- #include "exec-all.h"
- #include "sysemu.h"
-@@ -25,6 +26,7 @@
+@@ -25,6 +25,7 @@
  #include "xen_backend.h"
  #include "console.h"
  #include "xen_backend.h"
@@ -3579,7 +3470,7 @@ index c7ca228..7691848 100644
  
  /* The token used to identify the keymap watch. */
  #define KEYMAP_TOKEN "keymap"
-@@ -61,8 +63,7 @@ void xenstore_do_eject(BlockDriverState *bs)
+@@ -61,8 +62,7 @@ void xenstore_do_eject(BlockDriverState *bs)
          fprintf(stderr, "couldn't find disk to eject.\n");
          return;
      }
@@ -3589,7 +3480,7 @@ index c7ca228..7691848 100644
  }
  
  static struct {
-@@ -74,9 +75,6 @@ static struct {
+@@ -74,9 +74,6 @@ static struct {
  void xenstore_set_device_locked(BlockDriverState *bs)
  {
      int i;
@@ -3599,7 +3490,7 @@ index c7ca228..7691848 100644
  
      i = xenstore_find_device(bs);
      if (i == -1) {
-@@ -86,22 +84,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
+@@ -86,22 +83,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
      /* not a cdrom device */
      if (!xenbus_param_paths[i])
          return;
@@ -3626,7 +3517,7 @@ index c7ca228..7691848 100644
  }
  
  #define UWAIT_MAX (30*1000000) /* thirty seconds */
-@@ -737,6 +723,7 @@ void xenstore_parse_domain_config(int hvm_domid)
+@@ -737,6 +722,7 @@ void xenstore_parse_domain_config(int hvm_domid)
              if (!strcmp(danger_type, "cdrom") || !strcmp(danger_type, "floppy")) {
                  if (pasprintf(&buf, "%s/params", bpath) != -1) {
                      char *buf2, *frontend;
@@ -3634,15 +3525,17 @@ index c7ca228..7691848 100644
                      xs_watch(xsh, buf, dev);
                      asprintf(&buf2, "%s/frontend", bpath);
                      frontend = xs_read(xsh, XBT_NULL, buf2, &len);
-@@ -1015,30 +1002,13 @@ struct xs_handle *xenstore_get(void)
+@@ -1015,30 +1001,19 @@ struct xs_handle *xenstore_get(void)
  static void xenstore_process_logdirty_event(void)
  {
      char *act;
 -    char *ret_path = NULL;
 -    char *cmd_path = NULL;
++    char ret_path[128];
++    char cmd_path[128];
      unsigned int len;
  
--    /* Remember the paths for the command and response entries */
+     /* Remember the paths for the command and response entries */
 -    if (pasprintf(&ret_path,
 -                "/local/domain/0/device-model/%u/logdirty/ret",
 -                domid) == -1) {
@@ -3655,11 +3548,12 @@ index c7ca228..7691848 100644
 -        fprintf(logfile, "Log-dirty: out of memory\n");
 -        exit(1);
 -    }
--
++    sprintf(ret_path, "/local/domain/0/device-model/%u/logdirty/ret", domid);
++    sprintf(cmd_path, "/local/domain/0/device-model/%u/logdirty/cmd", domid);
+ 
 -    
      /* Read the required active buffer from the store */
--    act = xs_read(xsh, XBT_NULL, cmd_path, &len);
-+    act = privsep_read_logdirty(&len);
+     act = xs_read(xsh, XBT_NULL, cmd_path, &len);
      if (!act) {
          fprintf(logfile, "Log-dirty: no command yet.\n");
 -        goto out;
@@ -3667,12 +3561,8 @@ index c7ca228..7691848 100644
      }
      fprintf(logfile, "Log-dirty command %s\n", act);
  
-@@ -1052,12 +1022,9 @@ static void xenstore_process_logdirty_event(void)
-     }
- 
-     /* Ack that we've service the command */
--    xs_write(xsh, XBT_NULL, ret_path, act, len);
-+    privsep_ack_logdirty_switch(act);
+@@ -1055,30 +1030,26 @@ static void xenstore_process_logdirty_event(void)
+     xs_write(xsh, XBT_NULL, ret_path, act, len);
  
      free(act);
 -out:
@@ -3681,25 +3571,34 @@ index c7ca228..7691848 100644
  }
  
  
-@@ -1072,13 +1039,14 @@ static void xenstore_process_dm_command_event(void)
-         fprintf(logfile, "out of memory reading dm command\n");
-         goto out;
-     }
--    command = xs_read(xsh, XBT_NULL, path, &len);
-+    command = privsep_read_dm("command");
+ /* Accept state change commands from the control tools */
+ static void xenstore_process_dm_command_event(void)
+ {
+-    char *path = NULL, *command = NULL, *par = NULL;
++    char path[128], *command = NULL, *par = NULL;
+     unsigned int len;
+ 
+-    if (pasprintf(&path, 
+-                  "/local/domain/0/device-model/%u/command", domid) == -1) {
+-        fprintf(logfile, "out of memory reading dm command\n");
+-        goto out;
+-    }
++    sprintf(path, "/local/domain/0/device-model/%u/command", domid);
+     command = xs_read(xsh, XBT_NULL, path, &len);
      if (!command)
          goto out;
 -    
-+    len = strlen(command);
 +
      if (!xs_rm(xsh, XBT_NULL, path))
          fprintf(logfile, "xs_rm failed: path=%s\n", path);
--
-+    
+ 
++    sprintf(path, "/local/domain/0/device-model/%u/parameter", domid);
++    par = xs_read(xsh, XBT_NULL, path, NULL);
++
      if (!strncmp(command, "save", len)) {
          fprintf(logfile, "dm-command: pause and save state\n");
          xen_pause_requested = 1;
-@@ -1086,43 +1054,28 @@ static void xenstore_process_dm_command_event(void)
+@@ -1086,14 +1057,7 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -3712,13 +3611,11 @@ index c7ca228..7691848 100644
 -        par = xs_read(xsh, XBT_NULL, path, &len);
 -        fprintf(logfile, "dm-command: usb-add a usb device: %s \n", par);
 +        fprintf(logfile, "dm-command: usb-add usb device\n");
-+        par = privsep_read_dm("parameter");
          if (!par)
              goto out;
          do_usb_add(par);
-         xenstore_record_dm_state("usb-added");
+@@ -1101,13 +1065,6 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-add a usb device:%s\n",par);
-+        free(par);
      } else if (!strncmp(command, "usb-del", len)) {
          fprintf(logfile, "dm-command: usb-del a usb device\n");
 -        if (pasprintf(&path,
@@ -3728,16 +3625,15 @@ index c7ca228..7691848 100644
 -        }
 -        par = xs_read(xsh, XBT_NULL, path, &len);
 -        fprintf(logfile, "dm-command: usb-del a usb device: %s \n", par);
-+        par = privsep_read_dm("parameter");
          if (!par)
              goto out;
          do_usb_del(par);
-         xenstore_record_dm_state("usb-deleted");
+@@ -1115,59 +1072,25 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-del a usb device:%s\n",par);
-+        free(par);
  #ifdef CONFIG_PASSTHROUGH
      } else if (!strncmp(command, "pci-rem", len)) {
-         fprintf(logfile, "dm-command: hot remove pass-through pci dev \n");
+-        fprintf(logfile, "dm-command: hot remove pass-through pci dev \n");
++        fprintf(logfile, "dm-command: hot remove pass-through pci dev %s\n", par);
  
 -        if (pasprintf(&path, 
 -                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
@@ -3745,13 +3641,16 @@ index c7ca228..7691848 100644
 -            goto out;
 -        }
 -        par = xs_read(xsh, XBT_NULL, path, &len);
-+        par = privsep_read_dm("parameter");
-         if (!par)
-             goto out;
- 
-@@ -1131,12 +1084,7 @@ static void xenstore_process_dm_command_event(void)
+-        if (!par)
+-            goto out;
+-
+-        do_pci_del(par);
+-        free(par);
++        if (par)
++            do_pci_del(par);
      } else if (!strncmp(command, "pci-ins", len)) {
-         fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
+-        fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
++        fprintf(logfile, "dm-command: hot insert pass-through pci dev %s\n", par);
  
 -        if (pasprintf(&path, 
 -                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
@@ -3759,11 +3658,21 @@ index c7ca228..7691848 100644
 -            goto out;
 -        }
 -        par = xs_read(xsh, XBT_NULL, path, &len);
-+        par = privsep_read_dm("parameter");
-         if (!par)
-             goto out;
+-        if (!par)
+-            goto out;
+-
+-        do_pci_add(par);
+-        free(par);
++        if (par)
++            do_pci_add(par);
+ #endif
+     } else {
+         fprintf(logfile, "dm-command: unknown command\"%*s\"\n", len, command);
+     }
  
-@@ -1152,22 +1100,6 @@ static void xenstore_process_dm_command_event(void)
+  out:
+-    free(path);
++    free(par);
      free(command);
  }
  
@@ -3786,7 +3695,7 @@ index c7ca228..7691848 100644
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1248,7 +1180,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1248,7 +1171,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
@@ -3795,7 +3704,7 @@ index c7ca228..7691848 100644
  }
  static int xenstore_process_one_vcpu_set_event(char *node)
  {
-@@ -1620,23 +1552,6 @@ void xenstore_write_vncport(int display)
+@@ -1620,23 +1543,6 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -3819,7 +3728,7 @@ index c7ca228..7691848 100644
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
      char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-@@ -1892,26 +1807,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+@@ -1892,26 +1798,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  
@@ -3846,7 +3755,7 @@ index c7ca228..7691848 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
-@@ -2157,62 +2052,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+@@ -2157,62 +2043,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
      free(buf);
  }
  
@@ -3909,7 +3818,7 @@ index c7ca228..7691848 100644
  char *xenstore_read(const char *path)
  {
      char *value = NULL;
-@@ -2223,9 +2062,3 @@ char *xenstore_read(const char *path)
+@@ -2223,9 +2053,3 @@ char *xenstore_read(const char *path)
      return xs_read(xsh, XBT_NULL, path, &len);
  }
  
