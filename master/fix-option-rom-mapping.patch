@@ -1,0 +1,22 @@
+hw/passthrough: Prevent QEMU from mapping PCI option ROM at address 0
+
+The PCI option ROM BAR uses the LSB to indicate if the BAR is enabled.
+The AMD graphics driver sets the address bit's of the BAR to 0 but leaves the
+LSB set to 1. Whilst this is not good practice, QEMU should be ignoring the 
+non address parts of the BAR.
+
+This patch adds masking of the non address parts of the BAR before comparing
+the address to 0.
+
+diff -r b9ec8b883cdd hw/pass-through.c
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -2175,7 +2175,7 @@ static void pt_bar_mapping_one(struct pt
+     }
+ 
+     /* prevent guest software mapping memory resource to 00000000h */
+-    if ((base->bar_flag == PT_BAR_FLAG_MEM) && (r_addr == 0))
++    if ((base->bar_flag == PT_BAR_FLAG_MEM) && ((r_addr & PCI_BASE_ADDRESS_MEM_MASK) == 0))
+         r_addr = -1;
+ 
+     /* align resource size (memory type only) */
