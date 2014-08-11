@@ -295,10 +295,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..a4dcac1
+index 0000000..e407dac
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2102 @@
+@@ -0,0 +1,2121 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -1971,6 +1971,7 @@ index 0000000..a4dcac1
 +check_xs_path(const char *path, check_type_t check)
 +{
 +    static const char backend_d0[] = "/local/domain/0/backend";
++    static const char dm_d0[] = "/local/domain/0/device-model";
 +    const char *s;
 +    char dom_num[64];
 +
@@ -1993,6 +1994,24 @@ index 0000000..a4dcac1
 +            || strcmp(s, "data/set_clipboard") == 0
 +            || strcmp(s, "console/vnc-port") == 0
 +            || strcmp(s, "device-misc/dm-ready") == 0)
++            return true;
++    }
++
++    if (path_starts_with(path, dm_d0)) {
++        s = path + strlen(dm_d0);
++        sprintf(dom_num, "/%u", domid);
++        if (!path_starts_with(s, dom_num))
++            goto fail;
++        if (check == CHECK_READ)
++            return true;
++        s += strlen(dom_num);
++        if (*s++ != '/' || check != CHECK_WRITE)
++            goto fail;
++        if (strcmp(s, "logdirty/ret") == 0
++            || strcmp(s, "logdirty/cmd") == 0
++            || strcmp(s, "command") == 0
++            || strcmp(s, "parameter") == 0
++            || strcmp(s, "state") == 0)
 +            return true;
 +    }
 +
@@ -3541,7 +3560,7 @@ index b65c0f1..37d01c8 100644
      qemu_fclose(f);
      if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
-index c7ca228..ab13518 100644
+index c7ca228..7691848 100644
 --- a/xenstore.c
 +++ b/xenstore.c
 @@ -14,6 +14,7 @@
@@ -3552,7 +3571,7 @@ index c7ca228..ab13518 100644
  
  #include "exec-all.h"
  #include "sysemu.h"
-@@ -25,6 +27,7 @@
+@@ -25,6 +26,7 @@
  #include "xen_backend.h"
  #include "console.h"
  #include "xen_backend.h"
@@ -3648,7 +3667,7 @@ index c7ca228..ab13518 100644
      }
      fprintf(logfile, "Log-dirty command %s\n", act);
  
-@@ -1052,33 +1022,23 @@ static void xenstore_process_logdirty_event(void)
+@@ -1052,12 +1022,9 @@ static void xenstore_process_logdirty_event(void)
      }
  
      /* Ack that we've service the command */
@@ -3662,31 +3681,25 @@ index c7ca228..ab13518 100644
  }
  
  
- /* Accept state change commands from the control tools */
- static void xenstore_process_dm_command_event(void)
- {
--    char *path = NULL, *command = NULL, *par = NULL;
-+    char *command = NULL, *par = NULL;
-     unsigned int len;
- 
--    if (pasprintf(&path, 
--                  "/local/domain/0/device-model/%u/command", domid) == -1) {
--        fprintf(logfile, "out of memory reading dm command\n");
--        goto out;
--    }
+@@ -1072,13 +1039,14 @@ static void xenstore_process_dm_command_event(void)
+         fprintf(logfile, "out of memory reading dm command\n");
+         goto out;
+     }
 -    command = xs_read(xsh, XBT_NULL, path, &len);
 +    command = privsep_read_dm("command");
      if (!command)
          goto out;
+-    
 +    len = strlen(command);
-     
--    if (!xs_rm(xsh, XBT_NULL, path))
--        fprintf(logfile, "xs_rm failed: path=%s\n", path);
++
+     if (!xs_rm(xsh, XBT_NULL, path))
+         fprintf(logfile, "xs_rm failed: path=%s\n", path);
 -
++    
      if (!strncmp(command, "save", len)) {
          fprintf(logfile, "dm-command: pause and save state\n");
          xen_pause_requested = 1;
-@@ -1086,43 +1046,28 @@ static void xenstore_process_dm_command_event(void)
+@@ -1086,43 +1054,28 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -3736,7 +3749,7 @@ index c7ca228..ab13518 100644
          if (!par)
              goto out;
  
-@@ -1131,12 +1076,7 @@ static void xenstore_process_dm_command_event(void)
+@@ -1131,12 +1084,7 @@ static void xenstore_process_dm_command_event(void)
      } else if (!strncmp(command, "pci-ins", len)) {
          fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
  
@@ -3750,11 +3763,7 @@ index c7ca228..ab13518 100644
          if (!par)
              goto out;
  
-@@ -1148,26 +1088,9 @@ static void xenstore_process_dm_command_event(void)
-     }
- 
-  out:
--    free(path);
+@@ -1152,22 +1100,6 @@ static void xenstore_process_dm_command_event(void)
      free(command);
  }
  
@@ -3777,7 +3786,7 @@ index c7ca228..ab13518 100644
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1248,7 +1171,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1248,7 +1180,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
@@ -3786,7 +3795,7 @@ index c7ca228..ab13518 100644
  }
  static int xenstore_process_one_vcpu_set_event(char *node)
  {
-@@ -1620,23 +1543,6 @@ void xenstore_write_vncport(int display)
+@@ -1620,23 +1552,6 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -3810,7 +3819,7 @@ index c7ca228..ab13518 100644
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
      char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-@@ -1892,26 +1798,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+@@ -1892,26 +1807,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  
@@ -3837,7 +3846,7 @@ index c7ca228..ab13518 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
-@@ -2157,62 +2043,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+@@ -2157,62 +2052,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
      free(buf);
  }
  
@@ -3900,7 +3909,7 @@ index c7ca228..ab13518 100644
  char *xenstore_read(const char *path)
  {
      char *value = NULL;
-@@ -2223,9 +2053,3 @@ char *xenstore_read(const char *path)
+@@ -2223,9 +2062,3 @@ char *xenstore_read(const char *path)
      return xs_read(xsh, XBT_NULL, path, &len);
  }
  
