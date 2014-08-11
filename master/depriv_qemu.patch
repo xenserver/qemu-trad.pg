@@ -3459,7 +3459,7 @@ index b65c0f1..37d01c8 100644
      qemu_fclose(f);
      if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
-index c7ca228..f6ff2ed 100644
+index c7ca228..51fbbc8 100644
 --- a/xenstore.c
 +++ b/xenstore.c
 @@ -25,6 +25,7 @@
@@ -3561,7 +3561,7 @@ index c7ca228..f6ff2ed 100644
      }
      fprintf(logfile, "Log-dirty command %s\n", act);
  
-@@ -1055,30 +1030,26 @@ static void xenstore_process_logdirty_event(void)
+@@ -1055,27 +1030,24 @@ static void xenstore_process_logdirty_event(void)
      xs_write(xsh, XBT_NULL, ret_path, act, len);
  
      free(act);
@@ -3589,16 +3589,14 @@ index c7ca228..f6ff2ed 100644
          goto out;
 -    
 +
-     if (!xs_rm(xsh, XBT_NULL, path))
-         fprintf(logfile, "xs_rm failed: path=%s\n", path);
- 
 +    sprintf(path, "/local/domain/0/device-model/%u/parameter", domid);
 +    par = xs_read(xsh, XBT_NULL, path, NULL);
 +
-     if (!strncmp(command, "save", len)) {
-         fprintf(logfile, "dm-command: pause and save state\n");
-         xen_pause_requested = 1;
-@@ -1086,14 +1057,7 @@ static void xenstore_process_dm_command_event(void)
++    sprintf(path, "/local/domain/0/device-model/%u/command", domid);
+     if (!xs_rm(xsh, XBT_NULL, path))
+         fprintf(logfile, "xs_rm failed: path=%s\n", path);
+ 
+@@ -1086,14 +1058,7 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -3614,7 +3612,7 @@ index c7ca228..f6ff2ed 100644
          if (!par)
              goto out;
          do_usb_add(par);
-@@ -1101,13 +1065,6 @@ static void xenstore_process_dm_command_event(void)
+@@ -1101,13 +1066,6 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-add a usb device:%s\n",par);
      } else if (!strncmp(command, "usb-del", len)) {
          fprintf(logfile, "dm-command: usb-del a usb device\n");
@@ -3628,7 +3626,7 @@ index c7ca228..f6ff2ed 100644
          if (!par)
              goto out;
          do_usb_del(par);
-@@ -1115,59 +1072,25 @@ static void xenstore_process_dm_command_event(void)
+@@ -1115,59 +1073,25 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-del a usb device:%s\n",par);
  #ifdef CONFIG_PASSTHROUGH
      } else if (!strncmp(command, "pci-rem", len)) {
@@ -3695,7 +3693,7 @@ index c7ca228..f6ff2ed 100644
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1248,7 +1171,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1248,7 +1172,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
@@ -3704,7 +3702,7 @@ index c7ca228..f6ff2ed 100644
  }
  static int xenstore_process_one_vcpu_set_event(char *node)
  {
-@@ -1620,23 +1543,6 @@ void xenstore_write_vncport(int display)
+@@ -1620,23 +1544,6 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -3728,7 +3726,7 @@ index c7ca228..f6ff2ed 100644
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
      char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-@@ -1892,26 +1798,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+@@ -1892,26 +1799,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  
@@ -3755,7 +3753,7 @@ index c7ca228..f6ff2ed 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
-@@ -2157,62 +2043,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+@@ -2157,62 +2044,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
      free(buf);
  }
  
@@ -3818,7 +3816,7 @@ index c7ca228..f6ff2ed 100644
  char *xenstore_read(const char *path)
  {
      char *value = NULL;
-@@ -2223,9 +2053,3 @@ char *xenstore_read(const char *path)
+@@ -2223,9 +2054,3 @@ char *xenstore_read(const char *path)
      return xs_read(xsh, XBT_NULL, path, &len);
  }
  
