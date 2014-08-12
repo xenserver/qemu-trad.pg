@@ -1,0 +1,33 @@
+diff --git a/hw/vga.c b/hw/vga.c
+index 0d41ccd..5a494ef 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -1250,7 +1250,8 @@ static void vga_draw_text(VGAState *s, int full_update)
+     vga_draw_glyph9_func *vga_draw_glyph9;
+ 
+     /* Disable dirty bit tracking */
+-    xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
++    if (xen_logdirty_enable)
++        xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
+ 
+     /* compute font data address (in plane 2) */
+     v = s->sr[3];
+@@ -1711,7 +1712,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+             /* We will not read that anyway. */
+             cpu_physical_memory_set_dirty(s->vram_offset + y);
+ 
+-        {
++        if (xen_logdirty_enable) {
+             unsigned long npages = (end - y) / TARGET_PAGE_SIZE;
+             const int width = sizeof(unsigned long) * 8;
+             unsigned long bitmap[(npages + width - 1) / width];
+@@ -1830,7 +1831,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
+         return;
+ 
+     /* Disable dirty bit tracking */
+-    xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
++    if (xen_logdirty_enable)
++        xc_hvm_track_dirty_vram(xc_handle, domid, 0, 0, NULL);
+ 
+     s->rgb_to_pixel =
+         rgb_to_pixel_dup_table[get_depth_index(s->ds)];
