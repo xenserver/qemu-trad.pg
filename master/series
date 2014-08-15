@@ -162,3 +162,4 @@ vnc_limit.patch
 vnc_buffer_mmap.patch
 fix-option-rom-mapping.patch
 dirty.patch
+depriv_qemu.patch
