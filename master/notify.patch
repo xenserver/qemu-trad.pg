@@ -1,0 +1,68 @@
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index 990e0df..af65c83 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
+@@ -292,6 +292,10 @@ set_build_number(uint32_t number)
+ 
+         fprintf(logfile, "UNPLUG: drivers %sblacklisted\n",
+                 (!drivers_blacklisted) ? "not " : "");
++
++	if (product_id == 3 && build_number <= 0xff &&
++                !drivers_blacklisted)
++                xenstore_notify_unplug();
+     }
+ 
+ }
+diff --git a/privsep.c b/privsep.c
+index 7ea1e89..1e8ca17 100644
+--- a/privsep.c
++++ b/privsep.c
+@@ -1593,7 +1593,10 @@ check_xs_path(const char *path, check_type_t check)
+         if (strcmp(s, "data/report_clipboard") == 0
+             || strcmp(s, "data/set_clipboard") == 0
+             || strcmp(s, "console/vnc-port") == 0
+-            || strcmp(s, "device-misc/dm-ready") == 0)
++            || strcmp(s, "device-misc/dm-ready") == 0
++            || strcmp(s, "control/feature-suspend") == 0
++            || strcmp(s, "control/feature-shutdown") == 0
++            || strcmp(s, "control/feature-vcpu-hotplug") == 0)
+             return true;
+     }
+ 
+diff --git a/qemu-xen.h b/qemu-xen.h
+index 3143883..401f709 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -107,7 +107,7 @@ char *xenstore_dom_read(int domid, const char *key, unsigned int *len);
+ int xenstore_dom_write(int domid, const char *key, const char *value);
+ void xenstore_dom_watch(int domid, const char *key, xenstore_callback ftp, void *opaque);
+ void xenstore_dom_chmod(int domid, const char *key, const char *perms);
+-
++void xenstore_notify_unplug(void);
+ char *xenstore_read(const char *path);
+ int xenstore_write(const char *path, const char *val);
+ 
+diff --git a/xenstore.c b/xenstore.c
+index 51fbbc8..a5ebccb 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -1995,6 +1995,19 @@ void xenstore_set_guest_clipboard(const char *text, size_t len)
+     set_clipboard_event();
+ }
+ 
++void xenstore_notify_unplug(void)
++{
++    char path[256];
++
++    sprintf(path, "/local/domain/%u/control/feature-suspend", domid);
++    xs_write(xsh, XBT_NULL, path, "1", 1);
++
++    sprintf(path, "/local/domain/%u/control/feature-shutdown", domid);
++    xs_write(xsh, XBT_NULL, path, "1", 1);
++
++    sprintf(path, "/local/domain/%u/control/feature-vcpu-hotplug", domid);
++    xs_write(xsh, XBT_NULL, path, "1", 1);
++}
+ 
+ char *xenstore_dom_read(int domid, const char *key, unsigned int *len)
+ {
