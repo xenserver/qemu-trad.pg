@@ -164,3 +164,4 @@ fix-option-rom-mapping.patch
 dirty.patch
 depriv_qemu.patch
 notify.patch
+CA-144613-vnc.patch
