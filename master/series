@@ -85,6 +85,7 @@ CP-3235.patch
 product-nr-3-blacklist.patch
 product-nr-4-blacklist.patch
 product-nr-1-blacklist.patch
+0001-vga-map-VRAM-when-BAR-is-updated-enabled.patch
 
 #
 # Compatible with upstream but not worth the effort of upstreaming

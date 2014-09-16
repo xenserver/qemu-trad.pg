@@ -1,0 +1,56 @@
+From aa02470807fe5d3950e84786a1b010e827832d5f Mon Sep 17 00:00:00 2001
+From: David Vrabel <david.vrabel@citrix.com>
+Date: Tue, 16 Sep 2014 15:14:08 +0100
+Subject: [PATCH] vga: map VRAM when BAR is updated/enabled
+
+On Xen, the frames for the VRAM are populated during device
+initialization at 0xFF00_0000.  They are later mapped to a different
+guest physical address (the linear frame buffer address) set from BAR0
+(normally 0xF100_0000).
+
+This mapping is done when the guest enables the display device by
+setting the ENABLED bit in the VBE ENABLE register.
+
+Grub, however, attempts to access the linear frame buffer /before/ the
+device has been enabled in this way (possbily because of the order it
+probes for different display devices).  Grub accesses the frame buffer
+> 32,000 times and each time, qemu tries to map frames (in batches of
+256) which are not present in the p2m.  This is expensive and
+significantly slows down boot.
+
+The linear frame buffer should be accessible when the BAR is enabled,
+so map it when the BAR is enabled or updated.
+
+Signed-off-by: David Vrabel <david.vrabel@citrix.com>
+---
+ hw/vga.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/hw/vga.c b/hw/vga.c
+index 5a494ef..5b7d17d 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -619,10 +619,6 @@ static void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
+                 !(s->vbe_regs[VBE_DISPI_INDEX_ENABLE] & VBE_DISPI_ENABLED)) {
+                 int h, shift_control;
+                 
+-                if (s->vram_gmfn != s->lfb_addr) {
+-                     set_vram_mapping(s, s->lfb_addr, s->lfb_end);
+-                }
+-
+                 s->vbe_regs[VBE_DISPI_INDEX_VIRT_WIDTH] =
+                     s->vbe_regs[VBE_DISPI_INDEX_XRES];
+                 s->vbe_regs[VBE_DISPI_INDEX_VIRT_HEIGHT] =
+@@ -2332,6 +2328,9 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
+         cpu_register_physical_memory(addr, s->vram_size, s->vram_offset);
+         s->lfb_addr = addr;
+         s->lfb_end = addr + size;
++        if (s->vram_gmfn != s->lfb_addr) {
++            set_vram_mapping(s, s->lfb_addr, s->lfb_end);
++        }
+ #ifdef CONFIG_BOCHS_VBE
+         s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_H] = s->lfb_addr >> 16;
+         s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_L] = s->lfb_addr & 0xFFFF;
+-- 
+1.7.10.4
+
