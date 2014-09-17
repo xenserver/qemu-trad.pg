@@ -22,12 +22,8 @@ The linear frame buffer should be accessible when the BAR is enabled,
 so map it when the BAR is enabled or updated.
 
 Signed-off-by: David Vrabel <david.vrabel@citrix.com>
----
- hw/vga.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
 diff --git a/hw/vga.c b/hw/vga.c
-index 5a494ef..5b7d17d 100644
+index fed2c54..e82a1df 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
 @@ -619,10 +619,6 @@ static void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
@@ -41,16 +37,13 @@ index 5a494ef..5b7d17d 100644
                  s->vbe_regs[VBE_DISPI_INDEX_VIRT_WIDTH] =
                      s->vbe_regs[VBE_DISPI_INDEX_XRES];
                  s->vbe_regs[VBE_DISPI_INDEX_VIRT_HEIGHT] =
-@@ -2332,6 +2328,9 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
+@@ -2330,6 +2326,9 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
          cpu_register_physical_memory(addr, s->vram_size, s->vram_offset);
          s->lfb_addr = addr;
          s->lfb_end = addr + size;
-+        if (s->vram_gmfn != s->lfb_addr) {
++        if (s->vram_gmfn && s->vram_gmfn != s->lfb_addr) {
 +            set_vram_mapping(s, s->lfb_addr, s->lfb_end);
 +        }
  #ifdef CONFIG_BOCHS_VBE
          s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_H] = s->lfb_addr >> 16;
          s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_L] = s->lfb_addr & 0xFFFF;
--- 
-1.7.10.4
-
