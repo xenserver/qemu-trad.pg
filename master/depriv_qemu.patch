@@ -287,10 +287,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..5fb1557
+index 0000000..714f4ab
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2016 @@
+@@ -0,0 +1,2077 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -421,6 +421,8 @@ index 0000000..5fb1557
 +    max_len_dump = (64*1024),
 +    /* define limit of data written by xs_write */
 +    max_len_xs_data = (64*1024),
++    /* maximum length of log message */
++    max_len_log = 1024,
 +};
 +
 +int privileged = 0;
@@ -457,7 +459,8 @@ index 0000000..5fb1557
 +    OPCODE(rm_xs) \
 +    OPCODE(daemon_open_xs) \
 +    OPCODE(daemon_close_xs) \
-+    OPCODE(restrict_paths)
++    OPCODE(restrict_paths) \
++    OPCODE(log_msg)
 +
 +#undef  OPCODE
 +#define OPCODE(n) privsep_op_ ## n ,
@@ -485,6 +488,9 @@ index 0000000..5fb1557
 +static bool check_xs_path(const char *path, check_type_t check);
 +
 +#define MAX_CDS (MAX_DRIVES+1)
++
++#define LOG_LIMIT_BURST 10000
++#define LOG_LIMIT_INTERVAL 60
 +
 +/* store fake xs_handle structure to give to unprivileged
 + * Qemu when we use privilege separation
@@ -1261,6 +1267,59 @@ index 0000000..5fb1557
 +    free(value);
 +}
 +
++static void
++log_msg(void)
++{
++    char *msg;
++    unsigned int len;
++    static time_t last_time;
++    static int count;
++
++    msg = receive_string_limited(parent_fd, &len, max_len_log);
++    if (msg) {
++        time_t now;
++
++        time(&now);
++        if (now - last_time > LOG_LIMIT_INTERVAL) {
++            count = 0;
++            last_time = now;
++        }
++
++        if (count < LOG_LIMIT_BURST) {
++            count++;
++            syslog(LOG_DAEMON|LOG_INFO, "%s", msg);
++        } else if (count == LOG_LIMIT_BURST) {
++            count++;
++            syslog(LOG_DAEMON|LOG_INFO, "Rate limited!");
++        }
++        free(msg);
++    }
++}
++
++int privsep_vsyslog(const char *fmt, va_list ap)
++{
++    int res;
++    char buf[max_len_log];
++
++    res = vsnprintf(buf, max_len_log, fmt, ap);
++    send_command(privsep_fd, privsep_op_log_msg);
++    send_string(privsep_fd, buf);
++
++    return res;
++}
++
++int privsep_syslog(const char *fmt, ...)
++{
++    va_list ap;
++    int res;
++
++    va_start(ap, fmt);
++    res = privsep_vsyslog(fmt, ap);
++    va_end(ap);
++
++    return res;
++}
++
 +#ifndef CONFIG_STUBDOM
 +static void
 +sigxfsz_handler_f(int num)
@@ -1610,6 +1669,8 @@ index 0000000..5fb1557
 +    sigaction (SIGINT, &sigterm_handler, NULL);
 +    sigaction (SIGHUP, &sigterm_handler, NULL);
 +    sigaction (SIGXFSZ, &sigxfsz_handler, NULL);
++
++    closelog();
 +
 +    privsep_state = privsep_started;
 +    send_command(privsep_fd, privsep_op_restrict_paths);
@@ -2309,12 +2370,14 @@ index 0000000..5fb1557
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..4d71faa
+index 0000000..c49f4db
 --- /dev/null
 +++ b/privsep.h
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,66 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
++
++#include <stdarg.h>
 +
 +/* privsep.c */
 +void privsep_prepare(void);
@@ -2330,6 +2393,8 @@ index 0000000..4d71faa
 +FILE* privsep_open_keymap(const char *language);
 +void privsep_record_dm(const char *subpath, const char *state);
 +char* privsep_read_dm(const char *subpath);
++int privsep_vsyslog(const char *fmt, va_list ap);
++int privsep_syslog(const char *fmt, ...);
 +
 +/* redirections */
 +char *privsep_get_domain_path(struct xs_handle *xsh, unsigned int domid);
@@ -2456,6 +2521,52 @@ index d30cbff..b342b58 100644
  void do_delvm(const char *name);
  void do_info_snapshots(void);
  
+diff --git a/syslog.c b/syslog.c
+index ed085af..6e550ad 100644
+--- a/syslog.c
++++ b/syslog.c
+@@ -27,6 +27,7 @@
+ #include <errno.h>
+ 
+ #include "qemu-common.h"
++#include "privsep.h"
+ 
+ #ifdef CONFIG_SYSLOG
+ #include <syslog.h>
+@@ -45,7 +46,10 @@ char use_syslog = 0;
+ int log_vfprintf(FILE *f, const char *fmt, va_list ap)
+ {
+     if (use_syslog && (f == stdout || f == stderr)) {
+-        vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
++        if (privileged || privsep_state != privsep_started)
++            vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
++        else
++            privsep_vsyslog(fmt, ap);
+         /* just return a value to make every caller happy */
+         return 10;
+     }
+@@ -68,10 +72,17 @@ void log_perror(const char *s)
+     if (errno != 0)
+        return;
+ 
+-    if (s && *s)
+-        syslog(LOG_DAEMON|LOG_INFO, "%s: %s", s, errbuf);
+-    else
+-        syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
++    if (s && *s) {
++        if (privileged || privsep_state != privsep_started)
++            syslog(LOG_DAEMON|LOG_INFO, "%s: %s", s, errbuf);
++        else
++            privsep_syslog("%s: %s", s, errbuf);
++    } else {
++        if (privileged || privsep_state != privsep_started)
++            syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
++        else
++            privsep_syslog("%s", errbuf);
++    }
+ }
+ 
+ int log_printf(const char *fmt, ...)
 diff --git a/unittests/Makefile b/unittests/Makefile
 index c91e17c..623caa2 100644
 --- a/unittests/Makefile
