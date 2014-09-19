@@ -287,10 +287,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..7ea1e89
+index 0000000..5fb1557
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2022 @@
+@@ -0,0 +1,2016 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -413,7 +413,7 @@ index 0000000..7ea1e89
 +enum {
 +    max_len_xs_path = 256,
 +    max_len_cd_path = 1024,
-+    max_len_state = 256,
++    max_len_privsep_state = 256,
 +    max_len_language = 256,
 +    max_len_subpath = 256,
 +    max_len_token = 256,
@@ -423,13 +423,8 @@ index 0000000..7ea1e89
 +    max_len_xs_data = (64*1024),
 +};
 +
-+typedef enum {
-+    /** not initialized at all, call privsep_prepare */
-+    privsep_not_initialized = 0,
-+    /** prepared but xenstore is not restricted */
-+    privsep_prepared,
-+    privsep_started,
-+} privsep_state_t;
++int privileged = 0;
++privsep_state_t privsep_state;
 +
 +static int privsep_fd = -1;
 +static struct xs_handle * priv_xsh;
@@ -439,7 +434,6 @@ index 0000000..7ea1e89
 +static int termsig;
 +static char *domain_path = NULL;
 +static char *vm_path = NULL;
-+static privsep_state_t state;
 +#define MAX_XS_CONN 4
 +static int xs_conns[MAX_XS_CONN] = { -1, -1, -1, -1 };
 +
@@ -1225,14 +1219,14 @@ index 0000000..7ea1e89
 +record_dm(void)
 +{
 +    receive_string_buf(parent_fd, subpath);
-+    receive_string_buf(parent_fd, state);
++    receive_string_buf(parent_fd, privsep_state);
 +
 +    /* these are the only values allowed, return to avoid
 +     * filling xenstore */
 +    if (strcmp(subpath, "parameter") != 0 && strcmp(subpath, "state") != 0)
 +        return;
 +
-+    do_record_dm(subpath, state);
++    do_record_dm(subpath, privsep_state);
 +}
 +
 +static char *
@@ -1467,7 +1461,7 @@ index 0000000..7ea1e89
 +    if (child < 0)
 +        err(1, "fork() failed");
 +
-+    state = privsep_prepared;
++    privsep_state = privsep_prepared;
 +    if (child == 0) {
 +        int i;
 +        struct rlimit limit;
@@ -1555,7 +1549,7 @@ index 0000000..7ea1e89
 +    uid_t qemu_uid;
 +    gid_t qemu_gid;
 +
-+    if (privsep_fd < 0 || state != privsep_prepared)
++    if (privsep_fd < 0 || privsep_state != privsep_prepared)
 +        err(1, "privilege separation not prepared");
 +    if (priv_xsh != NULL)
 +        err(1, "privilege separation not initialized properly");
@@ -1617,7 +1611,7 @@ index 0000000..7ea1e89
 +    sigaction (SIGHUP, &sigterm_handler, NULL);
 +    sigaction (SIGXFSZ, &sigxfsz_handler, NULL);
 +
-+    state = privsep_started;
++    privsep_state = privsep_started;
 +    send_command(privsep_fd, privsep_op_restrict_paths);
 +}
 +#endif
@@ -1625,7 +1619,7 @@ index 0000000..7ea1e89
 +void
 +init_privxsh(void)
 +{
-+    if (state != privsep_not_initialized)
++    if (privsep_state != privsep_not_initialized)
 +        return;
 +
 +    priv_xsh = xs_daemon_open();
@@ -1666,7 +1660,7 @@ index 0000000..7ea1e89
 +{
 +    int id = receive_int(parent_fd);
 +    receive_string_buf(parent_fd, cd_path);
-+    if (state == privsep_prepared && id >= 0 && id < MAX_CDS)
++    if (privsep_state == privsep_prepared && id >= 0 && id < MAX_CDS)
 +        do_set_cd_backend(id, cd_path);
 +}
 +
@@ -1674,10 +1668,10 @@ index 0000000..7ea1e89
 +privsep_set_cd_backend(int id, const char *cd_path)
 +{
 +    /* It's only meaningful to call this before we fork. */
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        do_set_cd_backend(id, cd_path);
 +
-+    if (state == privsep_prepared && check_len(cd_path)) {
++    if (privsep_state == privsep_prepared && check_len(cd_path)) {
 +        send_command(privsep_fd, privsep_op_set_cd_backend);
 +        send_int(privsep_fd, id);
 +        send_string(privsep_fd, cd_path);
@@ -1685,20 +1679,20 @@ index 0000000..7ea1e89
 +}
 +
 +void
-+privsep_record_dm(const char *subpath, const char *state)
++privsep_record_dm(const char *subpath, const char *privsep_state)
 +{
 +    if (privsep_fd < 0) {
-+        do_record_dm(subpath, state);
++        do_record_dm(subpath, privsep_state);
 +        return;
 +    }
 +
-+    if (!check_len(subpath) || !check_len(state)) {
++    if (!check_len(subpath) || !check_len(privsep_state)) {
 +        errno = EINVAL;
 +        return;
 +    }
 +    send_command(privsep_fd, privsep_op_record_dm);
 +    send_string(privsep_fd, subpath);
-+    send_string(privsep_fd, state);
++    send_string(privsep_fd, privsep_state);
 +}
 +
 +char*
@@ -1868,7 +1862,7 @@ index 0000000..7ea1e89
 +    const char *s;
 +    char dom_num[64];
 +
-+    if (state != privsep_started)
++    if (privsep_state != privsep_started)
 +        return true;
 +
 +    if (path_starts_with(path, domain_path)) {
@@ -1953,7 +1947,7 @@ index 0000000..7ea1e89
 +void *privsep_read(struct xs_handle *xsh, xs_transaction_t t,
 +                   const char *xs_path, unsigned int *len)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_read(xsh, t, xs_path, len);
 +
 +    if (!check_len(xs_path) || !xsh_valid(xsh)) {
@@ -1989,7 +1983,7 @@ index 0000000..7ea1e89
 +privsep_write(struct xs_handle *xsh, xs_transaction_t t,
 +              const char *xs_path, const void *data, unsigned int len)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_write(xsh, t, xs_path, data, len);
 +
 +    if (!check_len(xs_path) || len > max_len_xs_data || !xsh_valid(xsh)) {
@@ -2028,7 +2022,7 @@ index 0000000..7ea1e89
 +privsep_directory(struct xs_handle *xsh, xs_transaction_t t,
 +                  const char *xs_path, unsigned int *num)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_directory(xsh, t, xs_path, num);
 +
 +    if (!check_len(xs_path) || !xsh_valid(xsh)) {
@@ -2062,7 +2056,7 @@ index 0000000..7ea1e89
 +bool
 +privsep_watch(struct xs_handle *xsh, const char *xs_path, const char *token)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_watch(xsh, xs_path, token);
 +
 +    if (!check_len(xs_path) || !check_len(token) || !xsh_valid(xsh)) {
@@ -2094,7 +2088,7 @@ index 0000000..7ea1e89
 +bool
 +privsep_unwatch(struct xs_handle *xsh, const char *xs_path, const char *token)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_unwatch(xsh, xs_path, token);
 +
 +    if (!check_len(xs_path) || !check_len(token) || !xsh_valid(xsh)) {
@@ -2125,7 +2119,7 @@ index 0000000..7ea1e89
 +privsep_rm(struct xs_handle *xsh, xs_transaction_t t,
 +           const char *xs_path)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_rm(xsh, t, xs_path);
 +
 +    if (!check_len(xs_path) || !xsh_valid(xsh)) {
@@ -2162,7 +2156,7 @@ index 0000000..7ea1e89
 +struct xs_handle *
 +privsep_daemon_open(void)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_daemon_open();
 +
 +    privsep_handle_t *h = (privsep_handle_t*) calloc(1, sizeof(privsep_handle_t));
@@ -2210,7 +2204,7 @@ index 0000000..7ea1e89
 +void
 +privsep_daemon_close(struct xs_handle *xsh)
 +{
-+    if (state == privsep_not_initialized) {
++    if (privsep_state == privsep_not_initialized) {
 +        xs_daemon_close(xsh);
 +        return;
 +    }
@@ -2252,7 +2246,7 @@ index 0000000..7ea1e89
 +int
 +privsep_fileno(struct xs_handle *xsh)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_fileno(xsh);
 +
 +    if (!xsh_valid(xsh))
@@ -2264,7 +2258,7 @@ index 0000000..7ea1e89
 +char **
 +privsep_read_watch(struct xs_handle *xsh, unsigned int *num)
 +{
-+    if (state == privsep_not_initialized)
++    if (privsep_state == privsep_not_initialized)
 +        return xs_read_watch(xsh, num);
 +
 +    /* read from other end */
@@ -2277,7 +2271,7 @@ index 0000000..7ea1e89
 +static void
 +restrict_paths(void)
 +{
-+    state = privsep_started;
++    privsep_state = privsep_started;
 +}
 +
 +/* restriction functions */
@@ -2315,10 +2309,10 @@ index 0000000..7ea1e89
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..0eedb14
+index 0000000..4d71faa
 --- /dev/null
 +++ b/privsep.h
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,62 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
 +
@@ -2369,6 +2363,16 @@ index 0000000..0eedb14
 +#define xc_interface_restrict(h,d) xc_interface_restrict_qemu(h,d)
 +int xc_evtchn_restrict(xc_interface *xce_handle, int domid);
 +
++typedef enum {
++    /** not initialized at all, call privsep_prepare */
++    privsep_not_initialized = 0,
++    /** prepared but xenstore is not restricted */
++    privsep_prepared,
++    privsep_started,
++} privsep_state_t;
++
++extern int privileged;
++extern privsep_state_t privsep_state;
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
@@ -3260,7 +3264,7 @@ index fc8104d..87e02eb 100644
      return s;
  }
 diff --git a/vl.c b/vl.c
-index 2012f14..5258d21 100644
+index 2012f14..f7363f7 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -48,6 +48,7 @@
@@ -3287,11 +3291,7 @@ index 2012f14..5258d21 100644
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -4410,9 +4413,11 @@ int main(int argc, char **argv, char **envp)
-     int fd = 0;
-     struct passwd *pwd = NULL;
-     const char *chroot_dir = NULL;
-+    int priv = 0;
+@@ -4413,6 +4416,7 @@ int main(int argc, char **argv, char **envp)
      const char *run_as = NULL;
      char *crashdump_dir = NULL;
      long long crashdump_quota = 0;
@@ -3299,27 +3299,27 @@ index 2012f14..5258d21 100644
  
      logfile = stderr; /* initial value */
  
-@@ -5220,6 +5225,9 @@ geometry_error:
+@@ -5220,6 +5224,9 @@ geometry_error:
              case QEMU_OPTION_chroot:
                  chroot_dir = optarg;
                  break;
 +            case QEMU_OPTION_priv:
-+                priv = 1;
++                privileged = 1;
 +                break;
              case QEMU_OPTION_runas:
                  run_as = optarg;
                  break;
-@@ -5308,6 +5316,9 @@ geometry_error:
+@@ -5308,6 +5315,9 @@ geometry_error:
      }
  #endif
  
-+    if (!priv)
++    if (!privileged)
 +        privsep_prepare();
 +
      if (pid_file && qemu_create_pidfile(pid_file) != 0) {
          if (daemonize) {
              uint8_t status = 1;
-@@ -5515,6 +5526,8 @@ geometry_error:
+@@ -5515,6 +5525,8 @@ geometry_error:
          provision_crashdump(crashdump_dir, crashdump_quota);
      }
  
@@ -3328,7 +3328,7 @@ index 2012f14..5258d21 100644
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-@@ -5614,11 +5627,13 @@ geometry_error:
+@@ -5614,11 +5626,13 @@ geometry_error:
          }
      }
  
@@ -3347,7 +3347,7 @@ index 2012f14..5258d21 100644
  
      /* init USB devices */
      if (usb_enabled) {
-@@ -5757,6 +5772,30 @@ geometry_error:
+@@ -5757,6 +5771,30 @@ geometry_error:
          qemu_start_incoming_migration(incoming);
      }
  
@@ -3358,7 +3358,7 @@ index 2012f14..5258d21 100644
 +    }
 +
 +#ifdef __linux__
-+    if (!priv) {
++    if (!privileged) {
 +        if (xc_interface_restrict(xc_handle, domid) < 0)
 +            fprintf(stderr, "xc_interface_restrict(): %s\n", strerror(errno));
 +
@@ -3378,7 +3378,7 @@ index 2012f14..5258d21 100644
      if (autostart)
          vm_start();
  
-@@ -5773,9 +5812,6 @@ geometry_error:
+@@ -5773,9 +5811,6 @@ geometry_error:
  	    exit(1);
  
  	chdir("/");
