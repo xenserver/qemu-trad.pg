@@ -2719,7 +2719,7 @@ index 0000000..1d48502
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..887000b
+index 0000000..222a376
 --- /dev/null
 +++ b/unittests/sep.c
 @@ -0,0 +1,630 @@
@@ -3144,7 +3144,7 @@ index 0000000..887000b
 +    domain_path = "/local/domain/123";
 +    vm_path = "/vm/vmpathX";
 +
-+    state = privsep_started;
++    privsep_state = privsep_started;
 +
 +    path_fail("", READ);
 +    path_fail("", WRITE);
