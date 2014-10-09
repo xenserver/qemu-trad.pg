@@ -171,3 +171,4 @@ dirty.patch
 depriv_qemu.patch
 notify.patch
 CA-144613-vnc.patch
+CA-147808-vnc.patch
