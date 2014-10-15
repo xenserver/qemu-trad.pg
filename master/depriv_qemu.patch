@@ -1,0 +1,3939 @@
+diff --git a/Makefile.target b/Makefile.target
+index 85cea08..be96388 100644
+--- a/Makefile.target
++++ b/Makefile.target
+@@ -503,7 +503,7 @@ endif #CONFIG_BSD_USER
+ # System emulator target
+ ifndef CONFIG_USER_ONLY
+ 
+-OBJS=vl.o osdep.o monitor.o pci.o loader.o isa_mmio.o machine.o dma-helpers.o syslog.o
++OBJS=vl.o osdep.o monitor.o pci.o loader.o isa_mmio.o machine.o dma-helpers.o syslog.o privsep.o
+ # virtio has to be here due to weird dependency between PCI and virtio-net.
+ # need to fix this properly
+ OBJS+=virtio.o virtio-blk.o virtio-balloon.o virtio-net.o virtio-console.o
+diff --git a/block-raw-posix.c b/block-raw-posix.c
+index 4110f33..82a9c50 100644
+--- a/block-raw-posix.c
++++ b/block-raw-posix.c
+@@ -32,6 +32,7 @@
+ #ifdef CONFIG_AIO
+ #include "posix-aio-compat.h"
+ #endif
++#include "privsep.h"
+ 
+ #ifdef CONFIG_COCOA
+ #include <paths.h>
+@@ -195,10 +196,15 @@ static int raw_open(BlockDriverState *bs, const char *filename, int flags)
+ 
+     fd = open(filename, open_flags, 0644);
+     if (fd < 0) {
+-        ret = -errno;
+-        if (ret == -EROFS)
+-            ret = -EACCES;
+-        return ret;
++        fd = privsep_open_ro(filename);
++        if (fd < 0) {
++            ret = -errno;
++            if (ret == -EROFS)
++                ret = -EACCES;
++            return ret;
++        } else {
++            bs->read_only = 1;
++        }
+     }
+     s->fd = fd;
+     s->aligned_buf = NULL;
+diff --git a/hw/hw.h b/hw/hw.h
+index 6547a6e..d29cc9b 100644
+--- a/hw/hw.h
++++ b/hw/hw.h
+@@ -34,6 +34,7 @@ QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
+                          QEMUFileCloseFunc *close,
+                          QEMUFileRateLimit *rate_limit);
+ QEMUFile *qemu_fopen(const char *filename, const char *mode);
++QEMUFile *qemu_fdopen(int fd, const char *mode);
+ QEMUFile *qemu_fopen_socket(int fd);
+ QEMUFile *qemu_popen(FILE *popen_file, const char *mode);
+ QEMUFile *qemu_popen_cmd(const char *command, const char *mode);
+diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
+index 55a48b0..177f266 100644
+--- a/hw/piix4acpi.c
++++ b/hw/piix4acpi.c
+@@ -28,6 +28,7 @@
+ #include "pci.h"
+ #include "sysemu.h"
+ #include "qemu-xen.h"
++#include "privsep.h"
+ #include "battery_mgmt.h"
+ #include "qemu-log.h"
+ #include "qemu-timer.h"
+@@ -969,7 +970,7 @@ void acpi_php_add(int devfn)
+             sprintf(ret_str, "wrong bdf or vdevfn");
+ 
+         if ( strlen(ret_str) > 0 )
+-            xenstore_record_dm("parameter", ret_str);
++            privsep_record_dm("parameter", ret_str);
+ 
+         return;
+     }
+@@ -1000,7 +1001,7 @@ void acpi_php_add(int devfn)
+ 
+     /* tell Control panel which devfn for the new pass-throgh dev */
+     sprintf(ret_str, "0x%02x", devfn);
+-    xenstore_record_dm("parameter", ret_str);
++    privsep_record_dm("parameter", ret_str);
+ 
+     /* signal the CP ACPI hot insert done */
+     xenstore_record_dm_state("pci-inserted");
+diff --git a/hw/tpm_tis.c b/hw/tpm_tis.c
+index 50ecac0..bd872df 100644
+--- a/hw/tpm_tis.c
++++ b/hw/tpm_tis.c
+@@ -30,6 +30,7 @@
+ #include "qemu-timer.h"
+ #include "qemu-xen.h"
+ #include "exec-all.h"
++#include "privsep.h"
+ 
+ //#define DEBUG_TPM
+ 
+diff --git a/hw/xen_backend.c b/hw/xen_backend.c
+index 4b6f90d..6d35d25 100644
+--- a/hw/xen_backend.c
++++ b/hw/xen_backend.c
+@@ -41,11 +41,11 @@
+ #include "qemu-log.h"
+ #include "qemu-xen.h"
+ #include "xen_backend.h"
++#include "privsep.h"
+ 
+ /* ------------------------------------------------------------- */
+ 
+ /* public */
+-xc_interface *xen_xc;
+ static struct xs_handle *xenstore = NULL;
+ const char *xen_protocol;
+ 
+@@ -652,7 +652,6 @@ int xen_be_init(void)
+     if (!xenstore_watch_new_callback(NULL, xenstore_update, NULL))
+         goto err;
+ 
+-    xen_xc = xc_interface_open(0,0,0);
+     if (!xen_xc) {
+ 	xen_be_printf(NULL, 0, "can't open xen interface\n");
+ 	goto err;
+diff --git a/hw/xen_backend.h b/hw/xen_backend.h
+index 8d1263d..f95015b 100644
+--- a/hw/xen_backend.h
++++ b/hw/xen_backend.h
+@@ -54,7 +54,7 @@ struct XenDevice {
+ /* ------------------------------------------------------------- */
+ 
+ /* variables */
+-extern xc_interface *xen_xc;
++#define xen_xc xc_handle
+ extern const char *xen_protocol;
+ 
+ /* xenstore helper functions */
+diff --git a/hw/xen_console.c b/hw/xen_console.c
+index ca781bb..3ae21e3 100644
+--- a/hw/xen_console.c
++++ b/hw/xen_console.c
+@@ -38,6 +38,7 @@
+ #include "qemu-char.h"
+ #include "xen_backend.h"
+ #include "qemu-xen.h"
++#include "privsep.h"
+ 
+ struct buffer {
+     uint8_t *data;
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index 427b34b..886635a 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
+@@ -62,6 +62,7 @@
+ #include "qemu-xen.h"
+ #include "hw/pc.h"
+ #include "net.h"
++#include "privsep.h"
+ 
+ //#define DEBUG_MMU
+ 
+@@ -177,6 +178,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+             }
+             bufioreq_local_port = rc;
+         }
++
++#ifndef CONFIG_STUBDOM
++        if (xc_evtchn_restrict(xce_handle, domid) < 0) {
++            fprintf(logfile, "xc_evtchn_restrict(): %s\n", strerror(errno));
++            return NULL;
++        }
++#endif
+     }
+ 
+     return env;
+@@ -186,26 +194,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+ void cpu_reset(CPUX86State *env)
+ {
+     extern int s3_shutdown_flag;
+-    xc_interface *xcHandle;
+     int sts;
+  
+     if (s3_shutdown_flag)
+         return;
+ 
+-    xcHandle = xc_interface_open(0,0,0);
+-    if (!xcHandle)
+-        fprintf(logfile, "Cannot acquire xenctrl handle\n");
+-    else {
+-        xc_domain_shutdown_hook(xcHandle, domid);
+-        sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_reboot);
+-        if (sts != 0)
+-            fprintf(logfile,
+-                    "? xc_domain_shutdown failed to issue reboot, sts %d\n",
+-                    sts);
+-        else
+-            fprintf(logfile, "Issued domain %d reboot\n", domid);
+-        xc_interface_close(xcHandle);
+-    }
++    xc_domain_shutdown_hook(xc_handle, domid);
++    sts = xc_domain_shutdown(xc_handle, domid, SHUTDOWN_reboot);
++    if (sts != 0)
++        fprintf(logfile,
++                "? xc_domain_shutdown failed to issue reboot, sts %d\n",
++                sts);
++    else
++        fprintf(logfile, "Issued domain %d reboot\n", domid);
+ }
+ 
+ void cpu_x86_close(CPUX86State *env)
+@@ -458,14 +459,11 @@ void timeoffset_get(void)
+ 
+ static void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
+ {
+-    char b[64];
+-
+     time_offset += (unsigned long)req->data;
+ 
+     fprintf(logfile, "Time offset set %ld, added offset %"PRId64"\n",
+         time_offset, req->data);
+-    sprintf(b, "%ld", time_offset);
+-    xenstore_vm_write(domid, "rtc/timeoffset", b);
++    privsep_set_rtc_timeoffset(time_offset);
+ }
+ 
+ static void __handle_ioreq(CPUState *env, ioreq_t *req)
+@@ -661,19 +659,12 @@ int main_loop(void)
+ 
+ void destroy_hvm_domain(void)
+ {
+-    xc_interface *xcHandle;
+     int sts;
+  
+-    xcHandle = xc_interface_open(0,0,0);
+-    if (!xcHandle)
+-        fprintf(logfile, "Cannot acquire xenctrl handle\n");
+-    else {
+-        sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
+-        if (sts != 0)
+-            fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, "
+-                    "sts %d, errno %d\n", sts, errno);
+-        else
+-            fprintf(logfile, "Issued domain %d poweroff\n", domid);
+-        xc_interface_close(xcHandle);
+-    }
++    sts = xc_domain_shutdown(xc_handle, domid, SHUTDOWN_poweroff);
++    if (sts != 0)
++        fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, "
++                "sts %d, errno %d\n", sts, errno);
++    else
++        fprintf(logfile, "Issued domain %d poweroff\n", domid);
+ }
+diff --git a/keymaps.c b/keymaps.c
+index 2fb5a51..5d5b910 100644
+--- a/keymaps.c
++++ b/keymaps.c
+@@ -22,6 +22,8 @@
+  * THE SOFTWARE.
+  */
+ 
++#include "privsep.h"
++
+ static int get_keysym(const char *name)
+ {
+     const name2keysym_t *p;
+@@ -90,18 +92,15 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
+ 					   kbd_layout_t * k)
+ {
+     FILE *f;
+-    char file_name[1024];
+     char line[1024];
+     int len;
+ 
+-    snprintf(file_name, sizeof(file_name),
+-             "%s/keymaps/%s", bios_dir, language);
+-
+     if (!k)
+ 	k = qemu_mallocz(sizeof(kbd_layout_t));
+-    if (!(f = fopen(file_name, "r"))) {
++    f = privsep_open_keymap(language);
++    if (!f) {
+ 	fprintf(stderr,
+-		"Could not read keymap file: '%s'\n", file_name);
++		"Could not read keymap file: '%s'\n", language);
+ 	return 0;
+     }
+     for(;;) {
+diff --git a/privsep.c b/privsep.c
+new file mode 100644
+index 0000000..714f4ab
+--- /dev/null
++++ b/privsep.c
+@@ -0,0 +1,2077 @@
++/* Privilege separation.  Closely based on OpenBSD syslogd's
++ * privsep, which is:
++ *
++ * Copyright (c) 2003 Anil Madhavapeddy <anil@recoil.org>
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ *
++ * We also use some utility functions from privsep_fdpass.c, which is:
++ *
++ *
++ * Copyright 2001 Niels Provos <provos@citi.umich.edu>
++ * All rights reserved.
++ *
++ * Copyright (c) 2002 Matthieu Herrb
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *    - Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    - Redistributions in binary form must reproduce the above
++ *      copyright notice, this list of conditions and the following
++ *      disclaimer in the documentation and/or other materials provided
++ *      with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++/*
++ * Tests to do for this code (beside running the machine):
++ * - suspend/resume
++ * - insert a CD from XenCenter
++ * - eject a CD from XenCenter
++ * - eject a CD from the guest (ie right click on Windows)
++ * - hotplug network device
++ * - hotplug disk device
++ * - kill parent, check child exit automatically
++ * - kill parent with SEGV or ABRT signals, a core file should be generated
++ * - writing enable/disable to /local/domain/0/device-model/<domid>/logdirty/cmd
++ *   cause /local/domain/0/device-model/<domid>/logdirty/ret to be written
++ *   with same value
++ */
++
++#include <sys/types.h>
++#include <sys/fcntl.h>
++#include <sys/resource.h>
++#include <sys/socket.h>
++#include <sys/time.h>
++#include <assert.h>
++#include <err.h>
++#include <errno.h>
++#include <limits.h>
++#include <pwd.h>
++#include <grp.h>
++#include <stdlib.h>
++#include <syslog.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdio.h>
++#include <signal.h>
++#include <sys/stat.h>
++#ifndef CONFIG_STUBDOM
++#include <sys/prctl.h>
++#endif
++#include <dirent.h>
++#include <sys/ioctl.h>
++#include <dlfcn.h>
++#include <poll.h>
++#include <sched.h>
++
++#include "qemu-common.h"
++#include "hw/hw.h"
++#include "sysemu.h"
++#include "exec-all.h"
++#include "privsep.h"
++#include "qemu-xen.h"
++
++#ifndef CLONE_NEWNET
++#define CLONE_NEWNET 0x40000000
++#endif
++
++#undef xs_get_domain_path
++#undef xs_read
++#undef xs_write
++#undef xs_directory
++#undef xs_watch
++#undef xs_unwatch
++#undef xs_rm
++#undef xs_daemon_open
++#undef xs_daemon_close
++#undef xs_restrict
++#undef xs_fileno
++#undef xs_read_watch
++
++enum {
++    max_len_xs_path = 256,
++    max_len_cd_path = 1024,
++    max_len_privsep_state = 256,
++    max_len_language = 256,
++    max_len_subpath = 256,
++    max_len_token = 256,
++    /* define limit of the dump file */
++    max_len_dump = (64*1024),
++    /* define limit of data written by xs_write */
++    max_len_xs_data = (64*1024),
++    /* maximum length of log message */
++    max_len_log = 1024,
++};
++
++int privileged = 0;
++privsep_state_t privsep_state;
++
++static int privsep_fd = -1;
++static struct xs_handle * priv_xsh;
++static int parent_fd = -1;
++static int parent_pid;
++static char root_directory[64];
++static int termsig;
++static char *domain_path = NULL;
++static char *vm_path = NULL;
++#define MAX_XS_CONN 4
++static int xs_conns[MAX_XS_CONN] = { -1, -1, -1, -1 };
++
++#undef  OPCODES
++#define OPCODES \
++    OPCODE(open_iso) \
++    OPCODE(eject_cd) \
++    OPCODE(lock_cd) \
++    OPCODE(unlock_cd) \
++    OPCODE(set_cd_backend) \
++    OPCODE(set_rtc) \
++    OPCODE(save_vm_dump) \
++    OPCODE(open_keymap) \
++    OPCODE(record_dm) \
++    OPCODE(read_dm) \
++    OPCODE(read_xs) \
++    OPCODE(write_xs) \
++    OPCODE(directory_xs) \
++    OPCODE(watch_xs) \
++    OPCODE(unwatch_xs) \
++    OPCODE(rm_xs) \
++    OPCODE(daemon_open_xs) \
++    OPCODE(daemon_close_xs) \
++    OPCODE(restrict_paths) \
++    OPCODE(log_msg)
++
++#undef  OPCODE
++#define OPCODE(n) privsep_op_ ## n ,
++enum privsep_opcode {
++    OPCODES
++    privsep_op_count
++};
++
++typedef void privsep_read_t(void);
++#undef  OPCODE
++#define OPCODE(n) static privsep_read_t n;
++OPCODES
++
++#undef  OPCODE
++#define OPCODE(n) n ,
++static privsep_read_t *privsep_opcode[] = {
++    OPCODES
++};
++
++typedef enum {
++    CHECK_READ = 1,
++    CHECK_WRITE = 2,
++} check_type_t;
++
++static bool check_xs_path(const char *path, check_type_t check);
++
++#define MAX_CDS (MAX_DRIVES+1)
++
++#define LOG_LIMIT_BURST 10000
++#define LOG_LIMIT_INTERVAL 60
++
++/* store fake xs_handle structure to give to unprivileged
++ * Qemu when we use privilege separation
++ * This is required as watches are per-xs_handle
++ * and to multiplex watches
++ */
++typedef struct privsep_handle {
++    int watch_fd;
++    unsigned priv_handle;
++} privsep_handle_t;
++
++/* We have a list of xenstore paths which correspond to CD backends,
++   and we validate CD and ISO commands against that.  New backends can
++   only be added to that list before you drop privileges.
++*/
++static char *
++cd_backend_areas[MAX_CDS];
++
++static int watches_find(const char *token);
++
++static void
++clean_exit(int ret)
++{
++    if (strcmp(root_directory, "/var/empty")) {
++        char name[80];
++        struct stat buf;
++        strcpy(name, root_directory);
++        strcat(name, "/etc/localtime");
++        unlink(name);
++        strcpy(name, root_directory);
++        strcat(name, "/etc");
++        rmdir(name);
++
++        snprintf(name, 80, "%s/core.%d", root_directory, parent_pid);
++        if (!stat(name, &buf) && !buf.st_size)
++            unlink(name);
++
++        rmdir(root_directory);
++    }
++    _exit(ret);
++}
++
++/* Read data with the assertion that it all must come through, or
++ * else abort the process.  Based on atomicio() from openssh. */
++static void
++must_read(int fd, void *buf, size_t n)
++{
++        char *s = buf;
++        ssize_t res, pos = 0;
++
++        while (n > pos) {
++                res = read(fd, s + pos, n - pos);
++                switch (res) {
++                case -1:
++                        if (errno == EINTR || errno == EAGAIN)
++                                continue;
++                case 0:
++                        clean_exit(fd == privsep_fd ? 1 : 0);
++                default:
++                        pos += res;
++                }
++        }
++}
++
++/* Write data with the assertion that it all has to be written, or
++ * else abort the process.  Based on atomicio() from openssh. */
++static ssize_t
++write_all(int fd, const void *buf, size_t n)
++{
++        const char *s = buf;
++        ssize_t res, pos = 0;
++
++        while (n > pos) {
++                res = write(fd, s + pos, n - pos);
++                switch (res) {
++                case -1:
++                        if (errno == EINTR || errno == EAGAIN)
++                                continue;
++                case 0:
++                        return -1;
++                default:
++                        pos += res;
++                }
++        }
++        return pos;
++}
++
++static void
++must_write(int fd, const void *buf, size_t n)
++{
++    if (write_all(fd, buf, n) < 0)
++        clean_exit(0);
++}
++
++#ifndef CONFIG_STUBDOM
++static void
++send_fd(int sock, int fd)
++{
++        struct msghdr msg;
++        char tmp[CMSG_SPACE(sizeof(int))];
++        struct cmsghdr *cmsg;
++        struct iovec vec;
++        int result = 0;
++        ssize_t n;
++
++        memset(&msg, 0, sizeof(msg));
++
++        if (fd >= 0) {
++                msg.msg_control = (caddr_t)tmp;
++                msg.msg_controllen = CMSG_LEN(sizeof(int));
++                cmsg = CMSG_FIRSTHDR(&msg);
++                cmsg->cmsg_len = CMSG_LEN(sizeof(int));
++                cmsg->cmsg_level = SOL_SOCKET;
++                cmsg->cmsg_type = SCM_RIGHTS;
++                *(int *)CMSG_DATA(cmsg) = fd;
++        } else {
++                result = errno;
++        }
++
++        vec.iov_base = &result;
++        vec.iov_len = sizeof(int);
++        msg.msg_iov = &vec;
++        msg.msg_iovlen = 1;
++
++        while ((n = sendmsg(sock, &msg, 0)) == -1) {
++                if (errno == EINTR) continue;
++                warn("%s: sendmsg(%d)", "send_fd", sock);
++                break;
++        }
++        if (n != sizeof(int))
++                warnx("%s: sendmsg: expected sent 1 got %ld",
++                    "send_fd", (long)n);
++}
++#endif
++
++#ifndef CONFIG_STUBDOM
++static int
++receive_fd(int sock)
++{
++        struct msghdr msg;
++        char tmp[CMSG_SPACE(sizeof(int))];
++        struct cmsghdr *cmsg;
++        struct iovec vec;
++        ssize_t n;
++        int result;
++        int fd;
++
++        memset(&msg, 0, sizeof(msg));
++        vec.iov_base = &result;
++        vec.iov_len = sizeof(int);
++        msg.msg_iov = &vec;
++        msg.msg_iovlen = 1;
++        msg.msg_control = tmp;
++        msg.msg_controllen = sizeof(tmp);
++
++        while ((n = recvmsg(sock, &msg, 0)) == -1) {
++                if (errno == EINTR) continue;
++                warn("%s: recvmsg", "receive_fd");
++                break;
++        }
++        if (n != sizeof(int))
++                warnx("%s: recvmsg: expected received 1 got %zd",
++                      "receive_fd", n);
++        if (result == 0) {
++                cmsg = CMSG_FIRSTHDR(&msg);
++                if (cmsg == NULL) {
++                        warnx("%s: no message header", "receive_fd");
++                        return (-1);
++                }
++                if (cmsg->cmsg_type != SCM_RIGHTS)
++                        warnx("%s: expected type %d got %d", "receive_fd",
++                            SCM_RIGHTS, cmsg->cmsg_type);
++                fd = (*(int *)CMSG_DATA(cmsg));
++                return fd;
++        } else {
++                errno = result;
++                return -1;
++        }
++}
++#else
++
++static int
++receive_fd(int sock)
++{
++    return -1;
++}
++#endif
++
++#define send_raw(fd, x) must_write(fd, &x, sizeof(x))
++
++#define INVALID_SIZE (-(size_t)1)
++static void
++send_buf(int fd, const char *s, size_t len)
++{
++    if (!s) {
++        len = INVALID_SIZE;
++        send_raw(fd, len);
++    } else {
++        send_raw(fd, len);
++        must_write(fd, s, len);
++    }
++}
++
++static inline void
++send_string(int fd, const char *s)
++{
++    send_buf(fd, s, s ? strlen(s) : 0);
++}
++
++static char*
++receive_string_limited(int fd, unsigned int *p_len, size_t limit)
++{
++    size_t l;
++    char *res;
++
++    must_read(fd, &l, sizeof(l));
++    if (l == INVALID_SIZE)
++        return NULL;
++    if (limit && l > limit)
++        return NULL;
++
++    res = malloc(l + 1);
++    if (!res)
++        return res;
++    must_read(fd, res, l);
++    res[l] = 0;
++    if (p_len)
++        *p_len = l;
++    return res;
++}
++
++static char*
++receive_string(int fd, unsigned int *p_len)
++{
++    return receive_string_limited(fd, p_len, 0);
++}
++
++static void
++receive_string_buf_len(int fd, char *buf, unsigned len)
++{
++    size_t l;
++
++    must_read(fd, &l, sizeof(l));
++    if (l >= len)
++        clean_exit(1);
++
++    must_read(fd, buf, l);
++    buf[l] = 0;
++}
++#define MAX_LEN(n) max_len_ ## n
++#define check_len(n) (strlen(n) <= MAX_LEN(n))
++#define receive_string_buf(f, b) char b[MAX_LEN(b)+1]; receive_string_buf_len(f, b, MAX_LEN(b)+1)
++
++static inline void
++send_command(int fd, enum privsep_opcode cmd)
++{
++    send_raw(fd, cmd);
++}
++
++static inline void
++send_int(int fd, int i)
++{
++    send_raw(fd, i);
++}
++
++static inline int
++receive_int(int fd)
++{
++    int i;
++    must_read(fd, &i, sizeof(i));
++    return i;
++}
++
++static void
++send_list(int fd, char **list, unsigned num)
++{
++    size_t l;
++    unsigned n;
++
++    if (!list) {
++        num = -1u;
++        send_raw(fd, num);
++        return;
++    }
++
++    send_raw(fd, num);
++
++    l = 0;
++    for (n = 0; n < num; ++n)
++        l += strlen(list[n]);
++    send_raw(fd, l);
++
++    for (n = 0; n < num; ++n) {
++        l = strlen(list[n]);
++        send_raw(fd, l);
++        must_write(fd, list[n], l);
++    }
++}
++
++static char **
++receive_list(int fd, unsigned *p_num)
++{
++    size_t l;
++    unsigned n, num;
++    char **res;
++    char *p;
++
++    must_read(fd, &num, sizeof(num));
++    if (num == -1u) {
++        *p_num = 0;
++        return NULL;
++    }
++    *p_num = num;
++    must_read(fd, &l, sizeof(l));
++    res = (char **) malloc(l + num + sizeof(char*) * (num+1));
++    if (!res)
++        return NULL;
++
++    p = (char*) (res+num+1);
++
++    for (n = 0; n < num; ++n) {
++        res[n] = p;
++        must_read(fd, &l, sizeof(l));
++        must_read(fd, p, l);
++        p += l;
++        *p++ = 0;
++    }
++    res[n] = NULL;
++    return res;
++}
++
++typedef struct {
++    bool b;
++    int error;
++} bool_errno_t;
++
++static inline void
++send_bool_errno(int fd, bool b, int error)
++{
++    bool_errno_t data = { b, error };
++    send_raw(fd, data);
++}
++
++static inline bool
++receive_bool_errno(int fd)
++{
++    bool_errno_t data;
++    must_read(fd, &data, sizeof(data));
++    errno = data.error;
++    return data.b;
++}
++
++#ifndef CONFIG_STUBDOM
++static void
++open_iso(void)
++{
++    int i;
++    char *params_path;
++    char *allowed_path = NULL;
++    unsigned len;
++    int fd;
++
++    /* This is a bit icky.  We get a path from the unprivileged qemu,
++       and then scan the defined CD areas to make sure it matches.
++       The internal structure of qemu means that by the time you do
++       the open(), it's kind of hard to map back to the actual CD
++       drive. */
++    receive_string_buf(parent_fd, cd_path);
++
++    /* Have a path.  Validate against xenstore. */
++    for (i = 0; i < MAX_CDS; i++) {
++        if (!cd_backend_areas[i]) continue;
++        if (asprintf(&params_path, "%s/params", cd_backend_areas[i]) < 0) {
++            /* Umm, not sure what to do now */
++            continue;
++        }
++        free(allowed_path);
++        allowed_path = xs_read(priv_xsh, XBT_NULL, params_path, &len);
++        free(params_path);
++        if (allowed_path && strcmp(allowed_path, cd_path) == 0)
++            break;
++    }
++    free(allowed_path);
++    if (i >= MAX_CDS) {
++        errno = EPERM;
++        fd = -1;
++    } else {
++        fd = open(cd_path, O_RDONLY|O_LARGEFILE|O_BINARY);
++    }
++    send_fd(parent_fd, fd);
++    if (fd >= 0)
++        close(fd);
++}
++#endif
++
++static void
++do_eject_cd(int id)
++{
++    char *param_path;
++    if (cd_backend_areas[id]) {
++        if (asprintf(&param_path, "%s/params", cd_backend_areas[id]) >= 0){
++            xs_write(priv_xsh, XBT_NULL, param_path, "", 0);
++            free(param_path);
++        }
++    }
++}
++
++static void
++eject_cd(void)
++{
++    int id = receive_int(parent_fd);
++    if (id >= 0 && id < MAX_CDS)
++        do_eject_cd(id);
++}
++
++void
++privsep_eject_cd(int id)
++{
++    if (privsep_fd < 0) {
++        do_eject_cd(id);
++    } else {
++        send_command(privsep_fd, privsep_op_eject_cd);
++        send_raw(privsep_fd, id);
++    }
++}
++
++static void
++set_cd_lock_state(int id, const char *state)
++{
++    char *locked_path;
++    if (cd_backend_areas[id]) {
++        if (asprintf(&locked_path, "%s/locked", cd_backend_areas[id]) >= 0) {
++            xs_write(priv_xsh, XBT_NULL, locked_path, state, strlen(state));
++            free(locked_path);
++        }
++    }
++}
++
++static void
++lock_cd(void)
++{
++    int id = receive_int(parent_fd);
++    if (id >= 0 && id < MAX_CDS)
++        set_cd_lock_state(id, "true");
++}
++
++void
++privsep_lock_cd(int id)
++{
++    if (privsep_fd < 0) {
++        set_cd_lock_state(id, "true");
++        return;
++    }
++
++    send_command(privsep_fd, privsep_op_lock_cd);
++    send_raw(privsep_fd, id);
++}
++
++static void
++unlock_cd(void)
++{
++    int id = receive_int(parent_fd);
++    if (id >= 0 && id < MAX_CDS)
++        set_cd_lock_state(id, "false");
++}
++
++void
++privsep_unlock_cd(int id)
++{
++    if (privsep_fd < 0) {
++        set_cd_lock_state(id, "false");
++    } else {
++        send_command(privsep_fd, privsep_op_unlock_cd);
++        send_raw(privsep_fd, id);
++    }
++}
++
++static int 
++xenstore_vm_write(int domid, const char *key, const char *value)
++{
++    char *buf, *path;
++    int rc;
++
++    path = xs_get_domain_path(priv_xsh, domid);
++    if (path == NULL) {
++        return 0;
++    }
++
++    rc = asprintf(&buf, "%s/vm", path);
++    free(path);
++    if (rc < 0)
++        return 0;
++
++    path = xs_read(priv_xsh, XBT_NULL, buf, NULL);
++    free(buf);
++    if (path == NULL) {
++        return 0;
++    }
++
++    rc = asprintf(&buf, "%s/%s", path, key);
++    free(path);
++    if (rc < 0)
++        return 0;
++
++    rc = xs_write(priv_xsh, XBT_NULL, buf, value, strlen(value));
++    free(buf);
++    return rc;
++}
++
++static void
++do_set_rtc(long time_offset)
++{
++    char b[64];
++
++    sprintf(b, "%ld", time_offset);
++    xenstore_vm_write(domid, "rtc/timeoffset", b);
++}
++
++static void
++set_rtc(void)
++{
++    long time_offset;
++
++    must_read(parent_fd, &time_offset, sizeof(time_offset));
++    do_set_rtc(time_offset);
++}
++
++void
++privsep_set_rtc_timeoffset(long time_offset)
++{
++    if (privsep_fd < 0) {
++        do_set_rtc(time_offset);
++    } else {
++        send_command(privsep_fd, privsep_op_set_rtc);
++        send_raw(privsep_fd, time_offset);
++    }
++}
++
++#ifndef CONFIG_STUBDOM
++static void
++save_vm_dump(void)
++{
++    int fd, e;
++    char name[128];
++    char *dump = NULL;
++    unsigned len;
++
++    sprintf(name, "/var/lib/xen/qemu-save.%d", domid);
++
++    dump = receive_string_limited(parent_fd, &len, max_len_dump);
++    if (!dump)
++        clean_exit(1);
++
++    fd = open(name, O_RDWR|O_CREAT|O_TRUNC, 0600);
++    e = errno;
++    if (fd < 0)
++        goto done;
++
++    if (write_all(fd, dump, len) >= 0) {
++        e = 0;
++    } else {
++        e = errno;
++        unlink(name);
++    }
++
++done:
++    if (fd >= 0)
++        close(fd);
++    free(dump);
++    send_int(parent_fd, e);
++}
++#endif
++
++typedef struct {
++    char *buf;
++    uint32_t len, capacity;
++    int has_error;
++} vm_dump_t;
++
++static int
++dump_put_buffer(void *opaque, const uint8_t *buf,
++                int64_t pos, int size)
++{
++    vm_dump_t *dump = (vm_dump_t *) opaque;
++
++    if (pos < 0 || size < 0 || pos + size > max_len_dump)
++        dump->has_error = 1;
++    if (dump->has_error)
++        return -1;
++
++    /* resize buf if needed */
++    uint32_t s = pos + size;
++    s += 1023;
++    s -= s % 1024;
++    if (s > dump->capacity) {
++        char *p = (char *) realloc(dump->buf, s);
++        if (!p) {
++            dump->has_error = 1;
++            return -1;
++        }
++        dump->buf = p;
++        dump->capacity = s;
++    }
++
++    memcpy(dump->buf + pos, buf, size);
++    s = pos + size;
++    if (s > dump->len)
++        dump->len = s;
++    return size;
++}
++
++
++static int
++dump_close(void *opaque)
++{
++    vm_dump_t *dump = (vm_dump_t *) opaque;
++    int ret = -1;
++
++    if (dump->has_error || dump->len > max_len_dump || !dump->buf)
++        goto cleanup;
++
++    send_command(privsep_fd, privsep_op_save_vm_dump);
++    send_buf(privsep_fd, dump->buf, dump->len);
++
++    ret = receive_int(privsep_fd);
++
++cleanup:
++    free(dump->buf);
++    free(dump);
++    return ret;
++}
++
++QEMUFile *
++privsep_open_vm_dump(const char *name)
++{
++    vm_dump_t *dump = (vm_dump_t *) calloc(1, sizeof(*dump));
++    if (!dump)
++        return NULL;
++
++    QEMUFile *res = qemu_fopen_ops(dump, dump_put_buffer, NULL, dump_close, NULL);
++    if (!res) {
++        free(dump);
++        return NULL;
++    }
++    return res;
++}
++
++static int
++do_open_keymap(const char *language)
++{
++    int e;
++    int fd;
++    char *filename;
++    int x;
++
++    for (x = 0; language[x]; x++) {
++        if (!isalnum(language[x]) && language[x] != '-') {
++            errno = EPERM;
++            return -1;
++        }
++    }
++
++    if (asprintf(&filename, "%s/keymaps/%s", bios_dir, language) < 0)
++        return -1;
++    fd = open(filename, O_RDONLY);
++    e = errno;
++    free(filename);
++    errno = e;
++    return fd;
++}
++
++#ifndef CONFIG_STUBDOM
++static void
++open_keymap(void)
++{
++    int fd;
++
++    receive_string_buf(parent_fd, language);
++
++    fd = do_open_keymap(language);
++
++    send_fd(parent_fd, fd);
++    if (fd >= 0)
++        close(fd);
++}
++#endif
++
++FILE *
++privsep_open_keymap(const char *language)
++{
++    int fd;
++    FILE *res;
++    int e;
++
++    if (privsep_fd < 0) {
++        fd = do_open_keymap(language);
++    } else {
++        if (!check_len(language)) {
++            errno = EINVAL;
++            return NULL;
++        }
++        send_command(privsep_fd, privsep_op_open_keymap);
++        send_string(privsep_fd, language);
++        fd = receive_fd(privsep_fd);
++    }
++
++    if (fd < 0)
++        return NULL;
++    res = fdopen(fd, "r");
++    if (!res) {
++        e = errno;
++        close(fd);
++        errno = e;
++    }
++    return res;
++}
++
++static void
++do_record_dm(const char *subpath, const char *state)
++{
++    char *path = NULL;
++
++    if (asprintf(&path, 
++                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
++        return;
++    }
++    xs_write(priv_xsh, XBT_NULL, path, state, strlen(state));
++    free(path);
++}
++
++static void
++record_dm(void)
++{
++    receive_string_buf(parent_fd, subpath);
++    receive_string_buf(parent_fd, privsep_state);
++
++    /* these are the only values allowed, return to avoid
++     * filling xenstore */
++    if (strcmp(subpath, "parameter") != 0 && strcmp(subpath, "state") != 0)
++        return;
++
++    do_record_dm(subpath, privsep_state);
++}
++
++static char *
++do_read_dm(const char *subpath)
++{
++    unsigned int len;
++    char *path = NULL, *res;
++    int e;
++
++    if (asprintf(&path, 
++                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
++        return NULL;
++    }
++    res = xs_read(priv_xsh, XBT_NULL, path, &len);
++    e = errno;
++    free(path);
++    errno = e;
++    return res;
++}
++
++static void
++read_dm(void)
++{
++    char *value;
++
++    receive_string_buf(parent_fd, subpath);
++
++    value = do_read_dm(subpath);
++
++    send_string(parent_fd, value);
++
++    free(value);
++}
++
++static void
++log_msg(void)
++{
++    char *msg;
++    unsigned int len;
++    static time_t last_time;
++    static int count;
++
++    msg = receive_string_limited(parent_fd, &len, max_len_log);
++    if (msg) {
++        time_t now;
++
++        time(&now);
++        if (now - last_time > LOG_LIMIT_INTERVAL) {
++            count = 0;
++            last_time = now;
++        }
++
++        if (count < LOG_LIMIT_BURST) {
++            count++;
++            syslog(LOG_DAEMON|LOG_INFO, "%s", msg);
++        } else if (count == LOG_LIMIT_BURST) {
++            count++;
++            syslog(LOG_DAEMON|LOG_INFO, "Rate limited!");
++        }
++        free(msg);
++    }
++}
++
++int privsep_vsyslog(const char *fmt, va_list ap)
++{
++    int res;
++    char buf[max_len_log];
++
++    res = vsnprintf(buf, max_len_log, fmt, ap);
++    send_command(privsep_fd, privsep_op_log_msg);
++    send_string(privsep_fd, buf);
++
++    return res;
++}
++
++int privsep_syslog(const char *fmt, ...)
++{
++    va_list ap;
++    int res;
++
++    va_start(ap, fmt);
++    res = privsep_vsyslog(fmt, ap);
++    va_end(ap);
++
++    return res;
++}
++
++#ifndef CONFIG_STUBDOM
++static void
++sigxfsz_handler_f(int num)
++{
++    struct rlimit rlim;
++
++    getrlimit(RLIMIT_FSIZE, &rlim);
++    rlim.rlim_cur = rlim.rlim_max;
++    setrlimit(RLIMIT_FSIZE, &rlim);
++
++    write(2, "SIGXFSZ received: exiting\n", 26);
++
++    exit(1);
++}
++
++static void
++sigterm_handler_f(int num)
++{
++    char buf[128];
++    if (termsig) {
++        /* Hmm, we got a exit signal before.  Still running.
++         * Main loop is probably stuck somewhere ... */
++        snprintf(buf, 128, "Termination signal %d received but we should already be exited, force exit now!\n", num);
++        write(2, buf, strlen(buf));
++        _exit(1);
++    }
++    snprintf(buf, 128, "Termination signal %d received, requesting clean shutdown\n", num);
++    write(2, buf, strlen(buf));
++    qemu_system_exit_request();
++    termsig = num;
++}
++
++static void
++create_localtime(void)
++{
++    int rd, wr, count;
++    char name[80];
++    char buf[256];
++
++    strcpy(name, root_directory);
++    strcat(name, "/etc");
++    if (mkdir(name, 00755) < 0) {
++        fprintf(stderr, "cannot create directory %s\n", name);
++        return;
++    }
++
++    rd = open("/etc/localtime", O_RDONLY);
++    if (rd < 0) {
++        fprintf(stderr, "cannot open /etc/localtime\n");
++        return;
++    }
++    strcat(name, "/localtime");
++    wr = open(name, O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW, 0644);
++    if (wr < 0) {
++        fprintf(stderr, "cannot create %s\n", name);
++        close(rd);
++        return;
++    }
++    while ((count = read(rd, buf, 256)) > 0) {
++        write(wr, buf, count);
++    }
++    close(rd);
++    close(wr);
++}
++
++/* build same structure of send_list but in memory */
++static unsigned char*
++build_watch_data(char **list, size_t *watch_len)
++{
++    size_t l, ll[2];
++    unsigned n;
++    unsigned char *p;
++
++    ll[0] = strlen(list[0]);
++    ll[1] = strlen(list[1]);
++
++#define ADD(x) do { memcpy(p, &x, sizeof(x)); p += sizeof(x); } while(0)
++    l = sizeof(l) * 3 + sizeof(n) + ll[0] + ll[1];
++    unsigned char *res = (unsigned char *) calloc(1, l);
++    if (!res) return NULL;
++
++    p = res;
++    *watch_len = l;
++    n = 2;
++    ADD(n);
++    l = ll[0] + ll[1];
++    ADD(l);
++    ADD(ll[0]);
++    memcpy(p, list[0], ll[0]);
++    p += ll[0];
++    ADD(ll[1]);
++    memcpy(p, list[1], ll[1]);
++    p += ll[1];
++    return res;
++}
++
++static void
++privsep_loop(void)
++{
++    enum privsep_opcode opcode;
++    struct pollfd fds[2] = {
++        { parent_fd, POLLIN, 0 },
++        { -1, 0 , 0 }
++    };
++
++    unsigned char *watch = NULL;
++    size_t watch_len = 0, watch_pos = 0;
++    int xs_conn = -1;
++
++    while (1) {
++        /* sanity check on watch connection */
++        if (watch && (xs_conn < 0 || xs_conns[xs_conn] < 0 || watch_pos >= watch_len)) {
++            free(watch);
++            watch = NULL;
++            continue;
++        }
++
++        /* watch for new events or send the old one */
++        /* we avoid to do both to avoid dead locks or DoS */
++        if (watch) {
++            fds[1].fd = xs_conns[xs_conn];
++            fds[1].events = POLLOUT;
++        } else {
++            fds[1].fd = xs_fileno(priv_xsh);
++            fds[1].events = POLLIN;
++        }
++
++        int rc = poll(fds, 2, -1);
++        if (rc < 0) {
++            if (errno == EINTR) continue;
++            break;
++        }
++
++        if ((fds[1].revents & POLLIN) != 0 && !watch) {
++            unsigned num;
++            char **list = xs_read_watch(priv_xsh, &num);
++            if (!list) continue;
++            xs_conn = watches_find(list[XS_WATCH_TOKEN]);
++            if (xs_conn >= 0 && xs_conns[xs_conn] >= 0) {
++                watch_pos = 0;
++                watch = build_watch_data(list, &watch_len);
++            }
++            free(list);
++        }
++
++        if ((fds[1].revents & (POLLERR|POLLHUP|POLLNVAL)) != 0) {
++            xs_conn = -1;
++            continue;
++        }
++
++        if ((fds[1].revents & POLLOUT) != 0 && watch) {
++            int rc = write(xs_conns[xs_conn], watch + watch_pos, watch_len - watch_pos);
++            if (rc < 0) {
++                if (errno == EINTR) continue;
++                /* assume connection was closed */
++                xs_conn = -1;
++            }
++            watch_pos += rc;
++        }
++
++        if (fds[0].revents & POLLIN) {
++            must_read(parent_fd, &opcode, sizeof(opcode));
++            if (opcode < 0 || opcode >= privsep_op_count)
++                break;
++            privsep_opcode[opcode]();
++        }
++    }
++    clean_exit(0);
++}
++
++/**
++ * Prepare privilege separation
++ * - fork to have the other process
++ * - privileged will connect to xenstore
++ */
++void
++privsep_prepare(void)
++{
++    int socks[2];
++    pid_t child;
++
++    if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, socks) == -1)
++        err(1, "socketpair() failed");
++
++    snprintf(root_directory, 64, "/var/xen/qemu/%d", getpid());
++    if (mkdir(root_directory, 00755) < 0) {
++        fprintf(stderr, "cannot create qemu scratch directory\n");
++        strcpy(root_directory, "/var/empty");
++    } else {
++        /* directory have to be at least execute permission */
++        chmod(root_directory, 0711);
++        create_localtime();
++    }
++
++    parent_pid = getpid();
++
++    child = fork();
++    if (child < 0)
++        err(1, "fork() failed");
++
++    privsep_state = privsep_prepared;
++    if (child == 0) {
++        int i;
++        struct rlimit limit;
++        char *path;
++
++        /* Child of privilege. */
++
++        parent_fd = socks[0];
++#ifdef QEMU_UNITEST
++        close(socks[1]);
++#endif
++
++        if (getrlimit(RLIMIT_NOFILE, &limit) < 0)
++            limit.rlim_max = 1024;
++
++        /* The only file descriptor we really need is the socket to
++           the parent.  Close everything else. */
++        closelog();
++        for (i = 0; i < limit.rlim_max; i++) {
++#ifndef QEMU_UNITEST
++            if (i != parent_fd)
++                close(i);
++#endif
++        }
++
++        /* Try to get something safe on to stdin, stdout, and stderr,
++           to avoid embarrassing bugs if someone tries to fprintf to
++           stderr and crashes xenstored. */
++#ifndef QEMU_UNITEST
++        open("/dev/null", O_RDONLY);
++        open("/dev/null", O_WRONLY);
++        open("/dev/null", O_WRONLY);
++#endif
++
++        logfile = stderr;
++
++        priv_xsh = xs_daemon_open();
++        if (!priv_xsh) {
++            send_int(parent_fd, errno);
++            exit(1);
++        }
++
++        domain_path = xs_get_domain_path(priv_xsh, domid);
++        if (!domain_path) {
++            send_int(parent_fd, errno);
++            exit(1);
++        }
++        if (asprintf(&path, "%s/vm", domain_path) < 0) {
++            send_int(parent_fd, ENOMEM);
++            exit(1);
++        }
++        vm_path = xs_read(priv_xsh, XBT_NULL, path, NULL);
++        if (!vm_path) {
++            send_int(parent_fd, errno);
++            exit(1);
++        }
++        free(path);
++
++        send_int(parent_fd, 0);
++        send_string(parent_fd, domain_path);
++
++        privsep_loop();
++    } else {
++        /* We are the parent.  chroot and drop privileges. */
++        close(socks[0]);
++        privsep_fd = socks[1];
++
++        /* wait privilege initialization */
++        errno = receive_int(privsep_fd);
++        if (errno)
++            err(1, "privilege separation failure");
++
++        /* read domain path */
++        domain_path = receive_string(privsep_fd, NULL);
++        if (!domain_path)
++            err(1, "unable to read domain path");
++    }
++}
++
++void
++init_privsep(void)
++{
++    struct passwd *pw;
++    struct group *gr;
++    uid_t qemu_uid;
++    gid_t qemu_gid;
++
++    if (privsep_fd < 0 || privsep_state != privsep_prepared)
++        err(1, "privilege separation not prepared");
++    if (priv_xsh != NULL)
++        err(1, "privilege separation not initialized properly");
++
++    pw = getpwnam("qemu_base");
++    if (!pw)
++        err(1, "cannot get qemu user id");
++    qemu_uid = pw->pw_uid + (unsigned short)domid;
++
++    gr = getgrnam("qemu_base");
++    if (!gr)
++        err(1, "cannot get qemu group id");
++    qemu_gid = gr->gr_gid + (unsigned short)domid;
++
++    struct sigaction sigterm_handler, sigxfsz_handler;
++    memset (&sigterm_handler, 0, sizeof(struct sigaction));
++    memset (&sigxfsz_handler, 0, sizeof(struct sigaction));
++    sigterm_handler.sa_handler = sigterm_handler_f;
++    sigxfsz_handler.sa_handler = sigxfsz_handler_f;
++    struct rlimit rlim;
++    char name[64];
++    int f;
++
++    if (!crashdump_enabled()) {
++        rlim.rlim_cur = 64 * 1024 * 1024;
++        rlim.rlim_max = 64 * 1024 * 1024 + 64;
++        setrlimit(RLIMIT_FSIZE, &rlim);
++    }
++
++    /* restrict network */
++    if (unshare(CLONE_NEWNET))
++        err(1, "unshare()");
++
++    if (chdir(root_directory) < 0
++        || chroot(root_directory) < 0
++        || chdir("/") < 0)
++        err(1, "cannot chroot");
++
++    snprintf(name, 64, "core.%d", parent_pid);
++    f = open(name, O_WRONLY|O_TRUNC|O_CREAT|O_NOFOLLOW, 0644);
++    if (f > 0) {
++        close(f);
++        chown(name, qemu_uid, qemu_gid);
++    }
++
++    if (setgroups(0, NULL) < 0)
++        err(1, "setgroups()");
++    if (setgid(qemu_gid) < 0)
++        err(1, "setgid()");
++    if (setuid(qemu_uid) < 0)
++        err(1, "setuid()");
++
++    /* qemu core dumps are often useful; make sure they're allowed. */
++    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
++
++    /* handling termination signals */
++    sigaction (SIGTERM, &sigterm_handler, NULL);
++    sigaction (SIGINT, &sigterm_handler, NULL);
++    sigaction (SIGHUP, &sigterm_handler, NULL);
++    sigaction (SIGXFSZ, &sigxfsz_handler, NULL);
++
++    closelog();
++
++    privsep_state = privsep_started;
++    send_command(privsep_fd, privsep_op_restrict_paths);
++}
++#endif
++
++void
++init_privxsh(void)
++{
++    if (privsep_state != privsep_not_initialized)
++        return;
++
++    priv_xsh = xs_daemon_open();
++    if (!priv_xsh) {
++        fprintf(logfile, "couldn't open privileged connection to xenstore\n");
++        exit(0);
++    }
++}
++
++int
++privsep_open_ro(const char *cd_path)
++{
++    if (privsep_fd < 0)
++        return open(cd_path, O_RDONLY|O_LARGEFILE|O_BINARY);
++
++    if (!check_len(cd_path)) {
++        errno = EINVAL;
++        return -1;
++    }
++    send_command(privsep_fd, privsep_op_open_iso);
++    send_string(privsep_fd, cd_path);
++
++    return receive_fd(privsep_fd);
++}
++
++static void
++do_set_cd_backend(int id, const char *path)
++{
++    if (cd_backend_areas[id]) return;
++
++    cd_backend_areas[id] = strdup(path);
++    if (!cd_backend_areas[id])
++        err(1, "cloning cd backend path %s", path);
++}
++
++static void
++set_cd_backend(void)
++{
++    int id = receive_int(parent_fd);
++    receive_string_buf(parent_fd, cd_path);
++    if (privsep_state == privsep_prepared && id >= 0 && id < MAX_CDS)
++        do_set_cd_backend(id, cd_path);
++}
++
++void
++privsep_set_cd_backend(int id, const char *cd_path)
++{
++    /* It's only meaningful to call this before we fork. */
++    if (privsep_state == privsep_not_initialized)
++        do_set_cd_backend(id, cd_path);
++
++    if (privsep_state == privsep_prepared && check_len(cd_path)) {
++        send_command(privsep_fd, privsep_op_set_cd_backend);
++        send_int(privsep_fd, id);
++        send_string(privsep_fd, cd_path);
++    }
++}
++
++void
++privsep_record_dm(const char *subpath, const char *privsep_state)
++{
++    if (privsep_fd < 0) {
++        do_record_dm(subpath, privsep_state);
++        return;
++    }
++
++    if (!check_len(subpath) || !check_len(privsep_state)) {
++        errno = EINVAL;
++        return;
++    }
++    send_command(privsep_fd, privsep_op_record_dm);
++    send_string(privsep_fd, subpath);
++    send_string(privsep_fd, privsep_state);
++}
++
++char*
++privsep_read_dm(const char *subpath)
++{
++    if (privsep_fd < 0)
++        return do_read_dm(subpath);
++
++    if (!check_len(subpath)) {
++        errno = EINVAL;
++        return NULL;
++    }
++
++    send_command(privsep_fd, privsep_op_read_dm);
++    send_string(privsep_fd, subpath);
++
++    return receive_string(privsep_fd, NULL);
++}
++
++/*
++ * Watches list
++ */
++
++typedef struct {
++    char *path;
++    char *token;
++    unsigned int xs_conn;
++} watch_t;
++
++#define MAX_WATCHES 128
++static watch_t watches[MAX_WATCHES];
++
++static bool
++watch_free(watch_t *w)
++{
++    if (!xs_unwatch(priv_xsh, w->path, w->token))
++        return false;
++
++    free(w->path);
++    w->path = NULL;
++    free(w->token);
++    w->token = NULL;
++    return true;
++}
++
++static bool
++watches_add(unsigned int xs_conn, const char *path, const char *token)
++{
++    unsigned int n;
++    char *p = strdup(path);
++    char *t = strdup(token);
++    int e = ENOMEM;
++    if (!p || !t)
++        goto cleanup;
++
++    for (n = 0; n < MAX_WATCHES; ++n)
++        if (!watches[n].path) {
++            if (!xs_watch(priv_xsh, path, token)) {
++                e = errno;
++                goto cleanup;
++            }
++            watches[n].path = p;
++            watches[n].token = t;
++            watches[n].xs_conn = xs_conn;
++            return true;
++        }
++
++cleanup:
++    free(p);
++    free(t);
++    errno = e;
++    return false;
++}
++
++static bool
++watches_rm(unsigned int xs_conn, const char *path, const char *token)
++{
++    unsigned int n;
++    for (n = 0; n < MAX_WATCHES; ++n) {
++        /* skip invalid */
++        if (!watches[n].path) continue;
++        if (!watches[n].token) continue;
++
++        /* skip not equal */
++        if (watches[n].xs_conn != xs_conn) continue;
++        if (strcmp(watches[n].path, path) != 0) continue;
++        if (strcmp(watches[n].token, token) != 0) continue;
++
++        return watch_free(&watches[n]);
++    }
++    errno = ENOENT;
++    return false;
++}
++
++static void
++watches_rm_conn(unsigned int xs_conn)
++{
++    unsigned int n;
++    for (n = 0; n < MAX_WATCHES; ++n) {
++        /* skip invalid */
++        if (!watches[n].path) continue;
++        if (!watches[n].token) continue;
++
++        /* skip not equal */
++        if (watches[n].xs_conn != xs_conn) continue;
++
++        watch_free(&watches[n]);
++    }
++}
++
++static int
++watches_find(const char *token)
++{
++    unsigned int n;
++    for (n = 0; n < MAX_WATCHES; ++n) {
++        /* skip invalid */
++        if (!watches[n].path) continue;
++        if (!watches[n].token) continue;
++
++        /* skip not equal */
++        if (strcmp(watches[n].token, token) != 0) continue;
++
++        return watches[n].xs_conn;
++    }
++    return -1;
++}
++
++/*
++ * redirections
++ */
++
++static inline bool
++xsh_valid(struct xs_handle *xsh)
++{
++    return xsh && ((privsep_handle_t*) xsh)->priv_handle < MAX_XS_CONN;
++}
++
++static inline void
++send_xsh(struct xs_handle *xsh)
++{
++    privsep_handle_t *h = (privsep_handle_t *) xsh;
++    send_raw(privsep_fd, h->priv_handle);
++}
++
++static inline unsigned
++receive_xsh(void)
++{
++    unsigned n;
++    must_read(parent_fd, &n, sizeof(n));
++    if (n > MAX_XS_CONN)
++        clean_exit(1);
++    return n;
++}
++
++static inline bool
++path_starts_with(const char *path, const char *s)
++{
++    size_t l = strlen(s);
++    return strncmp(path, s, l) == 0 && (path[l] == 0 || path[l] == '/');
++}
++
++static bool
++check_xs_path(const char *path, check_type_t check)
++{
++    static const char backend_d0[] = "/local/domain/0/backend";
++    static const char dm_d0[] = "/local/domain/0/device-model";
++    const char *s;
++    char dom_num[64];
++
++    if (privsep_state != privsep_started)
++        return true;
++
++    if (path_starts_with(path, domain_path)) {
++        if (check == CHECK_READ)
++            return true;
++        if (check != CHECK_WRITE)
++            goto fail;
++        s = path + strlen(domain_path);
++        if (*s++ != '/')
++            return false;
++        /*
++         * removed "device" as used only by Qemu as backend
++         * (not used in XenServer)
++         */
++        if (strcmp(s, "data/report_clipboard") == 0
++            || strcmp(s, "data/set_clipboard") == 0
++            || strcmp(s, "console/vnc-port") == 0
++            || strcmp(s, "device-misc/dm-ready") == 0)
++            return true;
++    }
++
++    if (path_starts_with(path, dm_d0)) {
++        s = path + strlen(dm_d0);
++        sprintf(dom_num, "/%u", domid);
++        if (!path_starts_with(s, dom_num))
++            goto fail;
++        if (check == CHECK_READ)
++            return true;
++        s += strlen(dom_num);
++        if (*s++ != '/' || check != CHECK_WRITE)
++            goto fail;
++        if (strcmp(s, "logdirty/ret") == 0
++            || strcmp(s, "logdirty/cmd") == 0
++            || strcmp(s, "command") == 0
++            || strcmp(s, "parameter") == 0
++            || strcmp(s, "state") == 0)
++            return true;
++    }
++
++    if (check != CHECK_READ)
++        goto fail;
++
++    if (path_starts_with(path, backend_d0)) {
++        s = path + strlen(backend_d0);
++        if (s[0] != '/' || s[1] == 0 || s[1] == '/')
++            return false;
++        s = strchr(s+2, '/');
++        if (!s) goto fail;
++        sprintf(dom_num, "%u", domid);
++        if (path_starts_with(s+1, dom_num))
++            return true;
++    }
++
++    if (vm_path && path_starts_with(path, vm_path))
++        return true;
++
++    if (path_starts_with(path, "/local/logconsole"))
++        return true;
++
++    if (path_starts_with(path, "/mh/driver-blacklist"))
++        return true;
++
++    if (strcmp(path, "@releaseDomain") == 0)
++        return true;
++
++fail:
++    /* NOTE: if returns false should set errno to EACCES */
++    errno = EACCES;
++    return false;
++}
++
++char *
++privsep_get_domain_path(struct xs_handle *xsh, unsigned int domid)
++{
++    char *path;
++
++    if (asprintf(&path, "/local/domain/%u", domid) < 0)
++        return NULL;
++    return path;
++}
++
++void *privsep_read(struct xs_handle *xsh, xs_transaction_t t,
++                   const char *xs_path, unsigned int *len)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_read(xsh, t, xs_path, len);
++
++    if (!check_len(xs_path) || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_read_xs);
++    send_string(privsep_fd, xs_path);
++
++    char *res = receive_string(privsep_fd, len);
++    errno = receive_int(privsep_fd);
++    return res;
++}
++
++static void
++read_xs(void)
++{
++    unsigned int len;
++
++    receive_string_buf(parent_fd, xs_path);
++
++    char *value = NULL;
++
++    if (check_xs_path(xs_path, CHECK_READ))
++        value = xs_read(priv_xsh, XBT_NULL, xs_path, &len);
++    int error = errno;
++    send_buf(parent_fd, value, len);
++    free(value);
++    send_int(parent_fd, error);
++}
++
++bool
++privsep_write(struct xs_handle *xsh, xs_transaction_t t,
++              const char *xs_path, const void *data, unsigned int len)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_write(xsh, t, xs_path, data, len);
++
++    if (!check_len(xs_path) || len > max_len_xs_data || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_write_xs);
++    send_string(privsep_fd, xs_path);
++    send_buf(privsep_fd, data, len);
++
++    return receive_bool_errno(privsep_fd);
++}
++
++static void
++write_xs(void)
++{
++    receive_string_buf(parent_fd, xs_path);
++
++    unsigned len;
++    char *data = receive_string_limited(parent_fd, &len, max_len_xs_data);
++    if (!data)
++        clean_exit(1);
++
++    bool res = check_xs_path(xs_path, CHECK_WRITE);
++    int error = EACCES;
++
++    if (res) {
++        res = xs_write(priv_xsh, XBT_NULL, xs_path, data, len);
++        error = errno;
++    }
++    free(data);
++    send_bool_errno(parent_fd, res, error);
++}
++
++char **
++privsep_directory(struct xs_handle *xsh, xs_transaction_t t,
++                  const char *xs_path, unsigned int *num)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_directory(xsh, t, xs_path, num);
++
++    if (!check_len(xs_path) || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_directory_xs);
++    send_string(privsep_fd, xs_path);
++
++    char **res = receive_list(privsep_fd, num);
++    errno = receive_int(privsep_fd);
++    return res;
++}
++
++static void
++directory_xs(void)
++{
++    receive_string_buf(parent_fd, xs_path);
++
++    unsigned num;
++    char **list = NULL;
++
++    if (check_xs_path(xs_path, CHECK_READ))
++        list = xs_directory(priv_xsh, XBT_NULL, xs_path, &num);
++    int error = errno;
++    send_list(parent_fd, list, num);
++    free(list);
++    send_int(parent_fd, error);
++}
++
++bool
++privsep_watch(struct xs_handle *xsh, const char *xs_path, const char *token)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_watch(xsh, xs_path, token);
++
++    if (!check_len(xs_path) || !check_len(token) || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_watch_xs);
++    send_xsh(xsh);
++    send_string(privsep_fd, xs_path);
++    send_string(privsep_fd, token);
++
++    return receive_bool_errno(privsep_fd);
++}
++
++static void
++watch_xs(void)
++{
++    unsigned xs_conn = receive_xsh();
++    receive_string_buf(parent_fd, xs_path);
++    receive_string_buf(parent_fd, token);
++
++    /* check path, add to a list */
++    bool res = check_xs_path(xs_path, CHECK_READ);
++    if (res)
++        res = watches_add(xs_conn, xs_path, token);
++    send_bool_errno(parent_fd, res, errno);
++}
++
++bool
++privsep_unwatch(struct xs_handle *xsh, const char *xs_path, const char *token)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_unwatch(xsh, xs_path, token);
++
++    if (!check_len(xs_path) || !check_len(token) || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_unwatch_xs);
++    send_xsh(xsh);
++    send_string(privsep_fd, xs_path);
++    send_string(privsep_fd, token);
++
++    return receive_bool_errno(privsep_fd);
++}
++
++static void
++unwatch_xs(void)
++{
++    unsigned xs_conn = receive_xsh();
++    receive_string_buf(parent_fd, xs_path);
++    receive_string_buf(parent_fd, token);
++
++    /* delete from list */
++    bool res = watches_rm(xs_conn, xs_path, token);
++    send_bool_errno(parent_fd, res, errno);
++}
++
++bool
++privsep_rm(struct xs_handle *xsh, xs_transaction_t t,
++           const char *xs_path)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_rm(xsh, t, xs_path);
++
++    if (!check_len(xs_path) || !xsh_valid(xsh)) {
++        errno = EINVAL;
++        return NULL;
++    }
++    send_command(privsep_fd, privsep_op_rm_xs);
++    send_string(privsep_fd, xs_path);
++
++    return receive_bool_errno(privsep_fd);
++}
++
++static void
++rm_xs(void)
++{
++    receive_string_buf(parent_fd, xs_path);
++
++    bool res = check_xs_path(xs_path, CHECK_WRITE);
++    int error = EACCES;
++
++    if (res) {
++        res = xs_rm(priv_xsh, XBT_NULL, xs_path);
++        error = errno;
++    }
++    send_bool_errno(parent_fd, res, error);
++}
++
++/**
++ * privsep_daemon_open
++ * wrapper for xs_daemon_open
++ * We need to provide a dummy connection for every connection requested
++ * to be able to send back watches on the appropriate connection.
++ */
++struct xs_handle *
++privsep_daemon_open(void)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_daemon_open();
++
++    privsep_handle_t *h = (privsep_handle_t*) calloc(1, sizeof(privsep_handle_t));
++    if (!h)
++        return NULL;
++
++    send_command(privsep_fd, privsep_op_daemon_open_xs);
++
++    must_read(privsep_fd, &h->priv_handle, sizeof(h->priv_handle));
++    int fd = receive_fd(privsep_fd);
++    if (fd < 0) {
++        free(h);
++        return NULL;
++    }
++    h->watch_fd = fd;
++    return (struct xs_handle *) h;
++}
++
++static void
++daemon_open_xs(void)
++{
++    int fds[2] = { -1, -1 };
++
++    /* allocate a new connection */
++    unsigned n;
++    for (n = 0; n < MAX_XS_CONN; ++n) {
++        if (xs_conns[n] < 0) {
++            /* create a pipe for this connection */
++            if (pipe(fds) < 0) {
++                fds[0] = -1;
++            } else {
++                xs_conns[n] = fds[1];
++            }
++            break;
++        }
++    }
++
++    /* return it */
++    send_raw(parent_fd, n);
++    send_fd(parent_fd, fds[0]);
++    if (fds[0] >= 0)
++        close(fds[0]);
++}
++
++void
++privsep_daemon_close(struct xs_handle *xsh)
++{
++    if (privsep_state == privsep_not_initialized) {
++        xs_daemon_close(xsh);
++        return;
++    }
++
++    if (!xsh_valid(xsh))
++        return;
++
++    send_command(privsep_fd, privsep_op_daemon_close_xs);
++    send_xsh(xsh);
++
++    /* wait other end close */
++    errno = receive_int(privsep_fd);
++
++    privsep_handle_t *h = (privsep_handle_t*) xsh;
++    close(h->watch_fd);
++    free(h);
++}
++
++static void
++daemon_close_xs(void)
++{
++    /* get connection */
++    unsigned n = receive_xsh();
++
++    /* on double free ignore */
++    if (xs_conns[n] < 0)
++        goto done;
++
++    /* remove watches */
++    watches_rm_conn(n);
++
++    close(xs_conns[n]);
++    xs_conns[n] = -1;
++
++done:
++    send_int(parent_fd, 0);
++}
++
++int
++privsep_fileno(struct xs_handle *xsh)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_fileno(xsh);
++
++    if (!xsh_valid(xsh))
++        return -1;
++
++    return ((privsep_handle_t*) xsh)->watch_fd;
++}
++
++char **
++privsep_read_watch(struct xs_handle *xsh, unsigned int *num)
++{
++    if (privsep_state == privsep_not_initialized)
++        return xs_read_watch(xsh, num);
++
++    /* read from other end */
++    if (!xsh_valid(xsh))
++        return NULL;
++
++    return receive_list(((privsep_handle_t*) xsh)->watch_fd, num);
++}
++
++static void
++restrict_paths(void)
++{
++    privsep_state = privsep_started;
++}
++
++/* restriction functions */
++#undef xc_interface_restrict
++typedef int xc_interface_restrict_t(xc_interface *xc_handle, uint32_t domid);
++
++int
++xc_interface_restrict_qemu(xc_interface *xc_handle, int domid)
++{
++    xc_interface_restrict_t *p = (xc_interface_restrict_t*) dlsym(RTLD_DEFAULT, "xc_interface_restrict");
++    if (!p)
++        return -1;
++    return p(xc_handle, domid);
++}
++
++#define IOCTL_EVTCHN_RESTRICT_DOMID                    \
++    _IOC(_IOC_NONE, 'E', 100, sizeof(struct ioctl_evtchn_restrict_domid))
++struct ioctl_evtchn_restrict_domid {
++    domid_t domid;
++};
++
++int
++xc_evtchn_restrict(xc_interface *xce_handle, int domid)
++{
++    int fd;
++    struct ioctl_evtchn_restrict_domid restrict_domid = { domid };
++
++    fd = xc_evtchn_fd(xce_handle);
++    if (fd < 0)
++        return -1;
++    if (ioctl(fd, IOCTL_EVTCHN_RESTRICT_DOMID, &restrict_domid) < 0)
++        return -1;
++    return 0;
++}
++
+diff --git a/privsep.h b/privsep.h
+new file mode 100644
+index 0000000..c49f4db
+--- /dev/null
++++ b/privsep.h
+@@ -0,0 +1,66 @@
++#ifndef PRIVSEP_H
++#define PRIVSEP_H
++
++#include <stdarg.h>
++
++/* privsep.c */
++void privsep_prepare(void);
++void init_privsep(void);
++void init_privxsh(void);
++int privsep_open_ro(const char *path);
++void privsep_eject_cd(int id);
++void privsep_lock_cd(int id);
++void privsep_unlock_cd(int id);
++void privsep_set_rtc_timeoffset(long offset);
++void privsep_set_cd_backend(int id, const char *path);
++QEMUFile* privsep_open_vm_dump(const char *name);
++FILE* privsep_open_keymap(const char *language);
++void privsep_record_dm(const char *subpath, const char *state);
++char* privsep_read_dm(const char *subpath);
++int privsep_vsyslog(const char *fmt, va_list ap);
++int privsep_syslog(const char *fmt, ...);
++
++/* redirections */
++char *privsep_get_domain_path(struct xs_handle *xsh, unsigned int domid);
++#define xs_get_domain_path(h, domid) privsep_get_domain_path(h, domid)
++void *privsep_read(struct xs_handle *h, xs_transaction_t t,
++		   const char *path, unsigned int *len);
++#define xs_read(h, t, p, l) privsep_read(h, t, p, l)
++bool privsep_write(struct xs_handle *h, xs_transaction_t t,
++		   const char *path, const void *data, unsigned int len);
++#define xs_write(h, t, p, d, l) privsep_write(h, t, p, d, l)
++char **privsep_directory(struct xs_handle *h, xs_transaction_t t,
++			 const char *path, unsigned int *num);
++#define xs_directory(h, t, p, n) privsep_directory(h, t, p, n)
++bool privsep_watch(struct xs_handle *h, const char *path, const char *token);
++#define xs_watch(h, p, t) privsep_watch(h, p, t)
++bool privsep_unwatch(struct xs_handle *h, const char *path, const char *token);
++#define xs_unwatch(h, p, t) privsep_unwatch(h, p, t)
++bool privsep_rm(struct xs_handle *h, xs_transaction_t t,
++		const char *path);
++#define xs_rm(h, t, p) privsep_rm(h, t, p)
++struct xs_handle *privsep_daemon_open(void);
++#define xs_daemon_open() privsep_daemon_open()
++void privsep_daemon_close(struct xs_handle *h);
++#define xs_daemon_close(h) privsep_daemon_close(h)
++int privsep_fileno(struct xs_handle *xsh);
++#define xs_fileno(h) privsep_fileno(h)
++char **privsep_read_watch(struct xs_handle *h, unsigned int *num);
++#define xs_read_watch(h, n) privsep_read_watch(h, n)
++
++int xc_interface_restrict_qemu(xc_interface *xc_handle, int domid);
++#define xc_interface_restrict(h,d) xc_interface_restrict_qemu(h,d)
++int xc_evtchn_restrict(xc_interface *xce_handle, int domid);
++
++typedef enum {
++    /** not initialized at all, call privsep_prepare */
++    privsep_not_initialized = 0,
++    /** prepared but xenstore is not restricted */
++    privsep_prepared,
++    privsep_started,
++} privsep_state_t;
++
++extern int privileged;
++extern privsep_state_t privsep_state;
++
++#endif
+diff --git a/qemu-xen.h b/qemu-xen.h
+index a8d0e50..3143883 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -73,12 +73,10 @@ void xenstore_parse_pf_config(struct pci_config_header *pch);
+ int xenstore_fd(void);
+ struct xs_handle *xenstore_get(void);
+ void xenstore_process_event(void *opaque);
+-void xenstore_record_dm(const char *subpath, const char *state);
+ void xenstore_record_dm_state(const char *state);
+ void xenstore_check_new_media_present(int timeout);
+ void xenstore_write_vncport(int vnc_display);
+ void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen);
+-void xenstore_write_vslots(char *vslots);
+ int store_dev_info(const char *devName, int domid,
+                    CharDriverState *cState, const char *storeString);
+ 
+@@ -125,7 +123,6 @@ int xenstore_write(const char *path, const char *val);
+   * at least when it comes to running our own frontends
+   */
+ 
+-int xenstore_vm_write(int domid, const char *key, const char *val);
+ char *xenstore_vm_read(int domid, const char *key, unsigned int *len);
+ char *xenstore_device_model_read(int domid, const char *key, unsigned int *len);
+ char *xenstore_read_battery_data(int battery_status);
+@@ -146,8 +143,8 @@ int xenfb_connect_vfb(const char *path);
+ 
+ int has_tpm_device_danger(void);
+ 
+-static void vga_dirty_log_start(void *s) { }
+-static void vga_dirty_log_stop(void *s) { }
++static inline void vga_dirty_log_start(void *s) { }
++static inline void vga_dirty_log_stop(void *s) { }
+ 
+ /* crashdump.c */
+ void provision_crashdump(const char *crashdump_dir, long long crashdump_quota);
+diff --git a/savevm.c b/savevm.c
+index e3c4045..60f3a60 100644
+--- a/savevm.c
++++ b/savevm.c
+@@ -327,6 +327,28 @@ fail:
+     return NULL;
+ }
+ 
++QEMUFile *qemu_fdopen(int fd, const char *mode)
++{
++    QEMUFileStdio *s;
++
++    s = qemu_mallocz(sizeof(QEMUFileStdio));
++
++    s->outfile = fdopen(fd, mode);
++    if (!s->outfile)
++        goto fail;
++
++    if (!strcmp(mode, "wb"))
++        return qemu_fopen_ops(s, file_put_buffer, NULL, file_close, NULL);
++    else if (!strcmp(mode, "rb"))
++        return qemu_fopen_ops(s, NULL, file_get_buffer, file_close, NULL);
++
++fail:
++    if (s->outfile)
++        fclose(s->outfile);
++    qemu_free(s);
++    return NULL;
++}
++
+ typedef struct QEMUFileBdrv
+ {
+     BlockDriverState *bs;
+diff --git a/sysemu.h b/sysemu.h
+index d30cbff..b342b58 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -41,6 +41,7 @@ void qemu_system_reset(void);
+ 
+ void do_savevm(const char *name);
+ void do_loadvm(const char *name);
++void do_loadvm_file(QEMUFile *f, const char *name);
+ void do_delvm(const char *name);
+ void do_info_snapshots(void);
+ 
+diff --git a/syslog.c b/syslog.c
+index ed085af..6e550ad 100644
+--- a/syslog.c
++++ b/syslog.c
+@@ -27,6 +27,7 @@
+ #include <errno.h>
+ 
+ #include "qemu-common.h"
++#include "privsep.h"
+ 
+ #ifdef CONFIG_SYSLOG
+ #include <syslog.h>
+@@ -45,7 +46,10 @@ char use_syslog = 0;
+ int log_vfprintf(FILE *f, const char *fmt, va_list ap)
+ {
+     if (use_syslog && (f == stdout || f == stderr)) {
+-        vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
++        if (privileged || privsep_state != privsep_started)
++            vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
++        else
++            privsep_vsyslog(fmt, ap);
+         /* just return a value to make every caller happy */
+         return 10;
+     }
+@@ -68,10 +72,17 @@ void log_perror(const char *s)
+     if (errno != 0)
+        return;
+ 
+-    if (s && *s)
+-        syslog(LOG_DAEMON|LOG_INFO, "%s: %s", s, errbuf);
+-    else
+-        syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
++    if (s && *s) {
++        if (privileged || privsep_state != privsep_started)
++            syslog(LOG_DAEMON|LOG_INFO, "%s: %s", s, errbuf);
++        else
++            privsep_syslog("%s: %s", s, errbuf);
++    } else {
++        if (privileged || privsep_state != privsep_started)
++            syslog(LOG_DAEMON|LOG_INFO, "%s", errbuf);
++        else
++            privsep_syslog("%s", errbuf);
++    }
+ }
+ 
+ int log_printf(const char *fmt, ...)
+diff --git a/unittests/Makefile b/unittests/Makefile
+index c91e17c..623caa2 100644
+--- a/unittests/Makefile
++++ b/unittests/Makefile
+@@ -1,16 +1,22 @@
+-QEMU_ROOT ?= ..
++QEMU_ROOT := ..
++CONFIG_BLKTAP1 := n
+ -include ../config-host.mak
+ VPATH=$(SRC_PATH)/tests
+ 
+-CFLAGS=-Wall -O2 -g -fno-strict-aliasing
++CFLAGS := -Wall -Werror -O2 -g -fno-strict-aliasing -ftest-coverage -fprofile-arcs
+ LDFLAGS=
+ 
+ TESTS=xen-tests
+ 
+ all: $(TESTS)
+ 
+-xen-tests: xen-tests.c ../syslog.c
+-	$(CC) $(CFLAGS) -I.. $(LDFLAGS) -Wl,--wrap,syslog -Wl,--wrap,vsyslog -o $@ $^ -lcheck
++sep.o: CFLAGS += -D_GNU_SOURCE -DNEED_CPU_H -D__XEN_TOOLS__ -DQEMU_UNITEST -I.. -I../i386-dm -I../hw -I../fpu
++sep.o: ../privsep.c
++
++mock.o: mock.h
++
++xen-tests: xen-tests.c ../syslog.c sep.o mock.o
++	$(CC) $(CFLAGS) -I.. $(LDFLAGS) -Wl,--wrap,syslog -Wl,--wrap,vsyslog -o $@ $^ -lcheck -ldl
+ 
+ unittests: $(TESTS)
+ 	./xen-tests
+diff --git a/unittests/mock.c b/unittests/mock.c
+new file mode 100644
+index 0000000..02683f3
+--- /dev/null
++++ b/unittests/mock.c
+@@ -0,0 +1,91 @@
++#include <check.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <errno.h>
++#include <unistd.h>
++
++#include "mock.h"
++
++typedef struct value {
++    const void *value;
++    struct value *next;
++} value_t;
++
++typedef struct func {
++    const char *name;
++    struct func *next, *prev;
++    struct value *first, *last;
++} func_t;
++
++static func_t *funcs;
++
++#undef fail_if
++static void fail_if(int cond, const char *s, const char *fn, int ln)
++{
++    if (!cond) return;
++    fprintf(stderr, "%s:%d: failed condition %s\n", fn, ln, s);
++    _exit(1);
++}
++#define fail_if(cond) fail_if(cond, #cond, fn, ln)
++
++static func_t*
++get_func(const char *name, int create, const char *fn, int ln)
++{
++    func_t *f;
++    for (f = funcs; f; f = f->next)
++        if (strcmp(f->name, name) == 0)
++            return f;
++    fail_if(!create);
++    f = (func_t *) calloc(1, sizeof(*f));
++    fail_if(!f);
++    f->name = name;
++    if (funcs) funcs->prev = f;
++    f->next = funcs;
++    funcs = f;
++    return f;
++}
++
++void _with_return(const char *name, const void *ret, const char *fn, int ln)
++{
++    func_t *f = get_func(name, 1, fn, ln);
++    value_t *v = (value_t *) calloc(1, sizeof(*v));
++    fail_if(v == NULL);
++    v->value = ret;
++    if (!f->first) f->first = v;
++    if (f->last) f->last->next = v;
++    f->last = v;
++}
++
++const void *_mock(const char *name, const char *fn, int ln)
++{
++    func_t *f = get_func(name, 0, fn, ln);
++    value_t *v = f->first;
++    fail_if(v == NULL);
++    const void *ret = v->value;
++    f->first = v->next;
++    if (f->last == v) {
++        if (f->prev) f->prev->next = f->next;
++        if (f->next) f->next->prev = f->prev;
++        if (funcs == f) funcs = f->next;
++        free(f);
++    }
++    free(v);
++    return ret;
++}
++
++int mock_check_left(void)
++{
++    int found = 0;
++    func_t *f;
++    value_t *v;
++
++    for (f = funcs; f; f = f->next)
++        for (v = f->first; v; v = v->next) {
++            found = 1;
++            fprintf(stderr, "Value %p still present for %s\n", v->value, f->name);
++        }
++
++    return !found;
++}
++
+diff --git a/unittests/mock.h b/unittests/mock.h
+new file mode 100644
+index 0000000..1d48502
+--- /dev/null
++++ b/unittests/mock.h
+@@ -0,0 +1,16 @@
++#ifndef _QEMU_MOCK_H_
++#define _QEMU_MOCK_H_
++
++/* interface inspired by CMocka*/
++
++#define with_return(func, ret)     _with_return(#func, ret, __FILE__, __LINE__)
++#define with_return_num(func, ret) _with_return(#func, (void*) (long) (ret), __FILE__, __LINE__)
++void _with_return(const char *f, const void *ret, const char *fn, int ln);
++
++#define mock()             _mock(__func__, __FILE__, __LINE__)
++#define mock_num() ((long) _mock(__func__, __FILE__, __LINE__))
++const void *_mock(const char *f, const char *fn, int ln);
++
++int mock_check_left(void);
++
++#endif
+diff --git a/unittests/sep.c b/unittests/sep.c
+new file mode 100644
+index 0000000..222a376
+--- /dev/null
++++ b/unittests/sep.c
+@@ -0,0 +1,630 @@
++#include <check.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <errno.h>
++
++#include "../privsep.c"
++#include "mock.h"
++
++#include <poll.h>
++#include <sys/types.h>
++#include <sys/wait.h>
++
++FILE *logfile = NULL;
++int domid = 123;
++const char *bios_dir = "/bios";
++
++int crashdump_enabled(void)
++{
++    return 0;
++}
++
++void qemu_system_exit_request(void)
++{
++}
++
++QEMUFile *qemu_fdopen(int fd, const char *mode)
++{
++    return (QEMUFile *) fdopen(fd, mode);
++}
++
++int xc_evtchn_fd(xc_interface *xc)
++{
++    return -1;
++}
++
++QEMUFile *qemu_fopen_ops(void *opaque, QEMUFilePutBufferFunc *put_buffer,
++                         QEMUFileGetBufferFunc *get_buffer,
++                         QEMUFileCloseFunc *close,
++                         QEMUFileRateLimit *rate_limit)
++{
++    exit(1);
++    return NULL;
++}
++
++static void
++end_ping(int fd)
++{
++    unsigned n = 0xdeadbeef;
++    must_write(fd, &n, sizeof(n));
++    exit(0);
++}
++#define end_ping() end_ping(socks[1])
++
++static void
++end_test(int fd)
++{
++    int status;
++    unsigned n;
++    must_read(fd, &n, sizeof(n));
++    fail_if(n != 0xdeadbeef);
++    wait(&status);
++    alarm(0);
++}
++#define end_test() do {\
++	end_test(socks[0]); mark_point(); \
++	} while(0)
++
++/*
++ * Base test for send/receive functions
++ * Test send/receive functions sending data and expecting same
++ * result. A child that does an echo is used.
++ * Also data is appended to check all data are readed.
++ */
++START_TEST (sep_data)
++{
++    int socks[2], fd;
++    char buf[10], *s;
++    unsigned l;
++    char *buf_list[3];
++
++    if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, socks) == -1)
++        err(1, "socketpair() failed");
++
++    /* send/receive bool */
++    alarm(5);
++    if (fork() == 0) {
++        bool b = receive_bool_errno(socks[1]);
++        send_bool_errno(socks[1], b, errno);
++        end_ping();
++    }
++    send_bool_errno(socks[0], true, 123);
++    fail_if(receive_bool_errno(socks[0]) != true);
++    fail_if(errno != 123);
++    end_test();
++
++    if (fork() == 0) {
++        bool b = receive_bool_errno(socks[1]);
++        send_bool_errno(socks[1], b, errno);
++        end_ping();
++    }
++    send_bool_errno(socks[0], false,321);
++    fail_if(receive_bool_errno(socks[0]) != false);
++    fail_if(errno != 321);
++    end_test();
++
++    /* send/receive a file */
++    alarm(5);
++    fd = open("out", O_CREAT|O_TRUNC|O_WRONLY, 0600);
++    fail_if(fd < 0);
++    if (fork() == 0) {
++        send_fd(socks[1], receive_fd(socks[1]));
++        end_ping();
++    }
++    send_fd(socks[0], fd);
++    close(fd);
++    fd = receive_fd(socks[0]);
++    must_write(fd, "test", 4);
++    close(fd);
++    fd = open("out", O_RDONLY);
++    fail_if(fd < 0);
++    must_read(fd, buf, 4);
++    buf[4] = 0;
++    fail_if(strcmp(buf, "test") != 0);
++    end_test();
++
++    /* send/receive normal string with no terminator */
++    alarm(5);
++    if (fork() == 0) {
++        s = receive_string(socks[1], NULL);
++        send_string(socks[1], s);
++        free(s);
++        end_ping();
++    }
++    send_string(socks[0], "foo 123");
++    s = receive_string(socks[0], &l);
++    fail_if(strcmp(s, "foo 123") != 0);
++    fail_if(l != 7);
++    free(s);
++    end_test();
++
++    /* send/receive normal string with terminator */
++    alarm(5);
++    if (fork() == 0) {
++        s = receive_string(socks[1], &l);
++        send_buf(socks[1], s, l);
++        free(s);
++        end_ping();
++    }
++    send_buf(socks[0], "foo\0\0duck", 9);
++    memset(buf, 0, sizeof(buf));
++    s = receive_string(socks[0], &l);
++    fail_if(memcmp(s, "foo\0\0duck\0", 10) != 0);
++    fail_if(l != 9);
++    free(s);
++    end_test();
++
++    /* send/receive NULL string. This happen if xs_read has not data */
++    alarm(5);
++    if (fork() == 0) {
++        s = receive_string(socks[1], &l);
++        send_buf(socks[1], s, l);
++        free(s);
++        end_ping();
++    }
++    send_buf(socks[0], NULL, 9);
++    s = receive_string(socks[0], &l);
++    fail_if(s != NULL);
++    end_test();
++
++    /* send/receive empty list */
++    char **list = buf_list;
++    alarm(5);
++    if (fork() == 0) {
++        l = -1u;
++        list = receive_list(socks[1], &l);
++        if (l != 0) exit(1);
++        send_list(socks[1], list, l);
++        free(list);
++        end_ping();
++    }
++    send_list(socks[0], list, 0);
++    list = receive_list(socks[0], &l);
++    fail_if(list == NULL);
++    fail_if(l != 0);
++    free(list);
++    end_test();
++
++    /* send/receive two element list */
++    alarm(5);
++    buf_list[0] = "test string 1";
++    buf_list[1] = "foo 654 ";
++    list = buf_list;
++    if (fork() == 0) {
++        l = -1u;
++        list = receive_list(socks[1], &l);
++        if (l != 2) exit(1);
++        send_list(socks[1], list, l);
++        free(list);
++        end_ping();
++    }
++    send_list(socks[0], list, 2);
++    list = receive_list(socks[0], &l);
++    fail_if(list == NULL);
++    fail_if(l != 2);
++    fail_if(strcmp(list[0], "test string 1") != 0, "string 0 %s", list[0]);
++    fail_if(strcmp(list[1], "foo 654 ") != 0, "string 1 %s", list[1]);
++    fail_if(list[2] != NULL);
++    free(list);
++    end_test();
++
++    /* use build_watch_data */
++    alarm(5);
++    buf_list[0] = "test string 1";
++    buf_list[1] = "foo 654 ";
++    list = buf_list;
++    if (fork() == 0) {
++        l = -1u;
++        list = receive_list(socks[1], &l);
++        if (l != 2) exit(1);
++        size_t len;
++        unsigned char *buf = build_watch_data(list, &len);
++        free(list);
++        must_write(socks[1], buf, len);
++        free(buf);
++        end_ping();
++    }
++    send_list(socks[0], list, 2);
++    list = receive_list(socks[0], &l);
++    fail_if(list == NULL);
++    fail_if(l != 2);
++    fail_if(strcmp(list[0], "test string 1") != 0, "string 0 %s", list[0]);
++    fail_if(strcmp(list[1], "foo 654 ") != 0, "string 1 %s", list[1]);
++    fail_if(list[2] != NULL);
++    free(list);
++    end_test();
++
++
++    /* send/receive NULL list */
++    list = NULL;
++    alarm(5);
++    if (fork() == 0) {
++        list = receive_list(socks[1], &l);
++        send_list(socks[1], list, 10);
++        free(list);
++        end_ping();
++    }
++    send_list(socks[0], list, 9);
++    list = receive_list(socks[0], &l);
++    fail_if(list != NULL);
++    end_test();
++
++    exit(125);
++}
++END_TEST
++
++static int watch_socks[2];
++
++/*
++ * Check separation code
++ * Use privileged call and check the function we want are called.
++ */
++START_TEST (sep_test)
++{
++    static const char logdirty_ret[] = "/local/domain/0/device-model/123/logdirty/ret";
++    static const char logdirty_cmd[] = "/local/domain/0/device-model/123/logdirty/cmd";
++
++    if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, watch_socks) < -1)
++        err(1, "socketpair() failed");
++
++    /* must be done before the prepare */
++    with_return(xs_get_domain_path, strdup("/local/domain/123"));
++    with_return(xs_read, NULL);
++    with_return_num(xs_read, 12);
++    with_return(xs_read, strdup("/vm/b78b8aba-9b19-1ce0-b977-3efb98a5fcbc"));
++
++    with_return(xs_read, NULL);
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("foo123"));
++
++    with_return(xs_write, "/test2");
++    with_return(xs_write, NULL);
++    with_return_num(xs_write, true);
++
++    with_return_num(xs_watch, true);
++    with_return_num(xs_watch, true);
++
++    with_return(xs_unwatch, "foo2");
++    with_return_num(xs_unwatch, true);
++
++    with_return(xs_unwatch, "foo");
++    with_return_num(xs_unwatch, true);
++
++    with_return(xs_read, NULL);
++    with_return_num(xs_read, 10);
++    with_return(xs_read, strdup("test_watch"));
++
++    with_return(xs_write, logdirty_ret);
++    with_return(xs_write, "enable");
++    with_return_num(xs_write, true);
++
++    with_return(xs_read, logdirty_cmd);
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state1"));
++
++    with_return(xs_write, logdirty_ret);
++    with_return(xs_write, "disable");
++    with_return_num(xs_write, false);
++
++    with_return(xs_read, logdirty_cmd);
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state2"));
++
++    with_return(xs_write, "/local/domain/0/device-model/123/state");
++    with_return(xs_write, NULL);
++    with_return_num(xs_write, true);
++
++    with_return(xs_read, "/local/domain/0/device-model/123/xyz/etc");
++    with_return_num(xs_read, 6);
++    with_return(xs_read, strdup("state3"));
++
++    with_return(xs_write, logdirty_ret);
++    with_return(xs_write, "mock_check");
++    with_return_num(xs_write, false);
++
++    privsep_prepare();
++
++    mark_point();
++    struct xs_handle *xsh = privsep_daemon_open();
++
++    mark_point();
++    char *s = privsep_get_domain_path(xsh, domid);
++    fail_if(strcmp(s, "/local/domain/123") != 0);
++    free(s);
++
++    mark_point();
++    unsigned l;
++    s = privsep_read(xsh, XBT_NULL, "/test1", &l);
++    fail_if(strcmp(s, "foo123") != 0);
++    free(s);
++
++    mark_point();
++    bool b = privsep_write(xsh, XBT_NULL, "/test2", "qemu-xen", 8);
++    fail_if(!b);
++
++    fail_if(privsep_watch(xsh, "/test3", "foo") == false);
++    fail_if(privsep_watch(xsh, "/test4", "foo2") == false);
++
++    int fd = privsep_fileno(xsh);
++    fail_if(fd < 0);
++
++    struct pollfd pfd = { fd, POLLIN, 0 };
++    int rc;
++    while ((rc=poll(&pfd, 1, 100)) < 0)
++        fail_if(errno != EINTR);
++    fail_if(rc != 0);
++
++    /* send some data to other end */
++    send_string(watch_socks[0], "foo_/test3/mao");
++
++    /* now we should have data */
++    pfd = (struct pollfd) { fd, POLLIN, 0 };
++    while ((rc=poll(&pfd, 1, 100)) < 0)
++        fail_if(errno != EINTR);
++    fail_if(rc != 1);
++
++    char **list = privsep_read_watch(xsh, &l);
++    fail_if(list == NULL);
++    fail_if(l != 2);
++    fail_if(strcmp(list[XS_WATCH_TOKEN], "foo") != 0, "token '%s'", list[XS_WATCH_TOKEN]);
++    fail_if(strncmp(list[XS_WATCH_PATH], "/test3", 5) != 0, "path '%s'", list[XS_WATCH_PATH]);
++
++    /* these two should not call xs_watch */
++    fail_if(privsep_unwatch(xsh, "/test5", "foo2"));
++    fail_if(privsep_unwatch(xsh, "/test4", "foo"));
++
++    fail_if(!privsep_unwatch(xsh, "/test4", "foo2"));
++
++    /* close should delete automatically the remain watch */
++    privsep_daemon_close(xsh);
++
++    xsh = privsep_daemon_open();
++    s = privsep_read(xsh, XBT_NULL, "/test1", &l);
++    fail_if(strcmp(s, "test_watch") != 0);
++    free(s);
++
++    send_command(privsep_fd, privsep_op_restrict_paths);
++
++    privsep_write(xsh, XBT_NULL, logdirty_ret, "enable", 6);
++    fail_if(strcmp(s=privsep_read(xsh, XBT_NULL, logdirty_cmd, &l), "state1") != 0);
++    free(s);
++    privsep_write(xsh, XBT_NULL, logdirty_ret, "disable", 7);
++    fail_if(strcmp(s=privsep_read(xsh, XBT_NULL, logdirty_cmd, &l), "state2") != 0);
++    free(s);
++
++    privsep_record_dm("a/b/c", "value");
++    privsep_record_dm("state", "value");
++    fail_if(strcmp(s=privsep_read_dm("xyz/etc"), "state3") != 0);
++    free(s);
++
++    /* check other process eat all data queued in mock */
++    fail_if(!privsep_write(xsh, XBT_NULL, logdirty_ret, "mock_check", 10));
++    privsep_daemon_close(xsh);
++    close(privsep_fd);
++    int status;
++    wait(&status);
++    fail_if(!WIFEXITED(status));
++    fail_if(WEXITSTATUS(status) != 0);
++
++    exit(125);
++}
++END_TEST
++
++#define path_ok(path,ck) fail_if(!check_xs_path(path, CHECK_ ## ck))
++#define path_fail(path,ck) fail_if(check_xs_path(path, CHECK_ ## ck))
++
++START_TEST(sep_check_paths)
++{
++    domain_path = "/local/domain/123";
++    vm_path = "/vm/vmpathX";
++
++    privsep_state = privsep_started;
++
++    path_fail("", READ);
++    path_fail("", WRITE);
++
++    path_fail("/", READ);
++    path_fail("/", WRITE);
++
++    path_fail("/test", READ);
++    path_fail("/foo", WRITE);
++
++    path_fail("test", READ);
++    path_fail("foo", WRITE);
++
++    path_ok  ("/local/domain/0/backend/vbd3/123/5696/params", READ);
++    path_fail("/local/domain/0/backend/vbd3/1234/5696/params", READ);
++    path_fail("/local/domain/0/backend/vbd3/123/5696/params", WRITE);
++
++    path_ok  ("/local/domain/123/data/report_clipboard", READ);
++    path_ok  ("/local/domain/123/data/report_clipboard", WRITE);
++    path_ok  ("/local/domain/123/data/set_clipboard", READ);
++    path_ok  ("/local/domain/123/data/set_clipboard", WRITE);
++
++    path_ok  ("/local/domain/123/data/report_clipboard/x", READ);
++    path_fail("/local/domain/123/data/report_clipboard/x", WRITE);
++    path_ok  ("/local/domain/123/data/set_clipboard/x", READ);
++    path_fail("/local/domain/123/data/set_clipboard/x", WRITE);
++
++    path_fail("/local/domain/1231/data/report_clipboard", READ);
++    path_fail("/local/domain/1231/data/report_clipboard", WRITE);
++    path_fail("/local/domain/1231/data/set_clipboard", READ);
++    path_fail("/local/domain/1231/data/set_clipboard", WRITE);
++
++    path_fail("/local/domain/123", WRITE);
++    path_fail("/local/domain/1234", WRITE);
++    path_fail("/local/domain/123/", WRITE);
++    path_fail("/local/domain/123/vm", WRITE);
++
++    /* paths removed as used only by Qemu as backend (not used in XenServer) */
++#if 0
++    path_ok  ("/local/domain/123/device", WRITE);
++    path_ok  ("/local/domain/123/device/", WRITE);
++    path_ok  ("/local/domain/123/device/foo", WRITE);
++#endif
++    path_fail("/local/domain/1234/device", WRITE);
++    path_fail("/local/domain/123/deviceX", WRITE);
++    path_fail("/local/domain/1234/deviceX", WRITE);
++    path_fail("/local/domain/1234/device/", WRITE);
++    path_fail("/local/domain/1234/device/foo", WRITE);
++    path_fail("/local/domain/12/device", WRITE);
++    path_fail("/local/domain/12/deviceX", WRITE);
++    path_fail("/local/domain/12/device/", WRITE);
++    path_fail("/local/domain/12/device/foo", WRITE);
++
++    /* backend */
++    path_fail("/local/domain/0/backend", READ);
++    path_fail("/local/domain/0/backend//123", READ);
++    path_fail("/local/domain/0/backend//12", READ);
++    path_fail("/local/domain/0/backend//1234", READ);
++    path_ok  ("/local/domain/0/backend/x/123", READ);
++    path_fail("/local/domain/0/backend/x/12", READ);
++    path_fail("/local/domain/0/backend/x/1234", READ);
++    path_fail("/local/domain/0/backend/x/ 123", READ);
++    path_fail("/local/domain/0/backend/x/123 ", READ);
++
++    path_fail("/local/domain/17/keymap", READ);
++    path_ok  ("/local/domain/123/keymap", READ);
++
++    path_ok  ("/mh/driver-blacklist/xensource-windows/86451", READ);
++    path_fail("/mh/driver-blacklist/xensource-windows/86451", WRITE);
++    path_ok  ("/mh/driver-blacklist", READ);
++    path_fail("/mh/driver-blacklist", WRITE);
++    path_fail("/mh/driver-blacklistX", READ);
++    path_fail("/mh/driver-blacklistX", WRITE);
++    path_fail("/mh/", READ);
++    path_fail("/mh/", WRITE);
++    path_fail("/mh", READ);
++    path_fail("/mh", WRITE);
++    path_fail("/m", READ);
++    path_fail("/m", WRITE);
++
++    path_ok  ("/vm/vmpathX", READ);
++    path_fail("/vm/vmpathXY", READ);
++    path_ok  ("/vm/vmpathX/x", READ);
++    path_fail("/vm/vmpath", READ);
++    path_ok  ("/vm/vmpathX/", READ);
++    path_fail("/vm/vmpathXY/", READ);
++
++    path_fail("/vm/vmpathX", WRITE);
++    path_fail("/vm/vmpathXY", WRITE);
++    path_fail("/vm/vmpathX/x", WRITE);
++    path_fail("/vm/vmpath", WRITE);
++    path_fail("/vm/vmpathX/", WRITE);
++    path_fail("/vm/vmpathXY/", WRITE);
++
++    path_ok  ("/local/logconsole", READ);
++    path_ok  ("/local/logconsole/x", READ);
++    path_ok  ("@releaseDomain", READ);
++
++    path_ok  ("/local/domain/0/device-model/123/logdirty/ret", WRITE);
++    path_ok  ("/local/domain/0/device-model/123/logdirty/cmd", WRITE);
++    path_fail("/local/domain/0/device-model/123/a/b", WRITE);
++}
++END_TEST
++
++struct xs_handle *xs_daemon_open(void)
++{
++    return (void *) (intptr_t) 0x1;
++}
++
++void xs_daemon_close(struct xs_handle *h)
++{
++    if ((void *) (intptr_t) 0x1 != h)
++        exit(1);
++}
++
++char *xs_get_domain_path(struct xs_handle *xsh, unsigned int domid)
++{
++    return (char *) mock();
++}
++
++void *xs_read(struct xs_handle *h, xs_transaction_t t,
++		   const char *path, unsigned int *len)
++{
++    char *s = (char *) mock();
++    if (s && strcmp(s, path) != 0)
++        exit(1);
++    unsigned n = mock_num();
++    if (len) *len = n;
++    return (void*) mock();
++}
++
++bool xs_write(struct xs_handle *h, xs_transaction_t t,
++		   const char *path, const void *data, unsigned int len)
++{
++    char *s = (char *) mock();
++    if (s && strcmp(s, path) != 0)
++        exit(1);
++    s = (char *) mock();
++    bool res = (bool) mock_num();
++    if (s && strcmp(s, "mock_check") == 0)
++        return mock_check_left();
++    if (s && strcmp(s, data) != 0)
++        exit(1);
++    return res;
++}
++
++bool xs_rm(struct xs_handle *h, xs_transaction_t t,
++		const char *path)
++{
++    return (bool) mock_num();
++}
++
++bool xs_watch(struct xs_handle *h, const char *path, const char *token)
++{
++    return (bool) mock_num();
++}
++
++bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
++{
++    printf("xs_unwatch %s %s\n", path, token);
++    if (strcmp(token, (char *) mock()) != 0)
++        exit(1);
++
++    return (bool) mock_num();
++}
++
++char **xs_directory(struct xs_handle *h, xs_transaction_t t,
++			 const char *path, unsigned int *num)
++{
++    *num = mock_num();
++    return (char**) mock();
++}
++
++int xs_fileno(struct xs_handle *xsh)
++{
++    return watch_socks[1];
++}
++
++char **xs_read_watch(struct xs_handle *h, unsigned int *num)
++{
++    char *s = receive_string(watch_socks[1], NULL);
++    if (!s) exit(1);
++
++    size_t l = strlen(s);
++    char **list = (char**) calloc(1, l + sizeof(char*) * 3 + 1);
++    memcpy(list+3, s, l + 1);
++    free(s);
++    s = (char *) (list+3);
++    char *p = strchr(s, '_');
++    *p++ = 0;
++    list[XS_WATCH_TOKEN] = s;
++    list[XS_WATCH_PATH] = p;
++    list[2] = NULL;
++    *num = 2;
++    return list;
++}
++
++TCase *
++sep_tc (void)
++{
++    TCase *tc = tcase_create ("Privsep");
++    tcase_add_exit_test(tc, sep_data, 125);
++    tcase_add_exit_test(tc, sep_test, 125);
++    tcase_add_test(tc, sep_check_paths);
++
++    return tc;
++}
++
+diff --git a/unittests/xen-tests.c b/unittests/xen-tests.c
+index fc8104d..87e02eb 100644
+--- a/unittests/xen-tests.c
++++ b/unittests/xen-tests.c
+@@ -102,6 +102,8 @@ START_TEST (syslog_redirect)
+ }
+ END_TEST
+  
++TCase *sep_tc (void);
++
+ static Suite *
+ xen_suite (void)
+ {
+@@ -111,6 +113,7 @@ xen_suite (void)
+     TCase *tc_syslog = tcase_create ("Syslog");
+     tcase_add_test (tc_syslog, syslog_redirect);
+     suite_add_tcase (s, tc_syslog);
++    suite_add_tcase (s, sep_tc());
+ 
+     return s;
+ }
+diff --git a/vl.c b/vl.c
+index 2012f14..f7363f7 100644
+--- a/vl.c
++++ b/vl.c
+@@ -48,6 +48,7 @@
+ #include "hw/xen.h"
+ #include <stdlib.h>
+ 
++#include "privsep.h"
+ #include "qemu-xen.h"
+ 
+ #include <xen/hvm/hvm_info_table.h>
+@@ -3878,6 +3879,7 @@ enum {
+     QEMU_OPTION_tb_size,
+     QEMU_OPTION_incoming,
+     QEMU_OPTION_chroot,
++    QEMU_OPTION_priv,
+     QEMU_OPTION_runas,
+     QEMU_OPTION_crashdump_dir,
+     QEMU_OPTION_crashdump_quota,
+@@ -4042,6 +4044,7 @@ static const QEMUOption qemu_options[] = {
+     { "tb-size", HAS_ARG, QEMU_OPTION_tb_size },
+     { "incoming", HAS_ARG, QEMU_OPTION_incoming },
+     { "chroot", HAS_ARG, QEMU_OPTION_chroot },
++    { "priv", 0, QEMU_OPTION_priv },
+     { "runas", HAS_ARG, QEMU_OPTION_runas },
+     { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
+     { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
+@@ -4413,6 +4416,7 @@ int main(int argc, char **argv, char **envp)
+     const char *run_as = NULL;
+     char *crashdump_dir = NULL;
+     long long crashdump_quota = 0;
++    QEMUFile *load_f = NULL;
+ 
+     logfile = stderr; /* initial value */
+ 
+@@ -5220,6 +5224,9 @@ geometry_error:
+             case QEMU_OPTION_chroot:
+                 chroot_dir = optarg;
+                 break;
++            case QEMU_OPTION_priv:
++                privileged = 1;
++                break;
+             case QEMU_OPTION_runas:
+                 run_as = optarg;
+                 break;
+@@ -5308,6 +5315,9 @@ geometry_error:
+     }
+ #endif
+ 
++    if (!privileged)
++        privsep_prepare();
++
+     if (pid_file && qemu_create_pidfile(pid_file) != 0) {
+         if (daemonize) {
+             uint8_t status = 1;
+@@ -5515,6 +5525,8 @@ geometry_error:
+         provision_crashdump(crashdump_dir, crashdump_quota);
+     }
+ 
++    init_privxsh();
++
+ #ifndef _WIN32
+ #ifndef CONFIG_DM
+     /* must be after terminal init, SDL library changes signal handlers */
+@@ -5614,11 +5626,13 @@ geometry_error:
+         }
+     }
+ 
+-    if (loadvm)
+-        do_loadvm(loadvm);
+-
+-    fprintf(logfile, "releasing VM\n");
+-    xenstore_dm_finished_startup();
++    if (loadvm) {
++        load_f = qemu_fopen(loadvm, "rb");
++        if (!load_f) {
++            fprintf(logfile, "Could not open VM state file\n");
++            abort();
++        }
++    }
+ 
+     /* init USB devices */
+     if (usb_enabled) {
+@@ -5757,6 +5771,30 @@ geometry_error:
+         qemu_start_incoming_migration(incoming);
+     }
+ 
++    if (daemonize) {
++        TFR(fd = open("/dev/null", O_RDWR));
++        if (fd == -1)
++            exit(1);
++    }
++
++#ifdef __linux__
++    if (!privileged) {
++        if (xc_interface_restrict(xc_handle, domid) < 0)
++            fprintf(stderr, "xc_interface_restrict(): %s\n", strerror(errno));
++
++        init_privsep();
++
++        run_as = NULL;
++        chroot_dir = NULL;
++    }
++#endif
++
++    if (load_f)
++        do_loadvm_file(load_f, loadvm);
++
++    fprintf(logfile, "releasing VM\n");
++    xenstore_dm_finished_startup();
++
+     if (autostart)
+         vm_start();
+ 
+@@ -5773,9 +5811,6 @@ geometry_error:
+ 	    exit(1);
+ 
+ 	chdir("/");
+-	TFR(fd = open("/dev/null", O_RDWR));
+-	if (fd == -1)
+-	    exit(1);
+     }
+ 
+ #ifndef CONFIG_STUBDOM
+diff --git a/xen-vl-extra.c b/xen-vl-extra.c
+index b65c0f1..37d01c8 100644
+--- a/xen-vl-extra.c
++++ b/xen-vl-extra.c
+@@ -8,6 +8,7 @@
+  * there is only one place where this file is included. */
+ 
+ #include "sysemu.h"
++#include "privsep.h"
+ 
+ /* Max number of PCI emulation */
+ #define MAX_PCI_EMULATION 32
+@@ -31,9 +32,9 @@ int vncunused;
+ void do_savevm(const char *name)
+ {
+     QEMUFile *f;
+-    int saved_vm_running, ret;
++    int saved_vm_running, ret, ret2;
+ 
+-    f = qemu_fopen(name, "wb");
++    f = privsep_open_vm_dump(name);
+     
+     /* ??? Should this occur after vm_stop?  */
+     qemu_aio_flush();
+@@ -47,9 +48,9 @@ void do_savevm(const char *name)
+     }
+     
+     ret = qemu_savevm_state(f);
+-    qemu_fclose(f);
++    ret2 = qemu_fclose(f);
+ 
+-    if (ret < 0)
++    if (ret < 0 || ret2)
+         fprintf(logfile, "Error %d while writing VM to savevm file '%s'\n",
+                 ret, name);
+ 
+@@ -59,9 +60,19 @@ void do_savevm(const char *name)
+ 
+     return;
+ }
++
+ void do_loadvm(const char *name)
+ {
+-    QEMUFile *f;
++    QEMUFile *f = qemu_fopen(name, "rb");
++    if (!f) {
++        fprintf(logfile, "Could not open VM state file\n");
++        abort();
++    }
++    do_loadvm_file(f, name);
++}
++
++void do_loadvm_file(QEMUFile *f, const char *name)
++{
+     int saved_vm_running, ret;
+ 
+     /* Flush all IO requests so they don't interfere with the new state.  */
+@@ -71,12 +82,6 @@ void do_loadvm(const char *name)
+     vm_stop(0);
+ 
+     /* restore the VM state */
+-    f = qemu_fopen(name, "rb");
+-    if (!f) {
+-        fprintf(logfile, "Could not open VM state file\n");
+-        abort();
+-    }
+-
+     ret = qemu_loadvm_state(f);
+     qemu_fclose(f);
+     if (ret < 0) {
+diff --git a/xenstore.c b/xenstore.c
+index c7ca228..51fbbc8 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -25,6 +25,7 @@
+ #include "xen_backend.h"
+ #include "console.h"
+ #include "xen_backend.h"
++#include "privsep.h"
+ 
+ /* The token used to identify the keymap watch. */
+ #define KEYMAP_TOKEN "keymap"
+@@ -61,8 +62,7 @@ void xenstore_do_eject(BlockDriverState *bs)
+         fprintf(stderr, "couldn't find disk to eject.\n");
+         return;
+     }
+-    if (xenbus_param_paths[i])
+-        xs_write(xsh, XBT_NULL, xenbus_param_paths[i], "eject", strlen("eject"));
++    privsep_eject_cd(i);
+ }
+ 
+ static struct {
+@@ -74,9 +74,6 @@ static struct {
+ void xenstore_set_device_locked(BlockDriverState *bs)
+ {
+     int i;
+-    size_t len;
+-    char *path;
+-    const char *val;
+ 
+     i = xenstore_find_device(bs);
+     if (i == -1) {
+@@ -86,22 +83,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
+     /* not a cdrom device */
+     if (!xenbus_param_paths[i])
+         return;
+-    len = strlen(xenbus_param_paths[i]);
+-    path = malloc(len + 1);
+-    if (!path) {
+-        fprintf(stderr, "xenstore_set_device_locked: malloc failed\n");
+-        return;
+-    }
+-    strcpy(path, xenbus_param_paths[i]);
+-    path[len - 6] = '\0';
+-    strcat(path, "locked");
+-
+-    val = bs->locked ? "true" : "false";
+-
+-    if (!xs_write(xsh, XBT_NULL, path, val, strlen(val)))
+-        fprintf(stderr, "xenstore_set_device_locked: xs_write for %s fail", path);
+-
+-    free(path);
++    if (bs->locked)
++        privsep_lock_cd(i);
++    else
++        privsep_unlock_cd(i);
+ }
+ 
+ #define UWAIT_MAX (30*1000000) /* thirty seconds */
+@@ -737,6 +722,7 @@ void xenstore_parse_domain_config(int hvm_domid)
+             if (!strcmp(danger_type, "cdrom") || !strcmp(danger_type, "floppy")) {
+                 if (pasprintf(&buf, "%s/params", bpath) != -1) {
+                     char *buf2, *frontend;
++                    privsep_set_cd_backend(nb_drives, bpath);
+                     xs_watch(xsh, buf, dev);
+                     asprintf(&buf2, "%s/frontend", bpath);
+                     frontend = xs_read(xsh, XBT_NULL, buf2, &len);
+@@ -1015,30 +1001,19 @@ struct xs_handle *xenstore_get(void)
+ static void xenstore_process_logdirty_event(void)
+ {
+     char *act;
+-    char *ret_path = NULL;
+-    char *cmd_path = NULL;
++    char ret_path[128];
++    char cmd_path[128];
+     unsigned int len;
+ 
+     /* Remember the paths for the command and response entries */
+-    if (pasprintf(&ret_path,
+-                "/local/domain/0/device-model/%u/logdirty/ret",
+-                domid) == -1) {
+-        fprintf(logfile, "Log-dirty: out of memory\n");
+-        exit(1);
+-    }
+-    if (pasprintf(&cmd_path,
+-                "/local/domain/0/device-model/%u/logdirty/cmd",
+-                domid) == -1) {
+-        fprintf(logfile, "Log-dirty: out of memory\n");
+-        exit(1);
+-    }
++    sprintf(ret_path, "/local/domain/0/device-model/%u/logdirty/ret", domid);
++    sprintf(cmd_path, "/local/domain/0/device-model/%u/logdirty/cmd", domid);
+ 
+-    
+     /* Read the required active buffer from the store */
+     act = xs_read(xsh, XBT_NULL, cmd_path, &len);
+     if (!act) {
+         fprintf(logfile, "Log-dirty: no command yet.\n");
+-        goto out;
++        return;
+     }
+     fprintf(logfile, "Log-dirty command %s\n", act);
+ 
+@@ -1055,27 +1030,24 @@ static void xenstore_process_logdirty_event(void)
+     xs_write(xsh, XBT_NULL, ret_path, act, len);
+ 
+     free(act);
+-out:
+-    free(ret_path);
+-    free(cmd_path);
+ }
+ 
+ 
+ /* Accept state change commands from the control tools */
+ static void xenstore_process_dm_command_event(void)
+ {
+-    char *path = NULL, *command = NULL, *par = NULL;
++    char path[128], *command = NULL, *par = NULL;
+     unsigned int len;
+ 
+-    if (pasprintf(&path, 
+-                  "/local/domain/0/device-model/%u/command", domid) == -1) {
+-        fprintf(logfile, "out of memory reading dm command\n");
+-        goto out;
+-    }
++    sprintf(path, "/local/domain/0/device-model/%u/command", domid);
+     command = xs_read(xsh, XBT_NULL, path, &len);
+     if (!command)
+         goto out;
+-    
++
++    sprintf(path, "/local/domain/0/device-model/%u/parameter", domid);
++    par = xs_read(xsh, XBT_NULL, path, NULL);
++
++    sprintf(path, "/local/domain/0/device-model/%u/command", domid);
+     if (!xs_rm(xsh, XBT_NULL, path))
+         fprintf(logfile, "xs_rm failed: path=%s\n", path);
+ 
+@@ -1086,14 +1058,7 @@ static void xenstore_process_dm_command_event(void)
+         fprintf(logfile, "dm-command: continue after state save\n");
+         xen_pause_requested = 0;
+     } else if (!strncmp(command, "usb-add", len)) {
+-        fprintf(logfile, "dm-command: usb-add a usb device\n");
+-        if (pasprintf(&path,
+-                "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+-            fprintf(logfile, "out of memory reading dm command parameter\n");
+-            goto out;
+-        }
+-        par = xs_read(xsh, XBT_NULL, path, &len);
+-        fprintf(logfile, "dm-command: usb-add a usb device: %s \n", par);
++        fprintf(logfile, "dm-command: usb-add usb device\n");
+         if (!par)
+             goto out;
+         do_usb_add(par);
+@@ -1101,13 +1066,6 @@ static void xenstore_process_dm_command_event(void)
+         fprintf(logfile, "dm-command: finish usb-add a usb device:%s\n",par);
+     } else if (!strncmp(command, "usb-del", len)) {
+         fprintf(logfile, "dm-command: usb-del a usb device\n");
+-        if (pasprintf(&path,
+-                "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+-            fprintf(logfile, "out of memory reading dm command parameter\n");
+-            goto out;
+-        }
+-        par = xs_read(xsh, XBT_NULL, path, &len);
+-        fprintf(logfile, "dm-command: usb-del a usb device: %s \n", par);
+         if (!par)
+             goto out;
+         do_usb_del(par);
+@@ -1115,59 +1073,25 @@ static void xenstore_process_dm_command_event(void)
+         fprintf(logfile, "dm-command: finish usb-del a usb device:%s\n",par);
+ #ifdef CONFIG_PASSTHROUGH
+     } else if (!strncmp(command, "pci-rem", len)) {
+-        fprintf(logfile, "dm-command: hot remove pass-through pci dev \n");
++        fprintf(logfile, "dm-command: hot remove pass-through pci dev %s\n", par);
+ 
+-        if (pasprintf(&path, 
+-                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+-            fprintf(logfile, "out of memory reading dm command parameter\n");
+-            goto out;
+-        }
+-        par = xs_read(xsh, XBT_NULL, path, &len);
+-        if (!par)
+-            goto out;
+-
+-        do_pci_del(par);
+-        free(par);
++        if (par)
++            do_pci_del(par);
+     } else if (!strncmp(command, "pci-ins", len)) {
+-        fprintf(logfile, "dm-command: hot insert pass-through pci dev \n");
++        fprintf(logfile, "dm-command: hot insert pass-through pci dev %s\n", par);
+ 
+-        if (pasprintf(&path, 
+-                      "/local/domain/0/device-model/%u/parameter", domid) == -1) {
+-            fprintf(logfile, "out of memory reading dm command parameter\n");
+-            goto out;
+-        }
+-        par = xs_read(xsh, XBT_NULL, path, &len);
+-        if (!par)
+-            goto out;
+-
+-        do_pci_add(par);
+-        free(par);
++        if (par)
++            do_pci_add(par);
+ #endif
+     } else {
+         fprintf(logfile, "dm-command: unknown command\"%*s\"\n", len, command);
+     }
+ 
+  out:
+-    free(path);
++    free(par);
+     free(command);
+ }
+ 
+-void xenstore_record_dm(const char *subpath, const char *state)
+-{
+-    char *path = NULL;
+-
+-    if (pasprintf(&path, 
+-                  "/local/domain/0/device-model/%u/%s", domid, subpath) == -1) {
+-        fprintf(logfile, "out of memory recording dm \n");
+-        goto out;
+-    }
+-    if (!xs_write(xsh, XBT_NULL, path, state, strlen(state)))
+-        fprintf(logfile, "error recording dm \n");
+-
+- out:
+-    free(path);
+-}
+-
+ int
+ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+                                      uint32_t build_nr)
+@@ -1248,7 +1172,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+ 
+ void xenstore_record_dm_state(const char *state)
+ {
+-    xenstore_record_dm("state", state);
++    privsep_record_dm("state", state);
+ }
+ static int xenstore_process_one_vcpu_set_event(char *node)
+ {
+@@ -1620,23 +1544,6 @@ void xenstore_write_vncport(int display)
+     free(buf);
+ }
+ 
+-void xenstore_write_vslots(char *vslots)
+-{
+-    char *path = NULL;
+-    int pci_devid = 0;
+-
+-    if (pasprintf(&path, 
+-                  "/local/domain/0/backend/pci/%u/%u/vslots", domid, pci_devid) == -1) {
+-        fprintf(logfile, "out of memory when updating vslots.\n");
+-        goto out;
+-    }
+-    if (!xs_write(xsh, XBT_NULL, path, vslots, strlen(vslots)))
+-        fprintf(logfile, "error updating vslots \n");
+-
+- out:
+-    free(path);
+-}
+-
+ void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
+ {
+     char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
+@@ -1892,26 +1799,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+     return value;
+ }
+ 
+-int xenstore_vm_write(int domid, const char *key, const char *value)
+-{
+-    char *path = NULL;
+-    int rc = -1;
+-
+-    path = xenstore_vm_key_path(domid, key);
+-    if (!path)
+-        return 0;
+-
+-    rc = xs_write(xsh, XBT_NULL, path, value, strlen(value));
+-    if (rc == 0) {
+-        fprintf(logfile, "xs_write(%s, %s): write error\n", path, key);
+-        goto out;
+-    }
+-
+- out:
+-    free(path);
+-    return rc;
+-}
+-
+ char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
+ {
+     char *path = NULL, *value = NULL;
+@@ -2157,62 +2044,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+     free(buf);
+ }
+ 
+-#ifndef CONFIG_STUBDOM
+-
+-void xenstore_dom_chmod(int domid, const char *key, const char *perms)
+-{
+-    char *buf = NULL, *path = NULL;
+-    int rc = -1;
+-	struct xs_permissions p;
+-
+-    if (xsh == NULL)
+-        goto out;
+-
+-    path = xs_get_domain_path(xsh, domid);
+-    if (path == NULL) {
+-        fprintf(logfile, "xs_get_domain_path: error\n");
+-        goto out;
+-    }
+-
+-    pasprintf(&buf, "%s/%s", path, key);
+-
+-	xs_strings_to_perms(&p, 1, perms);
+-	xs_set_permissions(xsh, XBT_NULL, buf, &p, 1);
+-
+- out:
+-    free(path);
+-    free(buf);
+-}
+-
+-#endif /*CONFIG_STUBDOM*/
+-
+-int xenstore_dom_write(int domid, const char *key, const char *value)
+-{
+-    char *buf = NULL, *path = NULL;
+-    int rc = -1;
+-
+-    if (xsh == NULL)
+-        goto out;
+-
+-    path = xs_get_domain_path(xsh, domid);
+-    if (path == NULL) {
+-        fprintf(logfile, "xs_get_domain_path: error\n");
+-        goto out;
+-    }
+-
+-    pasprintf(&buf, "%s/%s", path, key);
+-    rc = xs_write(xsh, XBT_NULL, buf, value, strlen(value));
+-    if (rc == 0) {
+-        fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
+-        goto out;
+-    }
+-
+- out:
+-    free(path);
+-    free(buf);
+-    return rc;
+-}
+-
+ char *xenstore_read(const char *path)
+ {
+     char *value = NULL;
+@@ -2223,9 +2054,3 @@ char *xenstore_read(const char *path)
+     return xs_read(xsh, XBT_NULL, path, &len);
+ }
+ 
+-int xenstore_write(const char *path, const char *val)
+-{
+-    if (xsh == NULL)
+-        return 1;
+-    return xs_write(xsh, XBT_NULL, path, val, strlen(val));
+-}

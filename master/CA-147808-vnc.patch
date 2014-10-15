@@ -1,0 +1,40 @@
+diff --git a/vnc.c b/vnc.c
+index 60510fc..6640833 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -260,6 +260,7 @@ struct VncState
+     VncDisplay *vd;
+     int need_update;
+     int force_update;
++    int missed_update;
+     uint32_t features;
+     int absolute;
+     int last_x;
+@@ -950,6 +951,9 @@ static int find_and_clear_dirty_height(struct VncState *vs,
+ 
+ static int vnc_update_client(VncState *vs, int has_dirty)
+ {
++    if (has_dirty)
++        vs->missed_update = 1;
++
+     if (vs->need_update > 0 && vs->csock != -1) {
+         VncDisplay *vd = vs->vd;
+ 	int y;
+@@ -960,7 +964,8 @@ static int vnc_update_client(VncState *vs, int has_dirty)
+             /* kernel send buffers are full -> drop frames to throttle */
+             return 0;
+ 
+-        if (!has_dirty && !vs->audio_cap && !vs->force_update)
++        if (!has_dirty && !vs->missed_update && !vs->audio_cap &&
++                !vs->force_update)
+ 	    return 0;
+ 
+         /*
+@@ -1002,6 +1007,7 @@ static int vnc_update_client(VncState *vs, int has_dirty)
+ 	vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
+ 	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
+ 	vnc_flush(vs);
++        vs->missed_update = 0;
+         vs->force_update = 0;
+         vs->need_update--;
+         if (vs->need_update < 0)

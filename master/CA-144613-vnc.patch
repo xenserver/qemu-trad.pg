@@ -1,0 +1,15 @@
+diff --git a/vnc.c b/vnc.c
+index 38beaa2..60510fc 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -873,6 +873,10 @@ static void vnc_dpy_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int
+         }
+     }
+ 
++    /* vd->server could be NULL now if the last client disconnected. */
++    if (!vd->server)
++        return;
++    
+     /* do bitblit op on the local surface too */
+     pitch = ds_get_linesize(vd->ds);
+     depth = ds_get_bytes_per_pixel(vd->ds);
