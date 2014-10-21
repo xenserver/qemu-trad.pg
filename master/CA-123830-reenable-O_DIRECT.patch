@@ -1,8 +1,8 @@
 diff --git a/hw/xen_disk.c b/hw/xen_disk.c
-index ee8d36f..33a5531 100644
+index 250d806..ff36ec9 100644
 --- a/hw/xen_disk.c
 +++ b/hw/xen_disk.c
-@@ -635,7 +635,7 @@ static int blk_init(struct XenDevice *xendev)
+@@ -657,7 +657,7 @@ static int blk_init(struct XenDevice *xendev)
  	return -1;
  
      /* read-only ? */

@@ -1,10 +1,11 @@
 # HG changeset patch
 # Parent d55764563b44c59ab220469ca7c3befe7f38e14c
 
-diff -r d55764563b44 vnc.c
---- a/vnc.c	Wed May 09 16:52:39 2012 +0100
-+++ b/vnc.c	Wed May 09 17:55:39 2012 +0100
-@@ -88,7 +88,7 @@ typedef void VncSendHextileTile(VncState
+diff --git a/vnc.c b/vnc.c
+index ed6de92..91f6ec6 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -88,7 +88,7 @@ typedef void VncSendHextileTile(VncState *vs,
                                  void *last_fg,
                                  int *has_bg, int *has_fg);
  

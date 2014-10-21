@@ -1,7 +1,8 @@
-diff -r c2ff27ed5f65 hw/cirrus_vga.c
---- a/hw/cirrus_vga.c	Thu Jun 03 16:52:30 2010 +0100
-+++ b/hw/cirrus_vga.c	Fri Jun 04 13:07:36 2010 +0100
-@@ -1516,9 +1516,11 @@
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 38c829a..5ac82f3 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -1520,9 +1520,11 @@ cirrus_hook_write_gr(CirrusVGAState * s, unsigned reg_index, int reg_value)
  #endif
      switch (reg_index) {
      case 0x00:			// Standard VGA, BGCOLOR 0x000000ff

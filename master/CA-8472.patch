@@ -1,6 +1,7 @@
-diff -r ef8d96d449aa hw/xen_platform.c
---- a/hw/xen_platform.c	Tue Aug 07 09:56:28 2012 +0100
-+++ b/hw/xen_platform.c	Tue Aug 07 09:56:35 2012 +0100
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index 011d55f..d5ac0d3 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
 @@ -577,7 +577,10 @@ void pci_xen_platform_init(PCIBus *bus)
      pch->class = 0x1; /* Storage device class */
      pch->subclass = 0x0; /* SCSI subclass */

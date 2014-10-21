@@ -1,7 +1,8 @@
-diff -r be23038501e9 vnc.c
---- a/vnc.c	Thu Jul 02 17:41:59 2009 +0100
-+++ b/vnc.c	Thu Jul 02 18:37:10 2009 +0100
-@@ -2661,5 +2661,23 @@
+diff --git a/vnc.c b/vnc.c
+index fc15720..f7fa9e2 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -2779,5 +2779,23 @@ int vnc_display_open(DisplayState *ds, const char *display)
              vs->display = dpy;
          }
      }

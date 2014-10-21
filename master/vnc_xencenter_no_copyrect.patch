@@ -1,7 +1,8 @@
-diff -r d7f91713c5db vnc.c
---- a/vnc.c	Tue Aug 04 17:26:34 2009 +0100
-+++ b/vnc.c	Tue Aug 04 17:38:19 2009 +0100
-@@ -1423,6 +1423,7 @@
+diff --git a/vnc.c b/vnc.c
+index f9bf92c..ed6de92 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -1423,6 +1423,7 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
  {
      int i;
      unsigned int enc = 0;
@@ -9,7 +10,7 @@ diff -r d7f91713c5db vnc.c
  
      vnc_zlib_init(vs);
      vs->features = 0;
-@@ -1463,7 +1464,12 @@
+@@ -1463,7 +1464,12 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
          case VNC_ENCODING_WMVi:
              vs->features |= VNC_FEATURE_WMVI_MASK;
              break;
@@ -23,7 +24,7 @@ diff -r d7f91713c5db vnc.c
              vs->tight_compression = (enc & 0x0F);
              break;
          case VNC_ENCODING_QUALITYLEVEL0 ... VNC_ENCODING_QUALITYLEVEL0 + 9:
-@@ -1474,6 +1480,9 @@
+@@ -1474,6 +1480,9 @@ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
              break;
          }
      }
@@ -33,10 +34,11 @@ diff -r d7f91713c5db vnc.c
  
      check_pointer_type_change(vs, kbd_mouse_is_absolute());
  }
-diff -r d7f91713c5db vnc.h
---- a/vnc.h	Tue Aug 04 17:26:34 2009 +0100
-+++ b/vnc.h	Tue Aug 04 17:38:19 2009 +0100
-@@ -70,6 +70,7 @@
+diff --git a/vnc.h b/vnc.h
+index 6981606..a97b6e0 100644
+--- a/vnc.h
++++ b/vnc.h
+@@ -70,6 +70,7 @@ enum {
  #define VNC_ENCODING_EXT_KEY_EVENT        0XFFFFFEFE /* -258 */
  #define VNC_ENCODING_AUDIO                0XFFFFFEFD /* -259 */
  #define VNC_ENCODING_WMVi                 0x574D5669

@@ -15,9 +15,10 @@ Date:   Tue Jun 16 14:19:48 2009 +0200
     Signed-off-by: Anthony Liguori <aliguori@us.ibm.com>
 
 diff --git a/vnc.c b/vnc.c
+index 42dfc48..d4ae834 100644
 --- a/vnc.c
 +++ b/vnc.c
-@@ -208,6 +208,8 @@
+@@ -208,6 +208,8 @@ static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
  static void vnc_update_client(void *opaque);
  static void vnc_client_read(void *opaque);
@@ -26,7 +27,7 @@ diff --git a/vnc.c b/vnc.c
  
  static void vnc_colordepth(VncState *vs);
  
-@@ -644,9 +646,6 @@
+@@ -644,9 +646,6 @@ static void send_framebuffer_update(VncState *vs, int x, int y, int w, int h)
  
  static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, int w, int h)
  {
@@ -36,7 +37,7 @@ diff --git a/vnc.c b/vnc.c
      vnc_write_u8(vs, 0);  /* msg id */
      vnc_write_u8(vs, 0);
      vnc_write_u16(vs, 1); /* number of rects */
-@@ -659,13 +658,22 @@
+@@ -659,13 +658,22 @@ static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, i
  static void vnc_dpy_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_y, int w, int h)
  {
      VncDisplay *vd = ds->opaque;
@@ -62,7 +63,7 @@ diff --git a/vnc.c b/vnc.c
      }
  }
  
-@@ -790,6 +798,8 @@
+@@ -790,6 +798,8 @@ static void vnc_update_client(void *opaque)
  
      if (vs->csock != -1) {
          qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
@@ -71,7 +72,7 @@ diff --git a/vnc.c b/vnc.c
      }
  
  }
-@@ -875,40 +885,10 @@
+@@ -875,39 +885,9 @@ static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
              }
          }
  
@@ -89,10 +90,7 @@ diff --git a/vnc.c b/vnc.c
 -	}
 -#endif /* CONFIG_VNC_TLS */
 -        audio_del(vs);
-+        VNC_DEBUG("Closing down client sock: ret %d, errno %d\n",
-+                  ret, ret < 0 ? last_errno : 0);
-+        vnc_disconnect_start(vs);
- 
+-
 -        VncState *p, *parent = NULL;
 -        for (p = vs->vd->clients; p != NULL; p = p->next) {
 -            if (p == vs) {
@@ -111,11 +109,13 @@ diff --git a/vnc.c b/vnc.c
 -        qemu_free(vs->server.ds);
 -        qemu_free(vs->guest.ds);
 -        qemu_free(vs);
--
++        VNC_DEBUG("Closing down client sock: ret %d, errno %d\n",
++                  ret, ret < 0 ? last_errno : 0);
++        vnc_disconnect_start(vs);
+ 
  	return 0;
      }
-     return ret;
-@@ -916,7 +896,8 @@
+@@ -916,7 +896,8 @@ static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
  
  static void vnc_client_error(VncState *vs)
  {
@@ -125,7 +125,7 @@ diff --git a/vnc.c b/vnc.c
  }
  
  static void vnc_client_write(void *opaque)
-@@ -976,8 +957,11 @@
+@@ -976,8 +957,11 @@ static void vnc_client_read(void *opaque)
  #endif /* CONFIG_VNC_TLS */
  	ret = recv(vs->csock, buffer_end(&vs->input), 4096, 0);
      ret = vnc_client_io_error(vs, ret, socket_error());
@@ -138,7 +138,7 @@ diff --git a/vnc.c b/vnc.c
  
      vs->input.offset += ret;
  
-@@ -986,8 +970,10 @@
+@@ -986,8 +970,10 @@ static void vnc_client_read(void *opaque)
  	int ret;
  
  	ret = vs->read_handler(vs, vs->input.buffer, len);
@@ -150,7 +150,7 @@ diff --git a/vnc.c b/vnc.c
  
  	if (!ret) {
  	    memmove(vs->input.buffer, vs->input.buffer + len, (vs->input.offset - len));
-@@ -1002,7 +988,7 @@
+@@ -1002,7 +988,7 @@ static void vnc_write(VncState *vs, const void *data, size_t len)
  {
      buffer_reserve(&vs->output, len);
  
@@ -159,7 +159,7 @@ diff --git a/vnc.c b/vnc.c
  	qemu_set_fd_handler2(vs->csock, NULL, vnc_client_read, vnc_client_write, vs);
      }
  
-@@ -1043,7 +1029,7 @@
+@@ -1043,7 +1029,7 @@ static void vnc_write_u8(VncState *vs, uint8_t value)
  
  static void vnc_flush(VncState *vs)
  {
@@ -168,7 +168,7 @@ diff --git a/vnc.c b/vnc.c
  	vnc_client_write(vs);
  }
  
-@@ -1069,6 +1055,43 @@
+@@ -1069,6 +1055,43 @@ static uint32_t read_u32(uint8_t *data, size_t offset)
  	    (data[offset + 2] << 8) | data[offset + 3]);
  }
  
@@ -212,15 +212,15 @@ diff --git a/vnc.c b/vnc.c
  #ifdef CONFIG_VNC_TLS
  static ssize_t vnc_tls_push(gnutls_transport_ptr_t transport,
                              const void *data,
-@@ -1085,7 +1108,6 @@
-     }
+@@ -1086,7 +1109,6 @@ static ssize_t vnc_tls_push(gnutls_transport_ptr_t transport,
      return ret;
  }
--
  
+-
  static ssize_t vnc_tls_pull(gnutls_transport_ptr_t transport,
                              void *data,
-@@ -2308,11 +2330,13 @@
+                             size_t len) {
+@@ -2308,11 +2330,13 @@ static void vnc_connect(VncDisplay *vd, int csock)
      vnc_write(vs, "RFB 003.008\n", 12);
      vnc_flush(vs);
      vnc_read_when(vs, protocol_version, 12);

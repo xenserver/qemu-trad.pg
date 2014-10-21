@@ -1,9 +1,10 @@
 # HG changeset patch
 # Parent 8a948d949838e7b173d698e940992a50e45a36fd
-diff -r 8a948d949838 -r 45280067ff09 vl.c
---- a/vl.c	Thu Jul 26 14:33:07 2012 +0100
-+++ b/vl.c	Thu Jul 26 14:34:18 2012 +0100
-@@ -4961,7 +4961,7 @@ int main(int argc, char **argv, char **e
+diff --git a/vl.c b/vl.c
+index a0fe73d..a68218f 100644
+--- a/vl.c
++++ b/vl.c
+@@ -4965,7 +4965,7 @@ int main(int argc, char **argv, char **envp)
          serial_devices[i] = NULL;
      serial_device_index = 0;
  

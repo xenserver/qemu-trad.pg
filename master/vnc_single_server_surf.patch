@@ -1,7 +1,8 @@
 diff --git a/vnc.c b/vnc.c
+index 8cd31eb..4f55625 100644
 --- a/vnc.c
 +++ b/vnc.c
-@@ -92,6 +92,12 @@ typedef void VncSendHextileTile(VncState
+@@ -92,6 +92,12 @@ typedef void VncSendHextileTile(VncState *vs,
  
  typedef struct VncDisplay VncDisplay;
  
@@ -44,7 +45,7 @@ diff --git a/vnc.c b/vnc.c
      VncDisplay *vd;
      int need_update;
      int force_update;
-@@ -206,7 +208,7 @@ static void vnc_write_s32(VncState *vs, 
+@@ -206,7 +208,7 @@ static void vnc_write_s32(VncState *vs, int32_t value);
  static void vnc_write_u16(VncState *vs, uint16_t value);
  static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
@@ -53,21 +54,19 @@ diff --git a/vnc.c b/vnc.c
  static void vnc_client_read(void *opaque);
  static void vnc_disconnect_start(VncState *vs);
  static void vnc_disconnect_finish(VncState *vs);
-@@ -214,7 +216,12 @@ static void vnc_init_timer(VncDisplay *v
+@@ -214,6 +216,11 @@ static void vnc_init_timer(VncDisplay *vd);
  static void vnc_remove_timer(VncDisplay *vd);
  
  static void vnc_colordepth(VncState *vs);
--
 +static void framebuffer_update_request(VncState *vs, int incremental,
 +                                       int x_position, int y_position,
 +                                       int w, int h);
 +static void vnc_refresh(void *opaque);
 +static int vnc_refresh_server_surface(VncDisplay *vd);
-+
+ 
  static inline void vnc_set_bit(uint32_t *d, int k)
  {
-     d[k >> 5] |= 1 << (k & 0x1f);
-@@ -256,10 +263,11 @@ static inline int vnc_and_bits(const uin
+@@ -256,10 +263,11 @@ static inline int vnc_and_bits(const uint32_t *d1, const uint32_t *d2,
      return 0;
  }
  
@@ -81,7 +80,7 @@ diff --git a/vnc.c b/vnc.c
  
      h += y;
  
-@@ -280,16 +288,6 @@ static void vnc_update(VncState *vs, int
+@@ -280,16 +288,6 @@ static void vnc_update(VncState *vs, int x, int y, int w, int h)
              vnc_set_bit(s->dirty[y], (x + i) / 16);
  }
  
@@ -98,7 +97,7 @@ diff --git a/vnc.c b/vnc.c
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
  				   int32_t encoding)
  {
-@@ -334,49 +332,44 @@ static void buffer_append(Buffer *buffer
+@@ -334,49 +332,44 @@ static void buffer_append(Buffer *buffer, const void *data, size_t len)
      buffer->offset += len;
  }
  
@@ -139,23 +138,7 @@ diff --git a/vnc.c b/vnc.c
 -            vnc_framebuffer_update(vs, 0, 0, ds_get_width(ds), ds_get_height(ds),
 -                                   VNC_ENCODING_DESKTOPRESIZE);
 -            vnc_flush(vs);
-+    size_changed = ds_get_width(ds) != vd->guest.ds->width ||
-+                   ds_get_height(ds) != vd->guest.ds->height;
-+    *(vd->guest.ds) = *(ds->surface);
-+    memset(vd->guest.dirty, 0xFF, sizeof(vd->guest.dirty));
-+
-+    while (vs != NULL) {
-+        vnc_colordepth(vs);
-+        if (size_changed) {
-+            if (vs->csock != -1 && vnc_has_feature(vs, VNC_FEATURE_RESIZE)) {
-+                vnc_write_u8(vs, 0);  /* msg id */
-+                vnc_write_u8(vs, 0);
-+                vnc_write_u16(vs, 1); /* number of rects */
-+                vnc_framebuffer_update(vs, 0, 0, ds_get_width(ds), ds_get_height(ds),
-+                        VNC_ENCODING_DESKTOPRESIZE);
-+                vnc_flush(vs);
-+            }
-         }
+-        }
 -    }
 -    memset(vs->guest.dirty, 0xFF, sizeof(vs->guest.dirty));
 -
@@ -169,29 +152,45 @@ diff --git a/vnc.c b/vnc.c
 -                                       vs->server.ds->height);
 -    memset(vs->server.dirty, 0xFF, sizeof(vs->guest.dirty));
 -}
--
++    size_changed = ds_get_width(ds) != vd->guest.ds->width ||
++                   ds_get_height(ds) != vd->guest.ds->height;
++    *(vd->guest.ds) = *(ds->surface);
++    memset(vd->guest.dirty, 0xFF, sizeof(vd->guest.dirty));
+ 
 -static void vnc_dpy_resize(DisplayState *ds)
 -{
 -    VncDisplay *vd = ds->opaque;
 -    VncState *vs = vd->clients;
--    while (vs != NULL) {
+     while (vs != NULL) {
 -        vnc_resize(vs);
++        vnc_colordepth(vs);
++        if (size_changed) {
++            if (vs->csock != -1 && vnc_has_feature(vs, VNC_FEATURE_RESIZE)) {
++                vnc_write_u8(vs, 0);  /* msg id */
++                vnc_write_u8(vs, 0);
++                vnc_write_u16(vs, 1); /* number of rects */
++                vnc_framebuffer_update(vs, 0, 0, ds_get_width(ds), ds_get_height(ds),
++                        VNC_ENCODING_DESKTOPRESIZE);
++                vnc_flush(vs);
++            }
++        }
 +        memset(vs->dirty, 0xFF, sizeof(vs->dirty));
          vs = vs->next;
      }
  }
-@@ -391,13 +384,14 @@ static void vnc_write_pixels_copy(VncSta
+@@ -391,13 +384,14 @@ static void vnc_write_pixels_copy(VncState *vs, void *pixels, int size)
  static void vnc_convert_pixel(VncState *vs, uint8_t *buf, uint32_t v)
  {
      uint8_t r, g, b;
-+    VncDisplay *vd = vs->vd;
- 
+-
 -    r = ((((v & vs->server.ds->pf.rmask) >> vs->server.ds->pf.rshift) << vs->clientds.pf.rbits) >>
 -        vs->server.ds->pf.rbits);
 -    g = ((((v & vs->server.ds->pf.gmask) >> vs->server.ds->pf.gshift) << vs->clientds.pf.gbits) >>
 -        vs->server.ds->pf.gbits);
 -    b = ((((v & vs->server.ds->pf.bmask) >> vs->server.ds->pf.bshift) << vs->clientds.pf.bbits) >>
 -        vs->server.ds->pf.bbits);
++    VncDisplay *vd = vs->vd;
++
 +    r = ((((v & vd->server->pf.rmask) >> vd->server->pf.rshift) << vs->clientds.pf.rbits) >>
 +        vd->server->pf.rbits);
 +    g = ((((v & vd->server->pf.gmask) >> vd->server->pf.gshift) << vs->clientds.pf.gbits) >>
@@ -201,7 +200,7 @@ diff --git a/vnc.c b/vnc.c
      v = (r << vs->clientds.pf.rshift) |
          (g << vs->clientds.pf.gshift) |
          (b << vs->clientds.pf.bshift);
-@@ -434,8 +428,9 @@ static void vnc_convert_pixel(VncState *
+@@ -434,8 +428,9 @@ static void vnc_convert_pixel(VncState *vs, uint8_t *buf, uint32_t v)
  static void vnc_write_pixels_generic(VncState *vs, void *pixels1, int size)
  {
      uint8_t buf[4];
@@ -212,7 +211,7 @@ diff --git a/vnc.c b/vnc.c
          uint32_t *pixels = pixels1;
          int n, i;
          n = size >> 2;
-@@ -443,7 +438,7 @@ static void vnc_write_pixels_generic(Vnc
+@@ -443,7 +438,7 @@ static void vnc_write_pixels_generic(VncState *vs, void *pixels1, int size)
              vnc_convert_pixel(vs, buf, pixels[i]);
              vnc_write(vs, buf, vs->clientds.pf.bytes_per_pixel);
          }
@@ -221,7 +220,7 @@ diff --git a/vnc.c b/vnc.c
          uint16_t *pixels = pixels1;
          int n, i;
          n = size >> 1;
-@@ -451,7 +446,7 @@ static void vnc_write_pixels_generic(Vnc
+@@ -451,7 +446,7 @@ static void vnc_write_pixels_generic(VncState *vs, void *pixels1, int size)
              vnc_convert_pixel(vs, buf, pixels[i]);
              vnc_write(vs, buf, vs->clientds.pf.bytes_per_pixel);
          }
@@ -230,7 +229,7 @@ diff --git a/vnc.c b/vnc.c
          uint8_t *pixels = pixels1;
          int n, i;
          n = size;
-@@ -468,8 +463,9 @@ static void send_framebuffer_update_raw(
+@@ -468,8 +463,9 @@ static void send_framebuffer_update_raw(VncState *vs, int x, int y, int w, int h
  {
      int i;
      uint8_t *row;
@@ -241,7 +240,7 @@ diff --git a/vnc.c b/vnc.c
      for (i = 0; i < h; i++) {
  	vs->write_pixels(vs, row, w * ds_get_bytes_per_pixel(vs->ds));
  	row += ds_get_linesize(vs->ds);
-@@ -517,9 +513,10 @@ static void send_framebuffer_update_hext
+@@ -517,9 +513,10 @@ static void send_framebuffer_update_hextile(VncState *vs, int x, int y, int w, i
      int i, j;
      int has_fg, has_bg;
      uint8_t *last_fg, *last_bg;
@@ -254,7 +253,7 @@ diff --git a/vnc.c b/vnc.c
      has_fg = has_bg = 0;
      for (j = y; j < (y + h); j += 16) {
  	for (i = x; i < (x + w); i += 16) {
-@@ -648,10 +645,6 @@ static void send_framebuffer_update(VncS
+@@ -648,10 +645,6 @@ static void send_framebuffer_update(VncState *vs, int x, int y, int w, int h)
  
  static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, int w, int h)
  {
@@ -265,7 +264,7 @@ diff --git a/vnc.c b/vnc.c
      /* send bitblit op to the vnc client */
      vnc_write_u8(vs, 0);  /* msg id */
      vnc_write_u8(vs, 0);
-@@ -660,113 +653,110 @@ static void vnc_copy(VncState *vs, int s
+@@ -660,113 +653,110 @@ static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, i
      vnc_write_u16(vs, src_x);
      vnc_write_u16(vs, src_y);
      vnc_flush(vs);
@@ -440,7 +439,7 @@ diff --git a/vnc.c b/vnc.c
          if (!has_dirty && !vs->audio_cap && !vs->force_update)
  	    return;
  
-@@ -782,18 +772,18 @@ static void vnc_update_client(VncState *
+@@ -782,18 +772,18 @@ static void vnc_update_client(VncState *vs)
  	saved_offset = vs->output.offset;
  	vnc_write_u16(vs, 0);
  
@@ -464,7 +463,7 @@ diff --git a/vnc.c b/vnc.c
  			send_framebuffer_update(vs, last_x * 16, y, (x - last_x) * 16, h);
  			n_rectangles++;
  		    }
-@@ -801,7 +791,7 @@ static void vnc_update_client(VncState *
+@@ -801,7 +791,7 @@ static void vnc_update_client(VncState *vs)
  		}
  	    }
  	    if (last_x != -1) {
@@ -473,7 +472,7 @@ diff --git a/vnc.c b/vnc.c
  		send_framebuffer_update(vs, last_x * 16, y, (x - last_x) * 16, h);
  		n_rectangles++;
  	    }
-@@ -1097,9 +1087,6 @@ static void vnc_disconnect_finish(VncSta
+@@ -1097,9 +1087,6 @@ static void vnc_disconnect_finish(VncState *vs)
      if (!vs->vd->clients)
          dcl->idle = 1;
  
@@ -483,7 +482,7 @@ diff --git a/vnc.c b/vnc.c
      qemu_free(vs);
      vnc_remove_timer(vs->vd);
  }
-@@ -1361,9 +1348,7 @@ static void framebuffer_update_request(V
+@@ -1361,9 +1348,7 @@ static void framebuffer_update_request(VncState *vs, int incremental,
      if (!incremental) {
          vs->force_update = 1;
  	for (i = 0; i < h; i++) {
@@ -494,7 +493,7 @@ diff --git a/vnc.c b/vnc.c
                      (ds_get_width(vs->ds) / 16), VNC_DIRTY_WORDS);
  	}
      }
-@@ -1492,7 +1477,7 @@ static void set_pixel_format(VncState *v
+@@ -1492,7 +1477,7 @@ static void set_pixel_format(VncState *vs,
          return;
      }
  
@@ -503,7 +502,7 @@ diff --git a/vnc.c b/vnc.c
      vs->clientds.pf.rmax = red_max;
      count_bits(vs->clientds.pf.rbits, red_max);
      vs->clientds.pf.rshift = red_shift;
-@@ -2317,15 +2302,69 @@ static int protocol_version(VncState *vs
+@@ -2317,15 +2302,69 @@ static int protocol_version(VncState *vs, uint8_t *version, size_t len)
      return 0;
  }
  
@@ -575,7 +574,7 @@ diff --git a/vnc.c b/vnc.c
          vs = vs->next;
      }
  
-@@ -2336,7 +2375,7 @@ static void vnc_init_timer(VncDisplay *v
+@@ -2336,7 +2375,7 @@ static void vnc_init_timer(VncDisplay *vd)
  {
      if (vd->timer == NULL && vd->clients != NULL) {
          vd->timer = qemu_new_timer(rt_clock, vnc_refresh, vd);
@@ -584,7 +583,7 @@ diff --git a/vnc.c b/vnc.c
      }
  }
  
-@@ -2369,17 +2408,18 @@ static void vnc_connect(VncDisplay *vd, 
+@@ -2369,17 +2408,18 @@ static void vnc_connect(VncDisplay *vd, int csock)
      vs->as.fmt = AUD_FMT_S16;
      vs->as.endianness = 0;
  
@@ -601,17 +600,18 @@ diff --git a/vnc.c b/vnc.c
  
 -    vs->next = vd->clients;
 -    vd->clients = vs;
-+    vnc_init_timer(vd);
- 
--    vnc_init_timer(vd);
+-
+     vnc_init_timer(vd);
 -    vnc_update_client(vs);
++
      /* vs might be free()ed here */
  }
  
 diff --git a/vnchextile.h b/vnchextile.h
+index f5b6fcb..c96ede3 100644
 --- a/vnchextile.h
 +++ b/vnchextile.h
-@@ -13,7 +13,8 @@ static void CONCAT(send_hextile_tile_, N
+@@ -13,7 +13,8 @@ static void CONCAT(send_hextile_tile_, NAME)(VncState *vs,
                                               void *last_fg_,
                                               int *has_bg, int *has_fg)
  {

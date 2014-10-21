@@ -1,8 +1,9 @@
 CA-32958: Move location of disable_pf key to allow for easy setting by XAPI
-diff -r d86f4b277b10 xenstore.c
---- a/xenstore.c	Fri Mar 19 12:42:35 2010 +0000
-+++ b/xenstore.c	Fri Mar 19 14:18:09 2010 +0000
-@@ -818,7 +818,7 @@
+diff --git a/xenstore.c b/xenstore.c
+index 3038c11..c8fde32 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -910,7 +910,7 @@ int xenstore_parse_disable_pf_config ()
      int disable_pf = 0;
      unsigned int len;
  

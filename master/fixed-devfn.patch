@@ -21,10 +21,10 @@ index 807e26c..235fc16 100644
      pci_config_set_vendor_id(pci_conf, PCI_VENDOR_ID_CIRRUS);
      pci_config_set_device_id(pci_conf, device_id);
 diff --git a/hw/pc.c b/hw/pc.c
-index 721baae..1b4bc8e 100644
+index 86f701a..6ceed35 100644
 --- a/hw/pc.c
 +++ b/hw/pc.c
-@@ -993,7 +993,7 @@ vga_bios_error:
+@@ -992,7 +992,7 @@ vga_bios_error:
  
      if (cirrus_vga_enabled) {
          if (pci_enabled) {
@@ -33,7 +33,7 @@ index 721baae..1b4bc8e 100644
                                  phys_ram_base + vga_ram_addr,
                                  vga_ram_addr, vga_ram_size);
          } else {
-@@ -1003,14 +1003,16 @@ vga_bios_error:
+@@ -1002,14 +1002,16 @@ vga_bios_error:
  #ifndef CONFIG_DM
      } else if (vmsvga_enabled) {
          if (pci_enabled)
@@ -52,7 +52,7 @@ index 721baae..1b4bc8e 100644
                           vga_ram_addr, vga_ram_size, 0, 0);
          } else {
              isa_vga_init(phys_ram_base + vga_ram_addr,
-@@ -1058,7 +1060,7 @@ vga_bios_error:
+@@ -1057,7 +1059,7 @@ vga_bios_error:
      if (pci_enabled) {
          disable_pf = xenstore_parse_disable_pf_config();
          if (disable_pf != 1) {
@@ -84,10 +84,10 @@ index f4746c2..39466e2 100644
  void isa_cirrus_vga_init(uint8_t *vga_ram_base,
                           ram_addr_t vga_ram_offset, int vga_ram_size);
 diff --git a/hw/vga.c b/hw/vga.c
-index fed2c54..3c5fef7 100644
+index e82a1df..efe444c 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
-@@ -2690,7 +2690,7 @@ static void pci_vga_write_config(PCIDevice *d,
+@@ -2689,7 +2689,7 @@ static void pci_vga_write_config(PCIDevice *d,
      vga_dirty_log_start(s);
  }
  
@@ -96,7 +96,7 @@ index fed2c54..3c5fef7 100644
                   unsigned long vga_ram_offset, int vga_ram_size,
                   unsigned long vga_bios_offset, int vga_bios_size)
  {
-@@ -2700,7 +2700,7 @@ int pci_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
+@@ -2699,7 +2699,7 @@ int pci_vga_init(PCIBus *bus, uint8_t *vga_ram_base,
  
      d = (PCIVGAState *)pci_register_device(bus, "VGA",
                                             sizeof(PCIVGAState),

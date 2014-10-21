@@ -1,10 +1,11 @@
 # HG changeset patch
 # Parent 3940be5a37e8d36567384e9eb19a40446edbf4d1
 
-diff -r 3940be5a37e8 i386-dm/helper2.c
---- a/i386-dm/helper2.c	Tue May 29 08:28:32 2012 +0100
-+++ b/i386-dm/helper2.c	Tue May 29 13:57:42 2012 +0100
-@@ -602,6 +602,11 @@ int main_loop(void)
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index fa86daa..2f3bb54 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
+@@ -638,6 +638,11 @@ int main_loop(void)
              FD_SET(xenstore_fd(), &fds);
              if (select(xenstore_fd() + 1, &fds, NULL, NULL, NULL) > 0)
                  xenstore_process_event(NULL);

@@ -1,7 +1,8 @@
-diff -r 024314e6110f xenstore.c
---- a/xenstore.c	Tue Nov 30 10:29:24 2010 +0000
-+++ b/xenstore.c	Tue Nov 30 10:30:17 2010 +0000
-@@ -132,7 +132,7 @@ static void insert_media(void *opaque)
+diff --git a/xenstore.c b/xenstore.c
+index 6de0c00..08f502b 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -133,7 +133,7 @@ static void insert_media(void *opaque)
              else 
                  format = &bdrv_raw;
  

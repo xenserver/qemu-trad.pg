@@ -1,7 +1,8 @@
-diff -r 0b03e36f7b34 qemu-xen.h
---- a/qemu-xen.h	Mon Jun 15 16:45:09 2009 +0100
-+++ b/qemu-xen.h	Mon Jun 15 16:45:41 2009 +0100
-@@ -72,6 +72,8 @@
+diff --git a/qemu-xen.h b/qemu-xen.h
+index a4ac6a4..de9063d 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -74,6 +74,8 @@ void xenstore_check_new_media_present(int timeout);
  void xenstore_write_vncport(int vnc_display);
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen);
  void xenstore_write_vslots(char *vslots);
@@ -10,10 +11,11 @@ diff -r 0b03e36f7b34 qemu-xen.h
  
  int xenstore_domain_has_devtype_danger(struct xs_handle *handle,
                                  const char *devtype);
-diff -r 0b03e36f7b34 vl.c
---- a/vl.c	Mon Jun 15 16:45:09 2009 +0100
-+++ b/vl.c	Mon Jun 15 16:45:41 2009 +0100
-@@ -5910,8 +5910,10 @@
+diff --git a/vl.c b/vl.c
+index 8c923b1..502c185 100644
+--- a/vl.c
++++ b/vl.c
+@@ -6052,8 +6052,10 @@ int main(int argc, char **argv, char **envp)
      text_consoles_set_display(display_state);
      qemu_chr_initial_reset();
  
@@ -25,10 +27,11 @@ diff -r 0b03e36f7b34 vl.c
  
      for(i = 0; i < MAX_SERIAL_PORTS; i++) {
          const char *devname = serial_devices[i];
-diff -r 0b03e36f7b34 xenstore.c
---- a/xenstore.c	Mon Jun 15 16:45:09 2009 +0100
-+++ b/xenstore.c	Mon Jun 15 16:45:41 2009 +0100
-@@ -1378,7 +1378,7 @@
+diff --git a/xenstore.c b/xenstore.c
+index c242dc0..6de0c00 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -1581,7 +1581,7 @@ int xenstore_refresh_battery_status(void)
   * The entry is <domain-path><storeString>/tty and the value is the name
   * of the pty associated with the device.
   */

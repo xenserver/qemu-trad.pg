@@ -35,10 +35,10 @@ index e9628d4..6547a6e 100644
   * halted due to rate limiting or EAGAIN errors occur as it can be used to
   * resume output. */
 diff --git a/hw/ide.c b/hw/ide.c
-index 791666b..97372e3 100644
+index 2c61dfd..12e27da 100644
 --- a/hw/ide.c
 +++ b/hw/ide.c
-@@ -3764,6 +3764,7 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn,
+@@ -3840,6 +3840,7 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn,
              hd_table[i]->private = &d->dev;
  
      register_savevm("ide", 0, 3, pci_ide_save, pci_ide_load, d);

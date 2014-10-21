@@ -8,10 +8,11 @@ non address parts of the BAR.
 This patch adds masking of the non address parts of the BAR before comparing
 the address to 0.
 
-diff -r b9ec8b883cdd hw/pass-through.c
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index 4821182..db3d7ed 100644
 --- a/hw/pass-through.c
 +++ b/hw/pass-through.c
-@@ -2175,7 +2175,7 @@ static void pt_bar_mapping_one(struct pt
+@@ -2208,7 +2208,7 @@ static void pt_bar_mapping_one(struct pt_dev *ptdev, int bar, int io_enable,
      }
  
      /* prevent guest software mapping memory resource to 00000000h */

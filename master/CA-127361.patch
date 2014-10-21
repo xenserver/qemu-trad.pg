@@ -1,8 +1,8 @@
 diff --git a/xenstore.c b/xenstore.c
-index 8320026..c62b77a 100644
+index 83daa19..47358bb 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -330,13 +330,14 @@ static void xenstore_get_backend_path(char **backend, const char *devtype,
+@@ -343,13 +343,14 @@ static void xenstore_get_backend_path(char **backend, const char *devtype,
      backend_dompath = xs_get_domain_path(xsh, domid_backend);
      if (!backend_dompath) goto out;
      

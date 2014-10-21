@@ -1,7 +1,8 @@
-diff -r 7cd247ec06e1 console.h
---- a/console.h	Fri Nov 19 16:44:39 2010 +0000
-+++ b/console.h	Fri Nov 19 16:45:08 2010 +0000
-@@ -305,6 +305,8 @@ void qemu_console_copy(DisplayState *ds,
+diff --git a/console.h b/console.h
+index 89096da..c26eeaa 100644
+--- a/console.h
++++ b/console.h
+@@ -305,6 +305,8 @@ void qemu_console_copy(DisplayState *ds, int src_x, int src_y,
  /* sdl.c */
  void sdl_display_init(DisplayState *ds, int full_screen, int no_frame, int opengl_enabled);
  extern int grab_disabled;
@@ -10,9 +11,10 @@ diff -r 7cd247ec06e1 console.h
  
  /* cocoa.m */
  void cocoa_display_init(DisplayState *ds, int full_screen);
-diff -r 7cd247ec06e1 sdl.c
---- a/sdl.c	Fri Nov 19 16:44:39 2010 +0000
-+++ b/sdl.c	Fri Nov 19 16:45:08 2010 +0000
+diff --git a/sdl.c b/sdl.c
+index 823d1c0..c4ed655 100644
+--- a/sdl.c
++++ b/sdl.c
 @@ -61,6 +61,8 @@ int mouse_active = SDL_ENABLE;
  static uint8_t allocator;
  static SDL_PixelFormat host_format;
@@ -22,7 +24,7 @@ diff -r 7cd247ec06e1 sdl.c
  
  #ifdef CONFIG_OPENGL
  static GLint tex_format;
-@@ -941,4 +943,11 @@ void sdl_display_init(DisplayState *ds, 
+@@ -941,4 +943,11 @@ void sdl_display_init(DisplayState *ds, int full_screen, int no_frame, int openg
              sdl_grab_start();
          }
      }
@@ -34,10 +36,11 @@ diff -r 7cd247ec06e1 sdl.c
 +        scaling_active = 1;
 +    }
  }
-diff -r 7cd247ec06e1 vl.c
---- a/vl.c	Fri Nov 19 16:44:39 2010 +0000
-+++ b/vl.c	Fri Nov 19 16:45:08 2010 +0000
-@@ -4246,6 +4246,7 @@ enum {
+diff --git a/vl.c b/vl.c
+index 804e69a..fce7236 100644
+--- a/vl.c
++++ b/vl.c
+@@ -4259,6 +4259,7 @@ enum {
      QEMU_OPTION_no_quit,
      QEMU_OPTION_sdl,
      QEMU_OPTION_nograb,
@@ -45,7 +48,7 @@ diff -r 7cd247ec06e1 vl.c
      QEMU_OPTION_portrait,
      QEMU_OPTION_vga,
      QEMU_OPTION_full_screen,
-@@ -4375,6 +4376,7 @@ static const QEMUOption qemu_options[] =
+@@ -4388,6 +4389,7 @@ static const QEMUOption qemu_options[] = {
      { "no-quit", 0, QEMU_OPTION_no_quit },
      { "sdl", 0, QEMU_OPTION_sdl },
      { "nograb", 0, QEMU_OPTION_nograb },
@@ -53,7 +56,7 @@ diff -r 7cd247ec06e1 vl.c
  #endif
      { "portrait", 0, QEMU_OPTION_portrait },
      { "vga", HAS_ARG, QEMU_OPTION_vga },
-@@ -5352,6 +5354,28 @@ int main(int argc, char **argv, char **e
+@@ -5370,6 +5372,28 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_nograb:
                  grab_disabled = 1;
                  break;

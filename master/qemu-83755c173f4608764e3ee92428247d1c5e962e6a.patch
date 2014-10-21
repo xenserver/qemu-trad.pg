@@ -1,6 +1,7 @@
-diff -r df46d1a8fe6e vnc.c
---- a/vnc.c	Fri Nov 19 17:02:40 2010 +0000
-+++ b/vnc.c	Fri Nov 19 17:02:47 2010 +0000
+diff --git a/vnc.c b/vnc.c
+index d550502..f83969b 100644
+--- a/vnc.c
++++ b/vnc.c
 @@ -2387,6 +2387,10 @@ static void vnc_refresh(void *opaque)
          /* vs might be free()ed here */
          vs = vn;

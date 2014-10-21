@@ -282,10 +282,10 @@ index 0000000..ae563b3
 +    atexit(tidy_up);
 +}
 diff --git a/hw/pc.c b/hw/pc.c
-index 3e33694..e57fbd0 100644
+index 7359338..6e7ae87 100644
 --- a/hw/pc.c
 +++ b/hw/pc.c
-@@ -1201,6 +1201,8 @@ vga_bios_error:
+@@ -1191,6 +1191,8 @@ vga_bios_error:
          }
      }
  #endif
@@ -309,7 +309,7 @@ index b2ba188..d0c90af 100644
 +
  #endif /*QEMU_XEN_H*/
 diff --git a/vl.c b/vl.c
-index 66b961a..73773f8 100644
+index 1bd79e2..a6abda8 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -59,6 +59,7 @@
@@ -320,7 +320,7 @@ index 66b961a..73773f8 100644
  
  #ifndef _WIN32
  #include <pwd.h>
-@@ -4331,6 +4332,8 @@ enum {
+@@ -4330,6 +4331,8 @@ enum {
      QEMU_OPTION_incoming,
      QEMU_OPTION_chroot,
      QEMU_OPTION_runas,
@@ -329,7 +329,7 @@ index 66b961a..73773f8 100644
  };
  
  typedef struct QEMUOption {
-@@ -4482,6 +4485,8 @@ static const QEMUOption qemu_options[] = {
+@@ -4481,6 +4484,8 @@ static const QEMUOption qemu_options[] = {
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
      { "runas", HAS_ARG, QEMU_OPTION_runas },
@@ -338,7 +338,7 @@ index 66b961a..73773f8 100644
      { NULL },
  };
  
-@@ -4836,7 +4841,8 @@ int main(int argc, char **argv, char **envp)
+@@ -4835,7 +4840,8 @@ int main(int argc, char **argv, char **envp)
      struct passwd *pwd = NULL;
      const char *chroot_dir = NULL;
      const char *run_as = NULL;
@@ -348,7 +348,7 @@ index 66b961a..73773f8 100644
      qemu_cache_utils_init(envp);
      logfile = stderr; /* initial value */
  
-@@ -5596,6 +5602,12 @@ int main(int argc, char **argv, char **envp)
+@@ -5595,6 +5601,12 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_gfx_passthru:
                  select_vgahw("passthrough");
                  break;
@@ -361,7 +361,7 @@ index 66b961a..73773f8 100644
              }
          }
      }
-@@ -5872,6 +5884,15 @@ int main(int argc, char **argv, char **envp)
+@@ -5871,6 +5883,15 @@ int main(int argc, char **argv, char **envp)
      register_savevm("timer", 0, 2, timer_save, timer_load, NULL);
      register_savevm_live("ram", 0, 3, ram_save_live, NULL, ram_load, NULL);
  

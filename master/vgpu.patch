@@ -12,10 +12,10 @@ index 3c3db2b..8052bfe 100644
  OBJS+= cirrus_vga.o apic.o parallel.o acpi.o piix_pci.o
  OBJS+= usb-uhci.o vmmouse.o vmport.o vmware_vga.o hpet.o
 diff --git a/hw/pc.c b/hw/pc.c
-index 14747d7..721baae 100644
+index 05edc1b..86f701a 100644
 --- a/hw/pc.c
 +++ b/hw/pc.c
-@@ -1016,6 +1016,8 @@ vga_bios_error:
+@@ -1015,6 +1015,8 @@ vga_bios_error:
              isa_vga_init(phys_ram_base + vga_ram_addr,
                           vga_ram_addr, vga_ram_size);
          }
@@ -186,7 +186,7 @@ index 0000000..6a27504
 +    s->server.sin_port = htons(s->shared->port);
 +}
 diff --git a/sysemu.h b/sysemu.h
-index 9cbde66..de2deba 100644
+index 6070dfe..45eeb10 100644
 --- a/sysemu.h
 +++ b/sysemu.h
 @@ -87,6 +87,7 @@ extern int bios_size;
@@ -198,7 +198,7 @@ index 9cbde66..de2deba 100644
  extern int graphic_width;
  extern int graphic_height;
 diff --git a/vl.c b/vl.c
-index 6a4513b..adb7571 100644
+index a68218f..1047e9a 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -217,6 +217,7 @@ static int rtc_date_offset = -1; /* -1 means no change */
@@ -209,7 +209,7 @@ index 6a4513b..adb7571 100644
  int gfx_passthru = 0;
  #ifdef TARGET_SPARC
  int graphic_width = 1024;
-@@ -4088,7 +4089,7 @@ static void help(int exitcode)
+@@ -4087,7 +4088,7 @@ static void help(int exitcode)
             "-disable-opengl disable OpenGL rendering, using SDL"
  #endif
             "-portrait       rotate graphical output 90 deg left (only PXA LCD)\n"
@@ -218,7 +218,7 @@ index 6a4513b..adb7571 100644
             "                select video card type\n"
             "-full-screen    start in full screen\n"
  #if defined(TARGET_PPC) || defined(TARGET_SPARC)
-@@ -4227,6 +4228,7 @@ static void help(int exitcode)
+@@ -4226,6 +4227,7 @@ static void help(int exitcode)
             "-pciemulation       name:vendorid:deviceid:command:status:revision:classcode:headertype:subvendorid:subsystemid:interruputline:interruputpin\n"
             "-vncunused      bind the VNC server to an unused port\n"
             "-std-vga        alias for -vga std\n"
@@ -226,7 +226,7 @@ index 6a4513b..adb7571 100644
  	   "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -4323,6 +4325,7 @@ enum {
+@@ -4322,6 +4324,7 @@ enum {
      QEMU_OPTION_vnclisten,
      QEMU_OPTION_videoram,
      QEMU_OPTION_std_vga,
@@ -234,7 +234,7 @@ index 6a4513b..adb7571 100644
      QEMU_OPTION_domid,
      QEMU_OPTION_domainname,
      QEMU_OPTION_acpi,
-@@ -4493,6 +4496,7 @@ static const QEMUOption qemu_options[] = {
+@@ -4492,6 +4495,7 @@ static const QEMUOption qemu_options[] = {
  
      /* Xen tree options: */
      { "std-vga", 0, QEMU_OPTION_std_vga },
@@ -242,7 +242,7 @@ index 6a4513b..adb7571 100644
      { "videoram", HAS_ARG, QEMU_OPTION_videoram },
      { "d", HAS_ARG, QEMU_OPTION_domid }, /* deprecated; for xend compatibility */
      { "domid", HAS_ARG, QEMU_OPTION_domid },
-@@ -4673,23 +4677,33 @@ static void select_vgahw (const char *p)
+@@ -4672,23 +4676,33 @@ static void select_vgahw (const char *p)
          std_vga_enabled = 1;
          cirrus_vga_enabled = 0;
          vmsvga_enabled = 0;
@@ -276,7 +276,7 @@ index 6a4513b..adb7571 100644
      } else {
      invalid_vga:
          fprintf(stderr, "Unknown vga type: %s\n", p);
-@@ -5451,6 +5465,9 @@ geometry_error:
+@@ -5449,6 +5463,9 @@ geometry_error:
              case QEMU_OPTION_std_vga:
                  select_vgahw("std");
                  break;

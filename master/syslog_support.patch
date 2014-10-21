@@ -421,7 +421,7 @@ index 0000000..fc8104d
 +}
 +
 diff --git a/vl.c b/vl.c
-index b7a0cd0..8738e73 100644
+index 1047e9a..596298e 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -123,6 +123,10 @@
@@ -435,7 +435,7 @@ index b7a0cd0..8738e73 100644
  #include "qemu_socket.h"
  
  #if defined(CONFIG_SLIRP)
-@@ -4368,6 +4372,9 @@ enum {
+@@ -4367,6 +4371,9 @@ enum {
      QEMU_OPTION_runas,
      QEMU_OPTION_crashdump_dir,
      QEMU_OPTION_crashdump_quota,
@@ -445,7 +445,7 @@ index b7a0cd0..8738e73 100644
  };
  
  typedef struct QEMUOption {
-@@ -4376,6 +4383,10 @@ typedef struct QEMUOption {
+@@ -4375,6 +4382,10 @@ typedef struct QEMUOption {
      int index;
  } QEMUOption;
  
@@ -456,7 +456,7 @@ index b7a0cd0..8738e73 100644
  static const QEMUOption qemu_options[] = {
      /* Please keep in synch with help, QEMU_OPTION_ enums, and
         qemu-doc.texi */
-@@ -4525,6 +4536,9 @@ static const QEMUOption qemu_options[] = {
+@@ -4524,6 +4535,9 @@ static const QEMUOption qemu_options[] = {
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
@@ -466,7 +466,7 @@ index b7a0cd0..8738e73 100644
      { NULL },
  };
  
-@@ -4890,9 +4904,37 @@ int main(int argc, char **argv, char **envp)
+@@ -4889,9 +4903,37 @@ int main(int argc, char **argv, char **envp)
      const char *run_as = NULL;
      char *crashdump_dir = NULL;
      long long crashdump_quota = 0;

@@ -1,7 +1,8 @@
-diff -r 2be10a4b1803 console.h
---- a/console.h	Tue Nov 30 13:36:24 2010 +0000
-+++ b/console.h	Tue Nov 30 13:36:49 2010 +0000
-@@ -317,6 +317,7 @@ void vnc_display_close(DisplayState *ds)
+diff --git a/console.h b/console.h
+index c26eeaa..7cf2242 100644
+--- a/console.h
++++ b/console.h
+@@ -317,6 +317,7 @@ void vnc_display_close(DisplayState *ds);
  int vnc_display_open(DisplayState *ds, const char *display);
  int vnc_display_password(DisplayState *ds, const char *password);
  void do_info_vnc(void);
@@ -9,9 +10,10 @@ diff -r 2be10a4b1803 console.h
  
  /* curses.c */
  void curses_display_init(DisplayState *ds, int full_screen);
-diff -r 2be10a4b1803 sysemu.h
---- a/sysemu.h	Tue Nov 30 13:36:24 2010 +0000
-+++ b/sysemu.h	Tue Nov 30 13:36:49 2010 +0000
+diff --git a/sysemu.h b/sysemu.h
+index 1edfb9a..fcc75b1 100644
+--- a/sysemu.h
++++ b/sysemu.h
 @@ -90,7 +90,7 @@ extern int graphic_width;
  extern int graphic_height;
  extern int graphic_depth;
@@ -21,10 +23,11 @@ diff -r 2be10a4b1803 sysemu.h
  extern int win2k_install_hack;
  extern int rtc_td_hack;
  extern int alt_grab;
-diff -r 2be10a4b1803 vl.c
---- a/vl.c	Tue Nov 30 13:36:24 2010 +0000
-+++ b/vl.c	Tue Nov 30 13:36:49 2010 +0000
-@@ -204,7 +204,7 @@ static DisplayState *display_state;
+diff --git a/vl.c b/vl.c
+index 61b87d5..b8ea400 100644
+--- a/vl.c
++++ b/vl.c
+@@ -205,7 +205,7 @@ static DisplayState *display_state;
  int nographic;
  static int curses;
  static int sdl;
@@ -33,7 +36,7 @@ diff -r 2be10a4b1803 vl.c
  int64_t ticks_per_sec;
  ram_addr_t ram_size;
  int nb_nics;
-@@ -5261,7 +5261,7 @@ int main(int argc, char **argv, char **e
+@@ -5279,7 +5279,7 @@ int main(int argc, char **argv, char **envp)
                  autostart = 0;
                  break;
  	    case QEMU_OPTION_k:
@@ -42,10 +45,11 @@ diff -r 2be10a4b1803 vl.c
  		break;
              case QEMU_OPTION_localtime:
                  rtc_utc = 0;
-diff -r 2be10a4b1803 vnc.c
---- a/vnc.c	Tue Nov 30 13:36:24 2010 +0000
-+++ b/vnc.c	Tue Nov 30 13:36:49 2010 +0000
-@@ -2472,6 +2472,28 @@ static void vnc_listen_read(void *opaque
+diff --git a/vnc.c b/vnc.c
+index f83969b..f4f263a 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -2472,6 +2472,28 @@ static void vnc_listen_read(void *opaque)
      }
  }
  
@@ -74,11 +78,11 @@ diff -r 2be10a4b1803 vnc.c
  void vnc_display_init(DisplayState *ds)
  {
      VncDisplay *vs = qemu_mallocz(sizeof(*vs));
-diff -r 2be10a4b1803 xenstore.c
---- a/xenstore.c	Tue Nov 30 13:36:24 2010 +0000
-+++ b/xenstore.c	Tue Nov 30 13:36:49 2010 +0000
-@@ -22,12 +22,17 @@
- #include "pci.h"
+diff --git a/xenstore.c b/xenstore.c
+index 42daefe..00ecb2b 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -23,11 +23,16 @@
  #include "qemu-timer.h"
  #include "qemu-xen.h"
  #include "xen_backend.h"
@@ -95,7 +99,7 @@ diff -r 2be10a4b1803 xenstore.c
  
  int xenstore_find_device(BlockDriverState *bs)
  {
-@@ -444,6 +449,8 @@ void xenstore_parse_domain_config(int hv
+@@ -495,6 +500,8 @@ void xenstore_parse_domain_config(int hvm_domid)
      unsigned int len, num, hd_index, pci_devid = 0;
      BlockDriverState *bs;
      BlockDriver *format;
@@ -104,7 +108,7 @@ diff -r 2be10a4b1803 xenstore.c
  
      /* Read-only handling for image files */
      char *mode = NULL;
-@@ -499,6 +506,21 @@ void xenstore_parse_domain_config(int hv
+@@ -534,6 +541,21 @@ void xenstore_parse_domain_config(int hvm_domid)
          goto out;
      }
  
@@ -126,7 +130,7 @@ diff -r 2be10a4b1803 xenstore.c
      if (pasprintf(&danger_buf, "%s/device/vbd", danger_path) == -1)
          goto out;
  
-@@ -810,6 +832,8 @@ void xenstore_parse_domain_config(int hv
+@@ -842,6 +864,8 @@ void xenstore_parse_domain_config(int hvm_domid)
      free(danger_buf);
      free(danger_path);
      free(e_danger);
@@ -135,7 +139,7 @@ diff -r 2be10a4b1803 xenstore.c
      free(drv);
      return;
  }
-@@ -1059,6 +1083,14 @@ void xenstore_process_event(void *opaque
+@@ -1278,6 +1302,14 @@ void xenstore_process_event(void *opaque)
          goto out;
      }
  

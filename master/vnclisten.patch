@@ -1,7 +1,8 @@
-diff -r 451474b29b14 vl.c
---- a/vl.c	Tue Nov 30 14:26:04 2010 +0000
-+++ b/vl.c	Tue Nov 30 14:26:13 2010 +0000
-@@ -4287,6 +4287,7 @@ enum {
+diff --git a/vl.c b/vl.c
+index b8ea400..095c7bf 100644
+--- a/vl.c
++++ b/vl.c
+@@ -4300,6 +4300,7 @@ enum {
      QEMU_OPTION_gfx_passthru,
      QEMU_OPTION_pci_emulation,
      QEMU_OPTION_vncunused,
@@ -9,7 +10,7 @@ diff -r 451474b29b14 vl.c
      QEMU_OPTION_videoram,
      QEMU_OPTION_std_vga,
      QEMU_OPTION_domid,
-@@ -4471,6 +4472,7 @@ static const QEMUOption qemu_options[] =
+@@ -4482,6 +4483,7 @@ static const QEMUOption qemu_options[] = {
      { "gfx_passthru", 0, QEMU_OPTION_gfx_passthru},
      { "pciemulation", HAS_ARG, QEMU_OPTION_pci_emulation },
      { "vncunused", 0, QEMU_OPTION_vncunused },
@@ -17,7 +18,7 @@ diff -r 451474b29b14 vl.c
      { "vcpus", HAS_ARG, QEMU_OPTION_vcpus },
      { "vcpu_avail", HAS_ARG, QEMU_OPTION_vcpu_avail },
  #if defined(CONFIG_XEN) && !defined(CONFIG_DM)
-@@ -5494,6 +5496,7 @@ geometry_error:
+@@ -5512,6 +5514,7 @@ geometry_error:
                      exit(1);
                  }
                  break;

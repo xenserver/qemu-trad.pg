@@ -1,7 +1,8 @@
-diff -r 58ec7bb071a5 qemu-char.c
---- a/qemu-char.c	Tue Jan 15 15:55:13 2013 +0000
-+++ b/qemu-char.c	Tue Jan 15 15:56:57 2013 +0000
-@@ -588,7 +588,7 @@ static CharDriverState *qemu_chr_open_fi
+diff --git a/qemu-char.c b/qemu-char.c
+index 324ed16..6acaa8c 100644
+--- a/qemu-char.c
++++ b/qemu-char.c
+@@ -588,7 +588,7 @@ static CharDriverState *qemu_chr_open_file_out(const char *file_out)
  {
      int fd_out;
  
@@ -10,10 +11,11 @@ diff -r 58ec7bb071a5 qemu-char.c
      if (fd_out < 0)
          return NULL;
      return qemu_chr_open_fd(-1, fd_out);
-diff -r 58ec7bb071a5 sysemu.h
---- a/sysemu.h	Tue Jan 15 15:55:13 2013 +0000
-+++ b/sysemu.h	Tue Jan 15 15:56:57 2013 +0000
-@@ -196,6 +196,7 @@ void pci_device_hot_remove_success(int p
+diff --git a/sysemu.h b/sysemu.h
+index 968258a..1edfb9a 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -198,6 +198,7 @@ void pci_device_hot_remove_success(int pcibus, int slot);
  #define MAX_SERIAL_PORTS 4
  
  extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
@@ -21,9 +23,10 @@ diff -r 58ec7bb071a5 sysemu.h
  
  /* parallel ports */
  
-diff -r 58ec7bb071a5 vl.c
---- a/vl.c	Tue Jan 15 15:55:13 2013 +0000
-+++ b/vl.c	Tue Jan 15 15:56:57 2013 +0000
+diff --git a/vl.c b/vl.c
+index a6abda8..fc98e9f 100644
+--- a/vl.c
++++ b/vl.c
 @@ -233,6 +233,7 @@ static int no_frame = 0;
  #endif
  int no_quit = 0;
@@ -32,7 +35,7 @@ diff -r 58ec7bb071a5 vl.c
  CharDriverState *parallel_hds[MAX_PARALLEL_PORTS];
  CharDriverState *virtcon_hds[MAX_VIRTIO_CONSOLES];
  #ifdef TARGET_I386
-@@ -4812,7 +4813,6 @@ int main(int argc, char **argv, char **e
+@@ -4821,7 +4822,6 @@ int main(int argc, char **argv, char **envp)
      const char *r, *optarg;
      CharDriverState *monitor_hd = NULL;
      const char *monitor_device;
@@ -40,7 +43,7 @@ diff -r 58ec7bb071a5 vl.c
      int serial_device_index;
      const char *parallel_devices[MAX_PARALLEL_PORTS];
      int parallel_device_index;
-@@ -5962,7 +5962,7 @@ int main(int argc, char **argv, char **e
+@@ -5969,7 +5969,7 @@ int main(int argc, char **argv, char **envp)
              if (!virtcon_hds[i]) {
                  fprintf(stderr, "qemu: could not open virtio console '%s'\n",
                          devname);
@@ -49,10 +52,11 @@ diff -r 58ec7bb071a5 vl.c
              }
          }
      }
-diff -r 58ec7bb071a5 xenstore.c
---- a/xenstore.c	Tue Jan 15 15:55:13 2013 +0000
-+++ b/xenstore.c	Tue Jan 15 15:56:57 2013 +0000
-@@ -488,6 +488,8 @@ void xenstore_parse_domain_config(int hv
+diff --git a/xenstore.c b/xenstore.c
+index 8661135..0f59e23 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -489,6 +489,8 @@ void xenstore_parse_domain_config(int hvm_domid)
      char *buf = NULL;
      char *fpath = NULL, *bpath = NULL,
          *dev = NULL, *params = NULL, *drv = NULL;

@@ -142,7 +142,7 @@ index 80beb31..ca781bb 100644
          snprintf(con->console, sizeof(con->console), "%s/console", dom);
      else
 diff --git a/hw/xen_platform.c b/hw/xen_platform.c
-index a095804..6265d4f 100644
+index 71a5ad6..30f3544 100644
 --- a/hw/xen_platform.c
 +++ b/hw/xen_platform.c
 @@ -65,7 +65,7 @@ set_platform_flags(uint8_t flags)
@@ -155,10 +155,10 @@ index a095804..6265d4f 100644
      int len;
      char *throttling = xenstore_dom_read(domid, "log-throttling", &len);
 diff --git a/qemu-xen.h b/qemu-xen.h
-index 7891419..ee11bfa 100644
+index 754d424..a8d0e50 100644
 --- a/qemu-xen.h
 +++ b/qemu-xen.h
-@@ -67,8 +67,10 @@ void xenstore_init(void);
+@@ -68,8 +68,10 @@ void xenstore_init(void);
  uint32_t xenstore_read_target(void);
  void xenstore_parse_domain_config(int domid);
  int xenstore_parse_disable_pf_config(void);
@@ -167,9 +167,9 @@ index 7891419..ee11bfa 100644
  int xenstore_fd(void);
 +struct xs_handle *xenstore_get(void);
  void xenstore_process_event(void *opaque);
+ void xenstore_record_dm(const char *subpath, const char *state);
  void xenstore_record_dm_state(const char *state);
- void xenstore_check_new_media_present(int timeout);
-@@ -97,7 +99,7 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
+@@ -100,7 +102,7 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
                                               const char *inst,
                                               const char *token);
  
@@ -179,18 +179,10 @@ index 7891419..ee11bfa 100644
  
  char *xenstore_dom_read(int domid, const char *key, unsigned int *len);
 diff --git a/xenstore.c b/xenstore.c
-index c08f052..def04ec 100644
+index c8fde32..83daa19 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -25,6 +25,7 @@
- #include "privsep.h"
- #include "qemu-xen.h"
- #include "console.h"
-+#include "xen_backend.h"
- 
- /* The token used to identify the keymap watch. */
- #define KEYMAP_TOKEN "keymap"
-@@ -35,7 +36,7 @@
+@@ -34,7 +34,7 @@
  /* The token used to identify the report_clipboard watch. */
  #define REPORT_CLIPBOARD_TOKEN "report_clipboard"
  
@@ -199,7 +191,7 @@ index c08f052..def04ec 100644
  static char *media_filename[MAX_DRIVES+1];
  static QEMUTimer *insert_timer = NULL;
  static char *xenbus_param_paths[MAX_DRIVES+1];
-@@ -104,35 +105,42 @@ int xenstore_watch_new_callback(const char          *path,
+@@ -119,35 +119,42 @@ int xenstore_watch_new_callback(const char          *path,
                                  xenstore_callback   fptr,
                                  void                *opaque)
  {
@@ -257,7 +249,7 @@ index c08f052..def04ec 100644
      return ret;
  }
  
-@@ -981,6 +989,12 @@ int xenstore_fd(void)
+@@ -997,6 +1004,12 @@ int xenstore_fd(void)
      return -1;
  }
  
@@ -270,7 +262,7 @@ index c08f052..def04ec 100644
  static void xenstore_process_logdirty_event(void)
  {
      char *act;
-@@ -1381,10 +1395,11 @@ void xenstore_process_event(void *opaque)
+@@ -1495,10 +1508,11 @@ void xenstore_process_event(void *opaque)
      if (xen_pause_requested)
          goto out;
  

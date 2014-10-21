@@ -1,7 +1,8 @@
-diff -r 9a7cf54e9960 hw/cirrus_vga.c
---- a/hw/cirrus_vga.c	Mon Aug 03 11:38:38 2009 +0100
-+++ b/hw/cirrus_vga.c	Mon Aug 03 11:39:13 2009 +0100
-@@ -854,13 +854,9 @@
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 2f7a5c7..9b72157 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -854,13 +854,9 @@ static void cirrus_bitblt_reset(CirrusVGAState * s)
  
      s->gr[0x31] &=
  	~(CIRRUS_BLT_START | CIRRUS_BLT_BUSY | CIRRUS_BLT_FIFOUSED);

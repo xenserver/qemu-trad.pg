@@ -5,10 +5,10 @@ Signed-off-by: Andrew Cooper <andrew.cooper3@citrix.com>
 
 
 diff --git a/vl.c b/vl.c
-index d93d2bb..88c55c4 100644
+index d21c3aa..d148a29 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -1677,7 +1677,7 @@ static void rtc_stop_timer(struct qemu_alarm_timer *t)
+@@ -1568,7 +1568,7 @@ static void rtc_stop_timer(struct qemu_alarm_timer *t)
  
  static int dynticks_start_timer(struct qemu_alarm_timer *t)
  {
@@ -17,7 +17,7 @@ index d93d2bb..88c55c4 100644
      timer_t host_timer;
      struct sigaction act;
  
-@@ -1687,7 +1687,6 @@ static int dynticks_start_timer(struct qemu_alarm_timer *t)
+@@ -1578,7 +1578,6 @@ static int dynticks_start_timer(struct qemu_alarm_timer *t)
  
      sigaction(SIGALRM, &act, NULL);
  

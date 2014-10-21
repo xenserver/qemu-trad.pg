@@ -1,7 +1,8 @@
-diff -r 489b0a4f41db console.h
---- a/console.h	Tue Aug 07 09:56:43 2012 +0100
-+++ b/console.h	Tue Aug 07 09:56:48 2012 +0100
-@@ -318,6 +318,7 @@ int vnc_display_open(DisplayState *ds, c
+diff --git a/console.h b/console.h
+index 7cf2242..28ef65f 100644
+--- a/console.h
++++ b/console.h
+@@ -318,6 +318,7 @@ int vnc_display_open(DisplayState *ds, const char *display);
  int vnc_display_password(DisplayState *ds, const char *password);
  void do_info_vnc(void);
  void vnc_keymap_change(char *keymap);
@@ -9,10 +10,11 @@ diff -r 489b0a4f41db console.h
  
  /* curses.c */
  void curses_display_init(DisplayState *ds, int full_screen);
-diff -r 489b0a4f41db qemu-xen.h
---- a/qemu-xen.h	Tue Aug 07 09:56:43 2012 +0100
-+++ b/qemu-xen.h	Tue Aug 07 09:56:48 2012 +0100
-@@ -133,6 +133,7 @@ void xenstore_do_eject(BlockDriverState 
+diff --git a/qemu-xen.h b/qemu-xen.h
+index 30924c0..754d424 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -134,6 +134,7 @@ void xenstore_do_eject(BlockDriverState *bs);
  int xenstore_find_device(BlockDriverState *bs);
  void xenstore_dm_finished_startup(void);
  void xenstore_set_device_locked(BlockDriverState *bs);
@@ -20,9 +22,10 @@ diff -r 489b0a4f41db qemu-xen.h
  
  /* xenfbfront.c */
  int xenfb_pv_display_init(DisplayState *ds);
-diff -r 489b0a4f41db vnc.c
---- a/vnc.c	Tue Aug 07 09:56:43 2012 +0100
-+++ b/vnc.c	Tue Aug 07 09:56:48 2012 +0100
+diff --git a/vnc.c b/vnc.c
+index f4f263a..fc15720 100644
+--- a/vnc.c
++++ b/vnc.c
 @@ -40,6 +40,8 @@
  #include "keymaps.c"
  #include "d3des.h"
@@ -32,7 +35,7 @@ diff -r 489b0a4f41db vnc.c
  #ifdef CONFIG_VNC_TLS
  #include <gnutls/gnutls.h>
  #include <gnutls/x509.h>
-@@ -1138,6 +1140,26 @@ static ssize_t vnc_tls_pull(gnutls_trans
+@@ -1138,6 +1140,26 @@ static ssize_t vnc_tls_pull(gnutls_transport_ptr_t transport,
  
  static void client_cut_text(VncState *vs, size_t len, uint8_t *text)
  {
@@ -59,10 +62,11 @@ diff -r 489b0a4f41db vnc.c
  }
  
  static void check_pointer_type_change(VncState *vs, int absolute)
-diff -r 489b0a4f41db xenstore.c
---- a/xenstore.c	Tue Aug 07 09:56:43 2012 +0100
-+++ b/xenstore.c	Tue Aug 07 09:56:48 2012 +0100
-@@ -27,6 +27,12 @@
+diff --git a/xenstore.c b/xenstore.c
+index 00ecb2b..1af7688 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -28,6 +28,12 @@
  /* The token used to identify the keymap watch. */
  #define KEYMAP_TOKEN "keymap"
  
@@ -75,7 +79,7 @@ diff -r 489b0a4f41db xenstore.c
  struct xs_handle *xsh = NULL;
  static char *media_filename[MAX_DRIVES+1];
  static QEMUTimer *insert_timer = NULL;
-@@ -57,6 +63,12 @@ void xenstore_do_eject(BlockDriverState 
+@@ -58,6 +64,12 @@ void xenstore_do_eject(BlockDriverState *bs)
          xs_write(xsh, XBT_NULL, xenbus_param_paths[i], "eject", strlen("eject"));
  }
  
@@ -88,7 +92,7 @@ diff -r 489b0a4f41db xenstore.c
  void xenstore_set_device_locked(BlockDriverState *bs)
  {
      int i;
-@@ -550,7 +562,15 @@ void xenstore_parse_domain_config(int hv
+@@ -553,7 +565,15 @@ void xenstore_parse_domain_config(int hvm_domid)
      }
  
      if (pasprintf(&buf, "%s/keymap", guest_path) != -1)
@@ -105,7 +109,7 @@ diff -r 489b0a4f41db xenstore.c
  #endif
  
      if (pasprintf(&danger_buf, "%s/device/vbd", danger_path) == -1)
-@@ -1212,6 +1232,120 @@ static void xenstore_process_vcpu_set_ev
+@@ -1287,6 +1307,120 @@ static void xenstore_process_vcpu_set_event(char **vec)
      return;
  }
  
@@ -226,7 +230,7 @@ diff -r 489b0a4f41db xenstore.c
  void xenstore_process_event(void *opaque)
  {
      char **vec, *offset, *bpath = NULL, *buf = NULL, *drv = NULL, *image = NULL;
-@@ -1235,6 +1369,16 @@ void xenstore_process_event(void *opaque
+@@ -1310,6 +1444,16 @@ void xenstore_process_event(void *opaque)
  	goto out;
      }
  
@@ -243,7 +247,7 @@ diff -r 489b0a4f41db xenstore.c
      if (!strcmp(vec[XS_WATCH_TOKEN], "logdirty")) {
          xenstore_process_logdirty_event();
          goto out;
-@@ -1827,6 +1971,26 @@ void xenstore_store_pv_console_info(int 
+@@ -1902,6 +2046,26 @@ void xenstore_store_pv_console_info(int i, CharDriverState *chr,
      }
  }
  

@@ -1,13 +1,14 @@
-diff -r ecf12df235b6 vnc.c
---- a/vnc.c	Mon Oct 05 10:47:09 2009 +0100
-+++ b/vnc.c	Mon Oct 05 10:47:19 2009 +0100
-@@ -1098,8 +1098,8 @@
+diff --git a/vnc.c b/vnc.c
+index 33dee89..d550502 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -1098,8 +1098,8 @@ static void vnc_disconnect_finish(VncState *vs)
      if (!vs->vd->clients)
          dcl->idle = 1;
  
-+    vnc_remove_timer(vs->vd);
-     qemu_free(vs);
--    vnc_remove_timer(vs->vd);
+-    qemu_free(vs);
+     vnc_remove_timer(vs->vd);
++    qemu_free(vs);
  }
  
  #ifdef CONFIG_VNC_TLS

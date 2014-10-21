@@ -1,7 +1,8 @@
-diff -r 9c8b1472d943 vnc.c
---- a/vnc.c	Tue Aug 04 17:14:03 2009 +0100
-+++ b/vnc.c	Tue Aug 04 17:18:00 2009 +0100
-@@ -671,6 +671,8 @@
+diff --git a/vnc.c b/vnc.c
+index 98fa47a..2ba918c 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -671,6 +671,8 @@ static void vnc_dpy_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int
      for (vs = vd->clients; vs != NULL; vs = vn) {
          vn = vs->next;
          if (vnc_has_feature(vs, VNC_FEATURE_COPYRECT)) {
@@ -10,7 +11,7 @@ diff -r 9c8b1472d943 vnc.c
              vs->force_update = 1;
              vnc_update_client(vs, 1);
              /* vs might be free()ed here */
-@@ -750,7 +752,7 @@
+@@ -750,7 +752,7 @@ static int find_and_clear_dirty_height(struct VncState *vs,
  
  static int vnc_update_client(VncState *vs, int has_dirty)
  {
@@ -19,7 +20,7 @@ diff -r 9c8b1472d943 vnc.c
          VncDisplay *vd = vs->vd;
  	int y;
  	int n_rectangles;
-@@ -803,6 +805,9 @@
+@@ -803,6 +805,9 @@ static int vnc_update_client(VncState *vs, int has_dirty)
  	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
  	vnc_flush(vs);
          vs->force_update = 0;
@@ -29,7 +30,7 @@ diff -r 9c8b1472d943 vnc.c
  
          return n_rectangles;
      }
-@@ -1350,7 +1355,7 @@
+@@ -1350,7 +1355,7 @@ static void framebuffer_update_request(VncState *vs, int incremental,
          h = ds_get_height(vs->ds) - y_position;
  
      int i;

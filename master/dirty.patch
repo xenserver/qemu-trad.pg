@@ -1,8 +1,8 @@
 diff --git a/hw/vga.c b/hw/vga.c
-index 0d41ccd..5a494ef 100644
+index a7812bb..a0930f2 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
-@@ -1250,7 +1250,8 @@ static void vga_draw_text(VGAState *s, int full_update)
+@@ -1246,7 +1246,8 @@ static void vga_draw_text(VGAState *s, int full_update)
      vga_draw_glyph9_func *vga_draw_glyph9;
  
      /* Disable dirty bit tracking */
@@ -12,7 +12,7 @@ index 0d41ccd..5a494ef 100644
  
      /* compute font data address (in plane 2) */
      v = s->sr[3];
-@@ -1711,7 +1712,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+@@ -1707,7 +1708,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
              /* We will not read that anyway. */
              cpu_physical_memory_set_dirty(s->vram_offset + y);
  
@@ -21,7 +21,7 @@ index 0d41ccd..5a494ef 100644
              unsigned long npages = (end - y) / TARGET_PAGE_SIZE;
              const int width = sizeof(unsigned long) * 8;
              unsigned long bitmap[(npages + width - 1) / width];
-@@ -1830,7 +1831,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
+@@ -1826,7 +1827,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
          return;
  
      /* Disable dirty bit tracking */

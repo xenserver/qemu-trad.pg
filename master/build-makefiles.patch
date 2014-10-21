@@ -2,7 +2,7 @@ Build system integration.
 
 diff --git a/Rules.mk b/Rules.mk
 new file mode 100644
-index 0000000..86528b1
+index 0000000..f140711
 --- /dev/null
 +++ b/Rules.mk
 @@ -0,0 +1,29 @@
@@ -36,7 +36,7 @@ index 0000000..86528b1
 +CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 +
 diff --git a/configure b/configure
-index 4547359..d7a03a8 100755
+index 4547359..215d9b7 100755
 --- a/configure
 +++ b/configure
 @@ -1513,12 +1513,6 @@ bsd)
@@ -75,7 +75,7 @@ index 0cce528..2bb2b51 100644
 -	$(INSTALL_PROG) $(QEMU_ROOT)/i386-dm/qemu-ifup-$(IOEMU_OS) "$(DESTDIR)/$(configdir)/qemu-ifup"
 diff --git a/mk/Makefile b/mk/Makefile
 new file mode 100644
-index 0000000..360a84d
+index 0000000..0c7fa4a
 --- /dev/null
 +++ b/mk/Makefile
 @@ -0,0 +1,81 @@
@@ -162,7 +162,7 @@ index 0000000..360a84d
 +
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
 new file mode 100644
-index 0000000..823a7ce
+index 0000000..6538aa0
 --- /dev/null
 +++ b/mk/xen-device-model.spec.in
 @@ -0,0 +1,39 @@
@@ -218,7 +218,7 @@ index aea181f..853789f 100644
  ifdef CONFIG_STUBDOM
  export TARGET_DIRS=i386-stubdom
 diff --git a/xen-config.mak b/xen-config.mak
-index 77fef4f..f099478 100644
+index 77fef4f..4ba752b 100644
 --- a/xen-config.mak
 +++ b/xen-config.mak
 @@ -3,10 +3,10 @@ XEN_ROOT ?= $(QEMU_ROOT)/../xen-unstable.hg
@@ -229,7 +229,7 @@ index 77fef4f..f099478 100644
 +TARGET_ARCH=x86_64
  TARGET_PATH:=$(SRC_PATH)/$(TARGET_DIRS)
  CONFIG_SOFTMMU=yes
-
+ 
  CFLAGS += -I$(QEMU_ROOT)/hw
  
 -bindir = ${LIBEXEC}

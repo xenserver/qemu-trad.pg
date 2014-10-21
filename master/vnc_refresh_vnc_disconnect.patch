@@ -1,7 +1,8 @@
-diff -r 38f71eb1fd7b vnc.c
---- a/vnc.c	Fri Nov 19 17:02:11 2010 +0000
-+++ b/vnc.c	Fri Nov 19 17:02:21 2010 +0000
-@@ -2373,7 +2373,7 @@ static int vnc_refresh_server_surface(Vn
+diff --git a/vnc.c b/vnc.c
+index 2ba918c..33dee89 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -2373,7 +2373,7 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
  static void vnc_refresh(void *opaque)
  {
      VncDisplay *vd = opaque;

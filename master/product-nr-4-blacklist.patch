@@ -6,10 +6,11 @@ workaround in this case.
 
 Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
 
-diff -r add81cce6452 -r 645d4eac92e9 xenstore.c
---- a/xenstore.c	Tue Sep 25 16:11:32 2012 +0100
-+++ b/xenstore.c	Tue Oct 02 11:57:32 2012 +0100
-@@ -1134,14 +1134,15 @@ xenstore_pv_driver_build_blacklisted(uin
+diff --git a/xenstore.c b/xenstore.c
+index 000e0d7..0682ffe 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -1062,14 +1062,15 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
          else
              return 1;
      }

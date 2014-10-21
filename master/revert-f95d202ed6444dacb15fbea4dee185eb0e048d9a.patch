@@ -1,4 +1,5 @@
 diff --git a/keymaps.c b/keymaps.c
+index d92057f..2fb5a51 100644
 --- a/keymaps.c
 +++ b/keymaps.c
 @@ -51,7 +51,6 @@ typedef struct {
@@ -40,9 +41,10 @@ diff --git a/keymaps.c b/keymaps.c
 -}
 -
 diff --git a/vnc.c b/vnc.c
+index 7629dfa..b90d760 100644
 --- a/vnc.c
 +++ b/vnc.c
-@@ -1274,25 +1274,12 @@ static void press_key_shift_up(VncState 
+@@ -1274,25 +1274,12 @@ static void press_key_shift_up(VncState *vs, int down, int keycode)
      }
  }
  
@@ -68,7 +70,7 @@ diff --git a/vnc.c b/vnc.c
  
      if (is_graphic_console()) {
          if (sym >= 'A' && sym <= 'Z') {
-@@ -1302,11 +1289,8 @@ static void do_key_event(VncState *vs, i
+@@ -1302,11 +1289,8 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
          else {
              shift = keysym_is_shift(vs->kbd_layout, sym & 0xFFFF);
          }
@@ -80,7 +82,7 @@ diff --git a/vnc.c b/vnc.c
  
      keycode = keysym2scancode(vs->kbd_layout, sym & 0xFFFF);
      if (keycode == 0) {
-@@ -1373,11 +1357,6 @@ static void do_key_event(VncState *vs, i
+@@ -1373,11 +1357,6 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
      }
  
      if (is_graphic_console()) {

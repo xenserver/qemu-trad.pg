@@ -1,7 +1,8 @@
-diff -r 49ab480a75d6 hw/ide.c
---- a/hw/ide.c	Fri Nov 19 16:16:18 2010 +0000
-+++ b/hw/ide.c	Fri Nov 19 16:16:54 2010 +0000
-@@ -2017,7 +2017,11 @@ static void ide_atapi_cmd(IDEState *s)
+diff --git a/hw/ide.c b/hw/ide.c
+index c104350..ace0a57 100644
+--- a/hw/ide.c
++++ b/hw/ide.c
+@@ -2054,7 +2054,11 @@ static void ide_atapi_cmd(IDEState *s)
          break;
      case GPCMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
          if (bdrv_is_inserted(s->bs)) {
@@ -14,10 +15,11 @@ diff -r 49ab480a75d6 hw/ide.c
              ide_atapi_cmd_ok(s);
          } else {
              ide_atapi_cmd_error(s, SENSE_NOT_READY,
-diff -r 49ab480a75d6 qemu-xen.h
---- a/qemu-xen.h	Fri Nov 19 16:16:18 2010 +0000
-+++ b/qemu-xen.h	Fri Nov 19 16:16:54 2010 +0000
-@@ -126,6 +126,7 @@ int xenstore_pv_driver_build_blacklisted
+diff --git a/qemu-xen.h b/qemu-xen.h
+index d0c90af..30924c0 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -133,6 +133,7 @@ int xenstore_pv_driver_build_blacklisted(uint16_t product_number,
  void xenstore_do_eject(BlockDriverState *bs);
  int xenstore_find_device(BlockDriverState *bs);
  void xenstore_dm_finished_startup(void);
@@ -25,7 +27,8 @@ diff -r 49ab480a75d6 qemu-xen.h
  
  /* xenfbfront.c */
  int xenfb_pv_display_init(DisplayState *ds);
-diff -r 49ab480a75d6 xenstore.c
+diff --git a/xenstore.c b/xenstore.c
+index b0da042..8661135 100644
 --- a/xenstore.c
 +++ b/xenstore.c
 @@ -53,6 +53,39 @@ void xenstore_do_eject(BlockDriverState *bs)

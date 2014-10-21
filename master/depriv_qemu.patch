@@ -287,7 +287,7 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..714f4ab
+index 0000000..93e3a42
 --- /dev/null
 +++ b/privsep.c
 @@ -0,0 +1,2077 @@
@@ -968,7 +968,7 @@ index 0000000..714f4ab
 +    }
 +}
 +
-+static int 
++static int
 +xenstore_vm_write(int domid, const char *key, const char *value)
 +{
 +    char *buf, *path;
@@ -1213,7 +1213,7 @@ index 0000000..714f4ab
 +{
 +    char *path = NULL;
 +
-+    if (asprintf(&path, 
++    if (asprintf(&path,
 +                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
 +        return;
 +    }
@@ -1242,7 +1242,7 @@ index 0000000..714f4ab
 +    char *path = NULL, *res;
 +    int e;
 +
-+    if (asprintf(&path, 
++    if (asprintf(&path,
 +                "/local/domain/0/device-model/%u/%s", domid, subpath) < 0) {
 +        return NULL;
 +    }
@@ -3570,18 +3570,18 @@ index b65c0f1..37d01c8 100644
      qemu_fclose(f);
      if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
-index c7ca228..51fbbc8 100644
+index 8fb2f81..7252dbf 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -25,6 +25,7 @@
+@@ -24,6 +24,7 @@
+ #include "qemu-xen.h"
  #include "xen_backend.h"
  #include "console.h"
- #include "xen_backend.h"
 +#include "privsep.h"
  
  /* The token used to identify the keymap watch. */
  #define KEYMAP_TOKEN "keymap"
-@@ -61,8 +62,7 @@ void xenstore_do_eject(BlockDriverState *bs)
+@@ -60,8 +61,7 @@ void xenstore_do_eject(BlockDriverState *bs)
          fprintf(stderr, "couldn't find disk to eject.\n");
          return;
      }
@@ -3591,7 +3591,7 @@ index c7ca228..51fbbc8 100644
  }
  
  static struct {
-@@ -74,9 +74,6 @@ static struct {
+@@ -73,9 +73,6 @@ static struct {
  void xenstore_set_device_locked(BlockDriverState *bs)
  {
      int i;
@@ -3601,7 +3601,7 @@ index c7ca228..51fbbc8 100644
  
      i = xenstore_find_device(bs);
      if (i == -1) {
-@@ -86,22 +83,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
+@@ -85,22 +82,10 @@ void xenstore_set_device_locked(BlockDriverState *bs)
      /* not a cdrom device */
      if (!xenbus_param_paths[i])
          return;
@@ -3628,7 +3628,7 @@ index c7ca228..51fbbc8 100644
  }
  
  #define UWAIT_MAX (30*1000000) /* thirty seconds */
-@@ -737,6 +722,7 @@ void xenstore_parse_domain_config(int hvm_domid)
+@@ -736,6 +721,7 @@ void xenstore_parse_domain_config(int hvm_domid)
              if (!strcmp(danger_type, "cdrom") || !strcmp(danger_type, "floppy")) {
                  if (pasprintf(&buf, "%s/params", bpath) != -1) {
                      char *buf2, *frontend;
@@ -3636,7 +3636,7 @@ index c7ca228..51fbbc8 100644
                      xs_watch(xsh, buf, dev);
                      asprintf(&buf2, "%s/frontend", bpath);
                      frontend = xs_read(xsh, XBT_NULL, buf2, &len);
-@@ -1015,30 +1001,19 @@ struct xs_handle *xenstore_get(void)
+@@ -1014,30 +1000,19 @@ struct xs_handle *xenstore_get(void)
  static void xenstore_process_logdirty_event(void)
  {
      char *act;
@@ -3672,7 +3672,7 @@ index c7ca228..51fbbc8 100644
      }
      fprintf(logfile, "Log-dirty command %s\n", act);
  
-@@ -1055,27 +1030,24 @@ static void xenstore_process_logdirty_event(void)
+@@ -1054,27 +1029,24 @@ static void xenstore_process_logdirty_event(void)
      xs_write(xsh, XBT_NULL, ret_path, act, len);
  
      free(act);
@@ -3707,7 +3707,7 @@ index c7ca228..51fbbc8 100644
      if (!xs_rm(xsh, XBT_NULL, path))
          fprintf(logfile, "xs_rm failed: path=%s\n", path);
  
-@@ -1086,14 +1058,7 @@ static void xenstore_process_dm_command_event(void)
+@@ -1085,14 +1057,7 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -3723,7 +3723,7 @@ index c7ca228..51fbbc8 100644
          if (!par)
              goto out;
          do_usb_add(par);
-@@ -1101,13 +1066,6 @@ static void xenstore_process_dm_command_event(void)
+@@ -1100,13 +1065,6 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-add a usb device:%s\n",par);
      } else if (!strncmp(command, "usb-del", len)) {
          fprintf(logfile, "dm-command: usb-del a usb device\n");
@@ -3737,7 +3737,7 @@ index c7ca228..51fbbc8 100644
          if (!par)
              goto out;
          do_usb_del(par);
-@@ -1115,59 +1073,25 @@ static void xenstore_process_dm_command_event(void)
+@@ -1114,59 +1072,25 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-del a usb device:%s\n",par);
  #ifdef CONFIG_PASSTHROUGH
      } else if (!strncmp(command, "pci-rem", len)) {
@@ -3804,7 +3804,7 @@ index c7ca228..51fbbc8 100644
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1248,7 +1172,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1251,7 +1175,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
@@ -3813,7 +3813,7 @@ index c7ca228..51fbbc8 100644
  }
  static int xenstore_process_one_vcpu_set_event(char *node)
  {
-@@ -1620,23 +1544,6 @@ void xenstore_write_vncport(int display)
+@@ -1623,23 +1547,6 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -3837,7 +3837,7 @@ index c7ca228..51fbbc8 100644
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
      char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-@@ -1892,26 +1799,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+@@ -1895,26 +1802,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  
@@ -3864,7 +3864,7 @@ index c7ca228..51fbbc8 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
-@@ -2157,62 +2044,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+@@ -2160,62 +2047,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
      free(buf);
  }
  
@@ -3927,7 +3927,7 @@ index c7ca228..51fbbc8 100644
  char *xenstore_read(const char *path)
  {
      char *value = NULL;
-@@ -2223,9 +2054,3 @@ char *xenstore_read(const char *path)
+@@ -2226,9 +2057,3 @@ char *xenstore_read(const char *path)
      return xs_read(xsh, XBT_NULL, path, &len);
  }
  

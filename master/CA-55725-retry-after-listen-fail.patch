@@ -1,10 +1,11 @@
 # HG changeset patch
 # Parent 5ce63ab5169c450767dd2c9dc873ae89476deacb
 
-diff -r 5ce63ab5169c qemu-sockets.c
---- a/qemu-sockets.c	Wed Apr 13 12:50:10 2011 +0100
-+++ b/qemu-sockets.c	Wed Apr 27 09:33:32 2011 +0100
-@@ -163,6 +163,7 @@
+diff --git a/qemu-sockets.c b/qemu-sockets.c
+index 9b9fa77..612d922 100644
+--- a/qemu-sockets.c
++++ b/qemu-sockets.c
+@@ -163,6 +163,7 @@ int inet_listen(const char *str, char *ostr, int olen,
  
      /* create socket + bind */
      for (e = res; e != NULL; e = e->ai_next) {
@@ -12,7 +13,7 @@ diff -r 5ce63ab5169c qemu-sockets.c
  	getnameinfo((struct sockaddr*)e->ai_addr,e->ai_addrlen,
  		    uaddr,INET6_ADDRSTRLEN,uport,32,
  		    NI_NUMERICHOST | NI_NUMERICSERV);
-@@ -186,8 +187,19 @@
+@@ -186,8 +187,19 @@ int inet_listen(const char *str, char *ostr, int olen,
                  if (sockets_debug)
                      fprintf(stderr,"%s: bind(%s,%s,%d): OK\n", __FUNCTION__,
                              inet_strfamily(e->ai_family), uaddr, inet_getport(e));
@@ -34,7 +35,7 @@ diff -r 5ce63ab5169c qemu-sockets.c
              try_next = to && (inet_getport(e) <= to + port_offset);
              if (!try_next || sockets_debug)
                  fprintf(stderr,"%s: bind(%s,%s,%d): %s\n", __FUNCTION__,
-@@ -205,12 +217,7 @@
+@@ -205,12 +217,7 @@ int inet_listen(const char *str, char *ostr, int olen,
      freeaddrinfo(res);
      return -1;
  

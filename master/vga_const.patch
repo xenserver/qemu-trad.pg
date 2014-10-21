@@ -36,10 +36,10 @@ index 3746839..53c10db 100644
  {
      int i, subwidth = 0;
 diff --git a/hw/vga.c b/hw/vga.c
-index 26b5768..0d41ccd 100644
+index 2d5feb5..a7812bb 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
-@@ -2127,13 +2127,13 @@ static void vga_update_text(void *opaque, console_ch_t *chardata)
+@@ -2123,13 +2123,13 @@ static void vga_update_text(void *opaque, console_ch_t *chardata)
      dpy_update(s->ds, 0, 0, s->last_width, height);
  }
  

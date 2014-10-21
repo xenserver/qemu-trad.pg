@@ -1,7 +1,8 @@
-diff -r 98a468d4b0d3 block.c
---- a/block.c	Wed Jun 17 14:57:08 2009 +0100
-+++ b/block.c	Wed Jun 17 15:12:38 2009 +0100
-@@ -870,59 +870,24 @@
+diff --git a/block.c b/block.c
+index 2c3044a..1379b56 100644
+--- a/block.c
++++ b/block.c
+@@ -876,59 +876,24 @@ static int guess_disk_lchs(BlockDriverState *bs,
  
  void bdrv_guess_geometry(BlockDriverState *bs, int *pcyls, int *pheads, int *psecs)
  {

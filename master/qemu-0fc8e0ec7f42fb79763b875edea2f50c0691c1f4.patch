@@ -1,5 +1,5 @@
 diff --git a/vnc.c b/vnc.c
-index 62777c5..98797bd 100644
+index dfad260..92cef5a 100644
 --- a/vnc.c
 +++ b/vnc.c
 @@ -1248,30 +1248,39 @@ static void do_key_event(VncState *vs, int down, int keycode, int sym)

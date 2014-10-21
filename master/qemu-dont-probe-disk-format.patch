@@ -1,7 +1,8 @@
-diff -r 24d3cc2434c2 block.c
---- a/block.c	Mon Jun 15 18:23:39 2009 +0100
-+++ b/block.c	Mon Jun 15 18:24:34 2009 +0100
-@@ -408,7 +408,7 @@
+diff --git a/block.c b/block.c
+index 05ff8cb..2c3044a 100644
+--- a/block.c
++++ b/block.c
+@@ -411,7 +411,7 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
          if (!drv)
              drv = &bdrv_raw;
      } else if (!drv) {

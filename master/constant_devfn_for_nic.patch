@@ -4,10 +4,11 @@
 Derive NIC device/function number from vif number.
 Modify NIC unplug accordingly.
 
-diff -r b36ce4c6fce0 hw/pc.c
---- a/hw/pc.c	Tue Aug 07 09:57:48 2012 +0100
-+++ b/hw/pc.c	Tue Aug 07 15:01:45 2012 +0100
-@@ -1081,7 +1081,7 @@ vga_bios_error:
+diff --git a/hw/pc.c b/hw/pc.c
+index 6e7ae87..05edc1b 100644
+--- a/hw/pc.c
++++ b/hw/pc.c
+@@ -1080,7 +1080,7 @@ vga_bios_error:
          if (!pci_enabled || (nd->model && strcmp(nd->model, "ne2k_isa") == 0))
              pc_init_ne2k_isa(nd, i8259);
          else
@@ -16,10 +17,11 @@ diff -r b36ce4c6fce0 hw/pc.c
      }
  
      qemu_system_hot_add_init();
-diff -r b36ce4c6fce0 hw/pci.c
---- a/hw/pci.c	Tue Aug 07 09:57:48 2012 +0100
-+++ b/hw/pci.c	Tue Aug 07 15:01:45 2012 +0100
-@@ -877,16 +877,20 @@ void pci_unplug_all_netifs(void)
+diff --git a/hw/pci.c b/hw/pci.c
+index b7070e4..7cc6671 100644
+--- a/hw/pci.c
++++ b/hw/pci.c
+@@ -877,15 +877,19 @@ void pci_unplug_all_netifs(void)
      }
  }
  
@@ -31,23 +33,23 @@ diff -r b36ce4c6fce0 hw/pci.c
 +    int index;
  
 -    if (i >= nb_nics)
+-        return -1;
 +    nd = NULL;
 +    for (index = 0; index < nb_nics; index++)
 +        if (nd_table[index].devfn == devfn)
 +            nd = &nd_table[index];
-+
-+    if (nd == NULL)
-         return -1;
  
 -    nd = &nd_table[i];
--
++    if (nd == NULL)
++        return -1;
+ 
      if (!nd->used)
          return -1;
- 
-diff -r b36ce4c6fce0 hw/xen_platform.c
---- a/hw/xen_platform.c	Tue Aug 07 09:57:48 2012 +0100
-+++ b/hw/xen_platform.c	Tue Aug 07 15:01:45 2012 +0100
-@@ -245,12 +245,16 @@ version_2_unplug(uint8_t type, uint8_t i
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index d5ac0d3..71a5ad6 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
+@@ -245,12 +245,16 @@ version_2_unplug(uint8_t type, uint8_t index)
  
      switch (type) {
      case UNPLUG_TYPE_IDE:
@@ -65,10 +67,11 @@ diff -r b36ce4c6fce0 hw/xen_platform.c
              net_tap_shutdown_vlan(id);
  
          break;
-diff -r b36ce4c6fce0 net.c
---- a/net.c	Tue Aug 07 09:57:48 2012 +0100
-+++ b/net.c	Tue Aug 07 15:01:45 2012 +0100
-@@ -1592,11 +1592,28 @@ static int nic_get_free_idx(void)
+diff --git a/net.c b/net.c
+index 9445265..d47ec2a 100644
+--- a/net.c
++++ b/net.c
+@@ -1593,11 +1593,28 @@ static int nic_get_free_idx(void)
      int index;
  
      for (index = 0; index < MAX_NICS; index++)
@@ -98,7 +101,7 @@ diff -r b36ce4c6fce0 net.c
  void qemu_check_nic_model(NICInfo *nd, const char *model)
  {
      const char *models[2];
-@@ -1767,6 +1784,7 @@ int net_client_init(const char *device, 
+@@ -1768,6 +1785,7 @@ int net_client_init(const char *device, const char *p)
                  pstrcpy(script_arg, sizeof(script_arg), "");
              }
              ret = net_tap_init(vlan, device, name, ifname, setup_script, down_script, script_arg);
@@ -106,9 +109,10 @@ diff -r b36ce4c6fce0 net.c
          }
      } else
  #endif
-diff -r b36ce4c6fce0 net.h
---- a/net.h	Tue Aug 07 09:57:48 2012 +0100
-+++ b/net.h	Tue Aug 07 15:01:45 2012 +0100
+diff --git a/net.h b/net.h
+index d2e5220..29290d4 100644
+--- a/net.h
++++ b/net.h
 @@ -67,6 +67,7 @@ struct NICInfo {
      VLANState *vlan;
      void *private;

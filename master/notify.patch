@@ -14,10 +14,10 @@ index 990e0df..af65c83 100644
  
  }
 diff --git a/privsep.c b/privsep.c
-index 7ea1e89..0996cfd 100644
+index 93e3a42..176f199 100644
 --- a/privsep.c
 +++ b/privsep.c
-@@ -1592,8 +1592,12 @@ check_xs_path(const char *path, check_type_t check)
+@@ -1647,8 +1647,12 @@ check_xs_path(const char *path, check_type_t check)
           */
          if (strcmp(s, "data/report_clipboard") == 0
              || strcmp(s, "data/set_clipboard") == 0
@@ -45,10 +45,10 @@ index 3143883..401f709 100644
  int xenstore_write(const char *path, const char *val);
  
 diff --git a/xenstore.c b/xenstore.c
-index 51fbbc8..1d57e7a 100644
+index 7252dbf..5eb85eb 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -1995,6 +1995,22 @@ void xenstore_set_guest_clipboard(const char *text, size_t len)
+@@ -1998,6 +1998,22 @@ void xenstore_set_guest_clipboard(const char *text, size_t len)
      set_clipboard_event();
  }
  

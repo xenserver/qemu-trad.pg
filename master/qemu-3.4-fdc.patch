@@ -1,7 +1,8 @@
-diff -r e3aa4732a378 hw/fdc.c
---- a/hw/fdc.c	Tue Nov 30 13:20:52 2010 +0000
-+++ b/hw/fdc.c	Tue Nov 30 13:23:44 2010 +0000
-@@ -977,6 +977,10 @@ static int fdctrl_media_changed(fdrive_t
+diff --git a/hw/fdc.c b/hw/fdc.c
+index b00a4ec..ca871b2 100644
+--- a/hw/fdc.c
++++ b/hw/fdc.c
+@@ -977,6 +977,10 @@ static int fdctrl_media_changed(fdrive_t *drv)
  
      if (!drv->bs)
          return 0;
@@ -12,10 +13,11 @@ diff -r e3aa4732a378 hw/fdc.c
      ret = bdrv_media_changed(drv->bs);
      if (ret) {
          fd_revalidate(drv);
-diff -r e3aa4732a378 xenstore.c
---- a/xenstore.c	Tue Nov 30 13:20:52 2010 +0000
-+++ b/xenstore.c	Tue Nov 30 13:23:44 2010 +0000
-@@ -188,20 +188,27 @@ static int parse_drive_name(const char *
+diff --git a/xenstore.c b/xenstore.c
+index 3497537..5d62f5a 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -189,20 +189,27 @@ static int parse_drive_name(const char *dev, DriveInfo *out) {
      /* if drive name not understood, returns -1 and *out may be garbage */
      int ch, max, per_bus;
  
@@ -55,7 +57,7 @@ diff -r e3aa4732a378 xenstore.c
      }
  
      if (out->type == IF_SCSI) {
-@@ -554,16 +561,21 @@ void xenstore_parse_domain_config(int hv
+@@ -597,16 +604,21 @@ void xenstore_parse_domain_config(int hvm_domid)
  
          bs = bdrv_new(dev);
          /* check if it is a cdrom */

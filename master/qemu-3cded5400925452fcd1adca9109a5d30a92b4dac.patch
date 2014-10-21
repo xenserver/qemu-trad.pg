@@ -1,5 +1,5 @@
 diff --git a/vnc.c b/vnc.c
-index 6ffbc46..62777c5 100644
+index bc8c2b6..dfad260 100644
 --- a/vnc.c
 +++ b/vnc.c
 @@ -1501,7 +1501,7 @@ static void pixel_format_message (VncState *vs) {

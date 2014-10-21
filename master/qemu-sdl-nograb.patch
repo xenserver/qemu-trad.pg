@@ -1,7 +1,8 @@
-diff -r daaf582d0890 console.h
---- a/console.h	Wed Dec 22 14:16:37 2010 +0000
-+++ b/console.h	Wed Dec 22 14:16:54 2010 +0000
-@@ -304,6 +304,7 @@ void qemu_console_copy(DisplayState *ds,
+diff --git a/console.h b/console.h
+index 2aff308..89096da 100644
+--- a/console.h
++++ b/console.h
+@@ -304,6 +304,7 @@ void qemu_console_copy(DisplayState *ds, int src_x, int src_y,
  
  /* sdl.c */
  void sdl_display_init(DisplayState *ds, int full_screen, int no_frame, int opengl_enabled);
@@ -9,9 +10,10 @@ diff -r daaf582d0890 console.h
  
  /* cocoa.m */
  void cocoa_display_init(DisplayState *ds, int full_screen);
-diff -r daaf582d0890 sdl.c
---- a/sdl.c	Wed Dec 22 14:16:37 2010 +0000
-+++ b/sdl.c	Wed Dec 22 14:16:54 2010 +0000
+diff --git a/sdl.c b/sdl.c
+index 4d063ce..db724d5 100644
+--- a/sdl.c
++++ b/sdl.c
 @@ -56,6 +56,7 @@ static SDL_Cursor *sdl_cursor_normal;
  static SDL_Cursor *sdl_cursor_hidden;
  static int absolute_enabled = 0;
@@ -29,7 +31,7 @@ diff -r daaf582d0890 sdl.c
      sdl_hide_cursor();
      SDL_WM_GrabInput(SDL_GRAB_ON);
      gui_grab = 1;
-@@ -732,7 +735,7 @@ static void sdl_refresh(DisplayState *ds
+@@ -732,7 +735,7 @@ static void sdl_refresh(DisplayState *ds)
                          gui_key_modifier_pressed = 0;
                          if (gui_keysym == 0) {
                              /* exit/enter grab if pressing Ctrl-Alt */
@@ -38,7 +40,7 @@ diff -r daaf582d0890 sdl.c
                                  /* if the application is not active,
                                     do not try to enter grab state. It
                                     prevents
-@@ -922,7 +925,10 @@ void sdl_display_init(DisplayState *ds, 
+@@ -922,7 +925,10 @@ void sdl_display_init(DisplayState *ds, int full_screen, int no_frame, int openg
      atexit(sdl_cleanup);
      if (full_screen) {
          gui_fullscreen = 1;
@@ -51,10 +53,11 @@ diff -r daaf582d0890 sdl.c
 +        }
      }
  }
-diff -r daaf582d0890 vl.c
---- a/vl.c	Wed Dec 22 14:16:37 2010 +0000
-+++ b/vl.c	Wed Dec 22 14:16:54 2010 +0000
-@@ -4047,6 +4047,7 @@ static void help(int exitcode)
+diff --git a/vl.c b/vl.c
+index fc98e9f..f140c84 100644
+--- a/vl.c
++++ b/vl.c
+@@ -4057,6 +4057,7 @@ static void help(int exitcode)
             "-alt-grab       use Ctrl-Alt-Shift to grab mouse (instead of Ctrl-Alt)\n"
             "-no-quit        disable SDL window close capability\n"
             "-sdl            enable SDL\n"
@@ -62,7 +65,7 @@ diff -r daaf582d0890 vl.c
             "-disable-opengl disable OpenGL rendering, using SDL"
  #endif
             "-portrait       rotate graphical output 90 deg left (only PXA LCD)\n"
-@@ -4247,6 +4248,7 @@ enum {
+@@ -4257,6 +4258,7 @@ enum {
      QEMU_OPTION_alt_grab,
      QEMU_OPTION_no_quit,
      QEMU_OPTION_sdl,
@@ -70,7 +73,7 @@ diff -r daaf582d0890 vl.c
      QEMU_OPTION_portrait,
      QEMU_OPTION_vga,
      QEMU_OPTION_full_screen,
-@@ -4375,6 +4377,7 @@ static const QEMUOption qemu_options[] =
+@@ -4385,6 +4387,7 @@ static const QEMUOption qemu_options[] = {
      { "alt-grab", 0, QEMU_OPTION_alt_grab },
      { "no-quit", 0, QEMU_OPTION_no_quit },
      { "sdl", 0, QEMU_OPTION_sdl },
@@ -78,7 +81,7 @@ diff -r daaf582d0890 vl.c
  #endif
      { "portrait", 0, QEMU_OPTION_portrait },
      { "vga", HAS_ARG, QEMU_OPTION_vga },
-@@ -5347,6 +5350,9 @@ int main(int argc, char **argv, char **e
+@@ -5364,6 +5367,9 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_sdl:
                  sdl = 1;
                  break;

@@ -1,7 +1,8 @@
-diff -r 5794fd7c3563 hw/cirrus_vga.c
---- a/hw/cirrus_vga.c	Fri Nov 19 12:55:52 2010 +0000
-+++ b/hw/cirrus_vga.c	Fri Nov 19 12:55:55 2010 +0000
-@@ -3153,6 +3153,8 @@ static int cirrus_vga_load(QEMUFile *f, 
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 5b199bc..da894c4 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -3155,6 +3155,8 @@ static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
          s->vram_gmfn = vga_acc ? s->lfb_addr : VRAM_RESERVED_ADDRESS;
          xen_vga_populate_vram(s->vram_gmfn, s->vram_size);
      } else {
@@ -10,10 +11,11 @@ diff -r 5794fd7c3563 hw/cirrus_vga.c
          xen_vga_vram_map(s->vram_gmfn, s->vram_size);
      }
      if (version_id < 3 || (!vga_acc && !t))
-diff -r 5794fd7c3563 hw/vga.c
---- a/hw/vga.c	Fri Nov 19 12:55:52 2010 +0000
-+++ b/hw/vga.c	Fri Nov 19 12:55:55 2010 +0000
-@@ -2240,11 +2240,12 @@ static int vga_load(QEMUFile *f, void *o
+diff --git a/hw/vga.c b/hw/vga.c
+index d0c12aa..fed2c54 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -2236,11 +2236,12 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
      VGAState *s = opaque;
      int is_vbe, ret;
      uint32_t vram_size;
@@ -27,7 +29,7 @@ diff -r 5794fd7c3563 hw/vga.c
          return -EINVAL;
  
      if (s->pci_dev && version_id >= 2) {
-@@ -2295,13 +2296,17 @@ static int vga_load(QEMUFile *f, void *o
+@@ -2291,13 +2292,17 @@ static int vga_load(QEMUFile *f, void *opaque, int version_id)
  	qemu_get_be32s(f, &vram_size);
  	if (vram_size != s->vram_size)
  	    return -EINVAL;
@@ -48,7 +50,7 @@ diff -r 5794fd7c3563 hw/vga.c
              xen_vga_populate_vram(VRAM_RESERVED_ADDRESS, s->vram_size);
              s->vram_gmfn = VRAM_RESERVED_ADDRESS;
              qemu_get_buffer(f, s->vram_ptr, s->vram_size); 
-@@ -2606,7 +2611,7 @@ static void vga_init(VGAState *s)
+@@ -2602,7 +2607,7 @@ static void vga_init(VGAState *s)
  {
      int vga_io_memory;
  
@@ -57,10 +59,11 @@ diff -r 5794fd7c3563 hw/vga.c
  
      register_ioport_write(0x3c0, 16, 1, vga_ioport_write, s);
  
-diff -r 5794fd7c3563 vl.c
---- a/vl.c	Fri Nov 19 12:55:52 2010 +0000
-+++ b/vl.c	Fri Nov 19 12:55:55 2010 +0000
-@@ -5769,6 +5769,8 @@ int main(int argc, char **argv, char **e
+diff --git a/vl.c b/vl.c
+index 5d9f331..8c923b1 100644
+--- a/vl.c
++++ b/vl.c
+@@ -5787,6 +5787,8 @@ int main(int argc, char **argv, char **envp)
         fprintf(stderr,"Defaulting vram to 4MB\n");
         vga_ram_size = 4 * 1024 * 1024;
      }

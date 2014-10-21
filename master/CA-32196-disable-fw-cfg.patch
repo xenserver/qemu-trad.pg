@@ -1,7 +1,8 @@
-diff -r a46101888eca hw/fw_cfg.c
---- a/hw/fw_cfg.c	Wed Oct 20 13:09:39 2010 +0100
-+++ b/hw/fw_cfg.c	Thu Oct 21 16:50:31 2010 +0100
-@@ -258,6 +258,7 @@ void *fw_cfg_init(uint32_t ctl_port, uin
+diff --git a/hw/fw_cfg.c b/hw/fw_cfg.c
+index e324e8d..eb58c71 100644
+--- a/hw/fw_cfg.c
++++ b/hw/fw_cfg.c
+@@ -258,6 +258,7 @@ void *fw_cfg_init(uint32_t ctl_port, uint32_t data_port,
  
      s = qemu_mallocz(sizeof(FWCfgState));
  
@@ -9,7 +10,7 @@ diff -r a46101888eca hw/fw_cfg.c
      if (ctl_port) {
          register_ioport_write(ctl_port, 2, 2, fw_cfg_io_writew, s);
      }
-@@ -275,6 +276,7 @@ void *fw_cfg_init(uint32_t ctl_port, uin
+@@ -275,6 +276,7 @@ void *fw_cfg_init(uint32_t ctl_port, uint32_t data_port,
                                             fw_cfg_data_mem_write, s);
          cpu_register_physical_memory(data_addr, FW_CFG_SIZE, io_data_memory);
      }

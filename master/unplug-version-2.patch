@@ -8,10 +8,10 @@ port 13 tells qemu which device of the current type to unplug.
 Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
 
 diff --git a/hw/ide.c b/hw/ide.c
-index 97372e3..b20b789 100644
+index 12e27da..c104350 100644
 --- a/hw/ide.c
 +++ b/hw/ide.c
-@@ -3096,44 +3096,57 @@ static void ide_reset(IDEState *s)
+@@ -3172,44 +3172,57 @@ static void ide_reset(IDEState *s)
  
  /* Unplug all of the IDE hard disks, starting at index @start in the
     table. */

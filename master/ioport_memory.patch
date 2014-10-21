@@ -9,7 +9,7 @@ Using a tree help saving memory.
 New Qemu upstream use a structure which is much more complicated.
 
 diff --git a/vl.c b/vl.c
-index 0594dce..239d45c 100644
+index 596298e..fb1c199 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -60,6 +60,7 @@
@@ -50,7 +50,7 @@ index 0594dce..239d45c 100644
  /* Note: drives_table[MAX_DRIVES] is a dummy block driver if none available
     to store the VM snapshots */
  DriveInfo drives_table[MAX_DRIVES+1];
-@@ -296,8 +315,54 @@ PicState2 *isa_pic;
+@@ -297,8 +316,54 @@ PicState2 *isa_pic;
  static IOPortReadFunc default_ioport_readb, default_ioport_readw, default_ioport_readl;
  static IOPortWriteFunc default_ioport_writeb, default_ioport_writew, default_ioport_writel;
  
@@ -105,7 +105,7 @@ index 0594dce..239d45c 100644
      static IOPortReadFunc *default_func[3] = {
          default_ioport_readb,
          default_ioport_readw,
-@@ -306,11 +371,18 @@ static uint32_t ioport_read(int index, uint32_t address)
+@@ -307,11 +372,18 @@ static uint32_t ioport_read(int index, uint32_t address)
      IOPortReadFunc *func = ioport_read_table[index][address];
      if (!func)
          func = default_func[index];
@@ -124,7 +124,7 @@ index 0594dce..239d45c 100644
      static IOPortWriteFunc *default_func[3] = {
          default_ioport_writeb,
          default_ioport_writew,
-@@ -319,7 +391,12 @@ static void ioport_write(int index, uint32_t address, uint32_t data)
+@@ -320,7 +392,12 @@ static void ioport_write(int index, uint32_t address, uint32_t data)
      IOPortWriteFunc *func = ioport_write_table[index][address];
      if (!func)
          func = default_func[index];
@@ -137,7 +137,7 @@ index 0594dce..239d45c 100644
  }
  
  static uint32_t default_ioport_readb(void *opaque, uint32_t address)
-@@ -386,10 +463,19 @@ int register_ioport_read(int start, int length, int size,
+@@ -387,10 +464,19 @@ int register_ioport_read(int start, int length, int size,
          return -1;
      }
      for(i = start; i < start + length; i += size) {
@@ -157,7 +157,7 @@ index 0594dce..239d45c 100644
      }
      return 0;
  }
-@@ -411,10 +497,19 @@ int register_ioport_write(int start, int length, int size,
+@@ -412,10 +498,19 @@ int register_ioport_write(int start, int length, int size,
          return -1;
      }
      for(i = start; i < start + length; i += size) {
@@ -177,7 +177,7 @@ index 0594dce..239d45c 100644
      }
      return 0;
  }
-@@ -424,6 +519,12 @@ void isa_unassign_ioport(int start, int length)
+@@ -425,6 +520,12 @@ void isa_unassign_ioport(int start, int length)
      int i;
  
      for(i = start; i < start + length; i++) {
@@ -190,7 +190,7 @@ index 0594dce..239d45c 100644
          ioport_read_table[0][i] = default_ioport_readb;
          ioport_read_table[1][i] = default_ioport_readw;
          ioport_read_table[2][i] = default_ioport_readl;
-@@ -433,6 +534,7 @@ void isa_unassign_ioport(int start, int length)
+@@ -434,6 +535,7 @@ void isa_unassign_ioport(int start, int length)
          ioport_write_table[2][i] = default_ioport_writel;
  
          ioport_opaque[i] = NULL;

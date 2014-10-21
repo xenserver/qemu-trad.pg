@@ -1,7 +1,8 @@
-diff -r 9c362147f306 net.c
---- a/net.c	Mon Jun 15 18:27:59 2009 +0100
-+++ b/net.c	Mon Jun 15 18:30:04 2009 +0100
-@@ -956,6 +956,7 @@
+diff --git a/net.c b/net.c
+index d41f595..9445265 100644
+--- a/net.c
++++ b/net.c
+@@ -956,6 +956,7 @@ static int tap_open(char *ifname, int ifname_size)
      struct ifreq ifr;
      int fd, ret;
  
@@ -9,7 +10,7 @@ diff -r 9c362147f306 net.c
      TFR(fd = open("/dev/net/tun", O_RDWR));
      if (fd < 0) {
          fprintf(stderr, "warning: could not open /dev/net/tun: no virtual network emulation\n");
-@@ -971,7 +972,11 @@
+@@ -971,7 +972,11 @@ static int tap_open(char *ifname, int ifname_size)
      if (ret != 0) {
          fprintf(stderr, "warning: could not configure /dev/net/tun: no virtual network emulation\n");
          close(fd);

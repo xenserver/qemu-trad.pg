@@ -19,10 +19,10 @@ Date:   Sun May 24 22:33:34 2009 +0200
     Signed-off-by: Anthony Liguori <aliguori@us.ibm.com>
 
 diff --git a/vnc.c b/vnc.c
-index 3f5d622..41defc2 100644
+index cf8a73c..42dfc48 100644
 --- a/vnc.c
 +++ b/vnc.c
-@@ -2033,9 +2033,8 @@ static void vnc_listen_read(void *opaque)
+@@ -2332,9 +2332,8 @@ static void vnc_listen_read(void *opaque)
  
  void vnc_display_init(DisplayState *ds)
  {

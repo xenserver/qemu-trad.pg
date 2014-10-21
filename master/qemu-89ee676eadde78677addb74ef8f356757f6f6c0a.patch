@@ -1,5 +1,5 @@
 diff --git a/vnc.c b/vnc.c
-index 7f1cab6..c40eea7 100644
+index cac1e30..1d86953 100644
 --- a/vnc.c
 +++ b/vnc.c
 @@ -357,17 +357,13 @@ static void vnc_resize(VncState *vs)
@@ -36,4 +36,4 @@ index 7f1cab6..c40eea7 100644
 +        qemu_free(vs->server.ds);
          qemu_free(vs->guest.ds);
          qemu_free(vs);
-   
+ 

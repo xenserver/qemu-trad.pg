@@ -1,6 +1,7 @@
-diff -r 2541b69ad89d Makefile
---- a/Makefile	Fri Nov 19 17:02:26 2010 +0000
-+++ b/Makefile	Fri Nov 19 17:02:28 2010 +0000
+diff --git a/Makefile b/Makefile
+index 8834df5..74ef4f8 100644
+--- a/Makefile
++++ b/Makefile
 @@ -146,7 +146,7 @@ AUDIO_OBJS+= wavcapture.o
  OBJS+=$(addprefix audio/, $(AUDIO_OBJS))
  
@@ -21,9 +22,10 @@ diff -r 2541b69ad89d Makefile
  
  sdl.o audio/sdlaudio.o: CFLAGS += $(SDL_CFLAGS)
  
-diff -r 2541b69ad89d console.h
---- a/console.h	Fri Nov 19 17:02:26 2010 +0000
-+++ b/console.h	Fri Nov 19 17:02:28 2010 +0000
+diff --git a/console.h b/console.h
+index a41dbca..2aff308 100644
+--- a/console.h
++++ b/console.h
 @@ -69,6 +69,7 @@ void kbd_put_keysym(int keysym);
  #define GUI_REFRESH_INTERVAL 30
  #define QEMU_BIG_ENDIAN_FLAG    0x01
@@ -32,7 +34,7 @@ diff -r 2541b69ad89d console.h
  
  struct PixelFormat {
      uint8_t bits_per_pixel;
-@@ -166,7 +167,8 @@ static inline int is_surface_bgr(Display
+@@ -166,7 +167,8 @@ static inline int is_surface_bgr(DisplaySurface *surface)
  
  static inline int is_buffer_shared(DisplaySurface *surface)
  {
@@ -42,9 +44,10 @@ diff -r 2541b69ad89d console.h
  }
  
  static inline void register_displaychangelistener(DisplayState *ds, DisplayChangeListener *dcl)
-diff -r 2541b69ad89d sdl.c
---- a/sdl.c	Fri Nov 19 17:02:26 2010 +0000
-+++ b/sdl.c	Fri Nov 19 17:02:28 2010 +0000
+diff --git a/sdl.c b/sdl.c
+index e0cd07b..4d063ce 100644
+--- a/sdl.c
++++ b/sdl.c
 @@ -25,6 +25,7 @@
  #include "console.h"
  #include "sysemu.h"
@@ -63,7 +66,7 @@ diff -r 2541b69ad89d sdl.c
  
  #ifdef CONFIG_OPENGL
  static GLint tex_format;
-@@ -144,16 +146,24 @@ static void opengl_update(DisplayState *
+@@ -144,16 +146,24 @@ static void opengl_update(DisplayState *ds, int x, int y, int w, int h)
  
  static void sdl_update(DisplayState *ds, int x, int y, int w, int h)
  {
@@ -82,8 +85,6 @@ diff -r 2541b69ad89d sdl.c
 -        rec.w = w;
 -        rec.h = h;
 -        SDL_BlitSurface(guest_screen, &rec, real_screen, &rec);
--    }
--    SDL_UpdateRect(real_screen, x, y, w, h);
 +        if (!scaling_active) {
 +            SDL_BlitSurface(guest_screen, &rec, real_screen, &rec);
 +        } else {
@@ -92,12 +93,13 @@ diff -r 2541b69ad89d sdl.c
 +                exit(1);
 +            }
 +        }
-+    }
+     }
+-    SDL_UpdateRect(real_screen, x, y, w, h);
 +    SDL_UpdateRect(real_screen, rec.x, rec.y, rec.w, rec.h);
  }
  
  static void sdl_setdata(DisplayState *ds)
-@@ -182,7 +192,7 @@ static void do_sdl_resize(int new_width,
+@@ -182,7 +192,7 @@ static void do_sdl_resize(int new_width, int new_height, int bpp)
          flags = SDL_OPENGL|SDL_RESIZABLE;
      else
  #endif
@@ -106,7 +108,7 @@ diff -r 2541b69ad89d sdl.c
  
      if (gui_fullscreen)
          flags |= SDL_FULLSCREEN;
-@@ -234,7 +244,10 @@ static void do_sdl_resize(int new_width,
+@@ -234,7 +244,10 @@ static void do_sdl_resize(int new_width, int new_height, int bpp)
  static void sdl_resize(DisplayState *ds)
  {
      if  (!allocator) {
@@ -118,11 +120,11 @@ diff -r 2541b69ad89d sdl.c
          dcl->dpy_setdata(ds);
      } else {
          if (guest_screen != NULL) {
-@@ -287,8 +300,26 @@ static DisplaySurface* sdl_create_displa
- 
+@@ -288,7 +301,25 @@ static DisplaySurface* sdl_create_displaysurface(int width, int height)
      surface->width = width;
      surface->height = height;
-+
+ 
+-    if (hostbpp == 16)
 +    if (scaling_active) {
 +        if (host_format.BytesPerPixel != 2 && host_format.BytesPerPixel != 4) {
 +            surface->linesize = width * 4;
@@ -137,8 +139,7 @@ diff -r 2541b69ad89d sdl.c
 +        surface->flags = QEMU_ALLOCATED_FLAG;
 +#endif
 +        surface->data = (uint8_t*) qemu_mallocz(surface->linesize * surface->height);
- 
--    if (hostbpp == 16)
++
 +        return surface;
 +    }
 +
@@ -146,7 +147,7 @@ diff -r 2541b69ad89d sdl.c
          do_sdl_resize(width, height, 16);
      else
          do_sdl_resize(width, height, 32);
-@@ -298,9 +329,9 @@ static DisplaySurface* sdl_create_displa
+@@ -298,9 +329,9 @@ static DisplaySurface* sdl_create_displaysurface(int width, int height)
      surface->data = real_screen->pixels;
  
  #ifdef WORDS_BIGENDIAN
@@ -158,25 +159,24 @@ diff -r 2541b69ad89d sdl.c
  #endif
      allocator = 1;
  
-@@ -309,10 +340,14 @@ static DisplaySurface* sdl_create_displa
+@@ -309,10 +340,14 @@ static DisplaySurface* sdl_create_displaysurface(int width, int height)
  
  static void sdl_free_displaysurface(DisplaySurface *surface)
  {
-+    if (surface == NULL)
+-    allocator = 0;
+     if (surface == NULL)
+-        return;
 +        goto out;
 +
 +    if (surface->flags & QEMU_ALLOCATED_FLAG)
 +        qemu_free(surface->data);
-+    qemu_free(surface);
+     qemu_free(surface);
 +out:
-     allocator = 0;
--    if (surface == NULL)
--        return;
--    qemu_free(surface);
++    allocator = 0;
  }
  
  static DisplaySurface* sdl_resize_displaysurface(DisplaySurface *surface, int width, int height)
-@@ -582,8 +617,12 @@ static void sdl_send_mouse_event(int dx,
+@@ -582,8 +617,12 @@ static void sdl_send_mouse_event(int dx, int dy, int dz, int state)
  static void toggle_full_screen(DisplayState *ds)
  {
      gui_fullscreen = !gui_fullscreen;
@@ -190,7 +190,7 @@ diff -r 2541b69ad89d sdl.c
          gui_saved_grab = gui_grab;
          sdl_grab_start();
      } else {
-@@ -779,18 +818,22 @@ static void sdl_refresh(DisplayState *ds
+@@ -779,18 +818,22 @@ static void sdl_refresh(DisplayState *ds)
  		}
  	    }
              break;
@@ -221,7 +221,7 @@ diff -r 2541b69ad89d sdl.c
          default:
              break;
          }
-@@ -854,7 +897,7 @@ void sdl_display_init(DisplayState *ds, 
+@@ -854,7 +897,7 @@ void sdl_display_init(DisplayState *ds, int full_screen, int no_frame, int openg
          const SDL_VideoInfo *vi;
  
          vi = SDL_GetVideoInfo();
@@ -230,9 +230,11 @@ diff -r 2541b69ad89d sdl.c
  
          da = qemu_mallocz(sizeof(DisplayAllocator));
          da->create_displaysurface = sdl_create_displaysurface;
-diff -r 2541b69ad89d sdl_zoom.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/sdl_zoom.c	Fri Nov 19 17:02:28 2010 +0000
+diff --git a/sdl_zoom.c b/sdl_zoom.c
+new file mode 100644
+index 0000000..bc4dfbd
+--- /dev/null
++++ b/sdl_zoom.c
 @@ -0,0 +1,447 @@
 +/*
 + * SDL_zoom - surface scaling
@@ -681,9 +683,11 @@ diff -r 2541b69ad89d sdl_zoom.c
 +    return ret;
 +}
 +
-diff -r 2541b69ad89d sdl_zoom.h
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/sdl_zoom.h	Fri Nov 19 17:02:28 2010 +0000
+diff --git a/sdl_zoom.h b/sdl_zoom.h
+new file mode 100644
+index 0000000..b6827a1
+--- /dev/null
++++ b/sdl_zoom.h
 @@ -0,0 +1,22 @@
 +/*
 + * SDL_zoom - surface scaling

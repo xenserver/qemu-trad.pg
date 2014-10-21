@@ -1,8 +1,8 @@
 diff --git a/xenstore.c b/xenstore.c
-index b104b73..96e2348 100644
+index 47358bb..8fb2f81 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -1170,8 +1170,12 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1229,8 +1229,12 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
          device_id = (build_nr >> 8) & 0xffff;
          revision = build_nr & 0xff;
  

@@ -1,7 +1,8 @@
-diff -r 4f2f3894711a i386-dm/helper2.c
---- a/i386-dm/helper2.c	Fri Nov 28 12:47:39 2008 +0000
-+++ b/i386-dm/helper2.c	Fri Nov 28 12:48:16 2008 +0000
-@@ -410,6 +410,8 @@
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index fa0e7f1..fa86daa 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
+@@ -445,6 +445,8 @@ void timeoffset_get(void)
      else
  	time_offset = 0;
  

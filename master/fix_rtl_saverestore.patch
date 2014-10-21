@@ -1,7 +1,8 @@
-diff -r 4c315d51d6f8 hw/rtl8139.c
---- a/hw/rtl8139.c	Thu Apr 08 20:06:07 2010 +0100
-+++ b/hw/rtl8139.c	Thu Apr 08 20:06:36 2010 +0100
-@@ -3437,7 +3437,6 @@
+diff --git a/hw/rtl8139.c b/hw/rtl8139.c
+index dc0b3b2..1c87bea 100644
+--- a/hw/rtl8139.c
++++ b/hw/rtl8139.c
+@@ -3437,7 +3437,6 @@ PCIDevice *pci_rtl8139_init(PCIBus *bus, NICInfo *nd, int devfn)
      PCIRTL8139State *d;
      RTL8139State *s;
      uint8_t *pci_conf;
@@ -9,7 +10,7 @@ diff -r 4c315d51d6f8 hw/rtl8139.c
  
      d = (PCIRTL8139State *)pci_register_device(bus,
                                                "RTL8139", sizeof(PCIRTL8139State),
-@@ -3481,9 +3480,8 @@
+@@ -3481,9 +3480,8 @@ PCIDevice *pci_rtl8139_init(PCIBus *bus, NICInfo *nd, int devfn)
      s->cplus_txbuffer_len = 0;
      s->cplus_txbuffer_offset = 0;
  

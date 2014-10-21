@@ -1,7 +1,8 @@
-diff -r ba89b38fd46d xenstore.c
---- a/xenstore.c	Thu Jun 18 18:24:05 2009 +0100
-+++ b/xenstore.c	Thu Jun 18 18:28:13 2009 +0100
-@@ -430,6 +430,19 @@
+diff --git a/xenstore.c b/xenstore.c
+index 94acbdf..3038c11 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -656,6 +656,19 @@ void xenstore_parse_domain_config(int hvm_domid)
  		format = &bdrv_raw;
              memmove(params, offset+1, strlen(offset+1)+1 );
              fprintf(logfile, "Strip off blktap sub-type prefix to %s (drv '%s')\n", params, drv); 

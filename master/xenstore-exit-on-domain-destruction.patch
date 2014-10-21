@@ -1,7 +1,8 @@
-diff -r 189b86189cc9 sysemu.h
---- a/sysemu.h	Wed Feb 23 18:02:40 2011 +0000
-+++ b/sysemu.h	Wed Feb 23 20:46:06 2011 +0000
-@@ -28,9 +28,11 @@
+diff --git a/sysemu.h b/sysemu.h
+index fcc75b1..6070dfe 100644
+--- a/sysemu.h
++++ b/sysemu.h
+@@ -28,9 +28,11 @@ void cpu_disable_ticks(void);
  void qemu_system_reset_request(void);
  void qemu_system_shutdown_request(void);
  void qemu_system_powerdown_request(void);
@@ -13,10 +14,11 @@ diff -r 189b86189cc9 sysemu.h
  #if !defined(TARGET_SPARC) && !defined(TARGET_I386)
  // Please implement a power failure function to signal the OS
  #define qemu_system_powerdown() do{}while(0)
-diff -r 189b86189cc9 vl.c
---- a/vl.c	Wed Feb 23 18:02:40 2011 +0000
-+++ b/vl.c	Wed Feb 23 20:46:06 2011 +0000
-@@ -3624,6 +3624,7 @@
+diff --git a/vl.c b/vl.c
+index 095c7bf..a0fe73d 100644
+--- a/vl.c
++++ b/vl.c
+@@ -3633,6 +3633,7 @@ static QEMUResetEntry *first_reset_entry;
  static int reset_requested;
  static int shutdown_requested;
  static int powerdown_requested;
@@ -24,49 +26,50 @@ diff -r 189b86189cc9 vl.c
  
  int qemu_shutdown_requested(void)
  {
-@@ -3643,6 +3644,13 @@
- {
-     int r = powerdown_requested;
-     powerdown_requested = 0;
-+    return r;
-+}
-+
+@@ -3655,6 +3656,13 @@ int qemu_powerdown_requested(void)
+     return r;
+ }
+ 
 +int qemu_exit_requested(void)
 +{
 +    int r = exit_requested;
 +    exit_requested = 0;
-     return r;
- }
- 
-@@ -3697,6 +3705,11 @@
-     fprintf(stderr, "requesting powerdown\n");
-     if (cpu_single_env)
-         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
++    return r;
 +}
 +
+ void qemu_register_reset(QEMUResetHandler *func, void *opaque)
+ {
+     QEMUResetEntry **pre, *re;
+@@ -3708,6 +3716,11 @@ void qemu_system_powerdown_request(void)
+         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
+ }
+ 
 +void qemu_system_exit_request(void)
 +{
 +    exit_requested = 1;
- }
- 
++}
++
  #ifdef _WIN32
-@@ -3825,6 +3838,12 @@
-         slirp_select_poll(&rfds, &wfds, &xfds);
+ static void host_main_loop_wait(int *timeout)
+ {
+@@ -3835,6 +3848,12 @@ void main_loop_wait(int timeout)
      }
  #endif
-+
+ 
 +    if (qemu_exit_requested()) {
 +        /* Flush the cache and cancel outstanding aio requests */
 +        bdrv_flush_all();
 +        exit(0);
 +    }
- 
++
      /* vm time timers */
      if (vm_running && likely(!(cur_cpu->singlestep_enabled & SSTEP_NOTIMER)))
-diff -r 189b86189cc9 xenstore.c
---- a/xenstore.c	Wed Feb 23 18:02:40 2011 +0000
-+++ b/xenstore.c	Wed Feb 23 20:46:06 2011 +0000
-@@ -570,6 +570,7 @@
+         qemu_run_timers(&active_timers[QEMU_TIMER_VIRTUAL],
+diff --git a/xenstore.c b/xenstore.c
+index 1af7688..94acbdf 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -563,6 +563,7 @@ void xenstore_parse_domain_config(int hvm_domid)
      } else {
          guest_path = strdup(danger_path);
      }
@@ -74,7 +77,7 @@ diff -r 189b86189cc9 xenstore.c
  
      if (pasprintf(&buf, "%s/keymap", guest_path) != -1)
          xs_watch(xsh, buf, KEYMAP_TOKEN); // Ignore failure -- we can muddle on.i
-@@ -1284,6 +1285,7 @@
+@@ -1425,6 +1426,7 @@ void xenstore_process_event(void *opaque)
  {
      char **vec, *offset, *bpath = NULL, *buf = NULL, *drv = NULL, *image = NULL;
      unsigned int len, num, hd_index, i;
@@ -82,13 +85,10 @@ diff -r 189b86189cc9 xenstore.c
  
      vec = xs_read_watch(xsh, &num);
      if (!vec)
-@@ -1320,6 +1322,18 @@
+@@ -1464,6 +1466,18 @@ void xenstore_process_event(void *opaque)
+         goto out;
+     }
  
-     if (!strcmp(vec[XS_WATCH_TOKEN], "vcpu-set")) {
-         xenstore_process_vcpu_set_event(vec);
-+        goto out;
-+    }
-+
 +    if (!strcmp(vec[XS_WATCH_TOKEN], "releaseDomain")) {
 +        int rc;
 +        if ( (rc=xc_domain_getinfo(xc_handle, domid, 1, &dominfo)) != 1
@@ -98,6 +98,9 @@ diff -r 189b86189cc9 xenstore.c
 +            fprintf(stderr," releaseDomain signal caught, but domain %d not dead:\n" \
 +                    "   rc %d dominfo.domid %d dominfo.dying %d\n",
 +                    domid, rc, dominfo.domid, dominfo.dying);
++        goto out;
++    }
++
+     /* if we are paused don't process anything else */
+     if (xen_pause_requested)
          goto out;
-     }
- 

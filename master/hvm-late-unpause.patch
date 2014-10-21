@@ -1,7 +1,8 @@
-diff -r 884da12bca62 qemu-xen.h
---- a/qemu-xen.h	Fri Nov 19 16:11:16 2010 +0000
-+++ b/qemu-xen.h	Fri Nov 19 16:11:35 2010 +0000
-@@ -125,6 +125,7 @@ int xenstore_pv_driver_build_blacklisted
+diff --git a/qemu-xen.h b/qemu-xen.h
+index bc067c3..b2ba188 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -132,6 +132,7 @@ int xenstore_pv_driver_build_blacklisted(uint16_t product_number,
                                           uint32_t build_nr);
  void xenstore_do_eject(BlockDriverState *bs);
  int xenstore_find_device(BlockDriverState *bs);
@@ -9,10 +10,11 @@ diff -r 884da12bca62 qemu-xen.h
  
  /* xenfbfront.c */
  int xenfb_pv_display_init(DisplayState *ds);
-diff -r 884da12bca62 vl.c
---- a/vl.c	Fri Nov 19 16:11:16 2010 +0000
-+++ b/vl.c	Fri Nov 19 16:11:35 2010 +0000
-@@ -5954,6 +5954,9 @@ int main(int argc, char **argv, char **e
+diff --git a/vl.c b/vl.c
+index 502c185..1bd79e2 100644
+--- a/vl.c
++++ b/vl.c
+@@ -5973,6 +5973,9 @@ int main(int argc, char **argv, char **envp)
      if (loadvm)
          do_loadvm(loadvm);
  
@@ -22,10 +24,11 @@ diff -r 884da12bca62 vl.c
      /* init USB devices */
      if (usb_enabled) {
          for(i = 0; i < usb_devices_index; i++) {
-diff -r 884da12bca62 xenstore.c
---- a/xenstore.c	Fri Nov 19 16:11:16 2010 +0000
-+++ b/xenstore.c	Fri Nov 19 16:11:35 2010 +0000
-@@ -1161,6 +1161,28 @@ void xenstore_read_vncpasswd(int domid, 
+diff --git a/xenstore.c b/xenstore.c
+index 5d62f5a..b0da042 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -1406,6 +1406,28 @@ void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
      free(buf);
  }
  

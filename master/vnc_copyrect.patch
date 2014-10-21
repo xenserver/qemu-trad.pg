@@ -1,7 +1,8 @@
-diff -r 4ed4ee21b9b1 vnc.c
---- a/vnc.c	Tue Jul 28 10:46:35 2009 +0100
-+++ b/vnc.c	Thu Jul 30 13:26:30 2009 +0100
-@@ -646,6 +646,11 @@
+diff --git a/vnc.c b/vnc.c
+index d4ae834..28d4022 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -646,6 +646,11 @@ static void send_framebuffer_update(VncState *vs, int x, int y, int w, int h)
  
  static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, int w, int h)
  {
@@ -13,7 +14,7 @@ diff -r 4ed4ee21b9b1 vnc.c
      vnc_write_u8(vs, 0);  /* msg id */
      vnc_write_u8(vs, 0);
      vnc_write_u16(vs, 1); /* number of rects */
-@@ -653,6 +658,23 @@
+@@ -653,6 +658,23 @@ static void vnc_copy(VncState *vs, int src_x, int src_y, int dst_x, int dst_y, i
      vnc_write_u16(vs, src_x);
      vnc_write_u16(vs, src_y);
      vnc_flush(vs);

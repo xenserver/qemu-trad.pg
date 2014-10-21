@@ -1,6 +1,7 @@
-diff -r 948d0526a672 hw/xen_platform.c
---- a/hw/xen_platform.c	Tue Aug 07 09:55:52 2012 +0100
-+++ b/hw/xen_platform.c	Tue Aug 07 09:56:19 2012 +0100
+diff --git a/hw/xen_platform.c b/hw/xen_platform.c
+index 511c83d..011d55f 100644
+--- a/hw/xen_platform.c
++++ b/hw/xen_platform.c
 @@ -574,8 +574,8 @@ void pci_xen_platform_init(PCIBus *bus)
  
      pch->command = 3; /* IO and memory access */

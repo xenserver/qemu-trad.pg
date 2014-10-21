@@ -1,7 +1,8 @@
-diff -r 3e18cc267db8 vnc.c
---- a/vnc.c	Tue Aug 04 17:09:54 2009 +0100
-+++ b/vnc.c	Tue Aug 04 17:10:26 2009 +0100
-@@ -94,6 +94,7 @@
+diff --git a/vnc.c b/vnc.c
+index 28d4022..8cd31eb 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -94,6 +94,7 @@ typedef struct VncDisplay VncDisplay;
  
  struct VncDisplay
  {
@@ -9,7 +10,7 @@ diff -r 3e18cc267db8 vnc.c
      int lsock;
      DisplayState *ds;
      VncState *clients;
-@@ -121,7 +122,6 @@
+@@ -121,7 +122,6 @@ struct VncSurface
  
  struct VncState
  {
@@ -17,7 +18,7 @@ diff -r 3e18cc267db8 vnc.c
      int csock;
      DisplayState *ds;
      struct VncSurface guest;   /* guest visible surface (aka ds->surface) */
-@@ -206,10 +206,12 @@
+@@ -206,10 +206,12 @@ static void vnc_write_s32(VncState *vs, int32_t value);
  static void vnc_write_u16(VncState *vs, uint16_t value);
  static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
@@ -31,7 +32,7 @@ diff -r 3e18cc267db8 vnc.c
  
  static void vnc_colordepth(VncState *vs);
  
-@@ -715,9 +717,8 @@
+@@ -715,9 +717,8 @@ static int find_and_clear_dirty_height(struct VncSurface *s,
      return h;
  }
  
@@ -42,7 +43,7 @@ diff -r 3e18cc267db8 vnc.c
      if (vs->need_update && vs->csock != -1) {
  	int y;
          uint8_t *guest_row;
-@@ -728,13 +729,9 @@
+@@ -728,13 +729,9 @@ static void vnc_update_client(void *opaque)
  	int saved_offset;
  	int has_dirty = 0;
  
@@ -57,10 +58,10 @@ diff -r 3e18cc267db8 vnc.c
  
          /*
           * Walk through the guest dirty map.
-@@ -770,10 +767,8 @@
+@@ -770,10 +767,8 @@ static void vnc_update_client(void *opaque)
              server_row += ds_get_linesize(vs->ds);
          }
-
+ 
 -        if (!has_dirty && !vs->audio_cap && !vs->force_update) {
 -	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
 +        if (!has_dirty && !vs->audio_cap && !vs->force_update)
@@ -69,7 +70,7 @@ diff -r 3e18cc267db8 vnc.c
  
          /*
           * Send screen updates to the vnc client using the server
-@@ -818,12 +813,8 @@
+@@ -818,12 +813,8 @@ static void vnc_update_client(void *opaque)
  
      }
  
@@ -83,7 +84,7 @@ diff -r 3e18cc267db8 vnc.c
  }
  
  /* audio */
-@@ -1088,8 +1079,6 @@
+@@ -1088,8 +1079,6 @@ static void vnc_disconnect_start(VncState *vs)
  
  static void vnc_disconnect_finish(VncState *vs)
  {
@@ -92,7 +93,7 @@ diff -r 3e18cc267db8 vnc.c
      if (vs->input.buffer) qemu_free(vs->input.buffer);
      if (vs->output.buffer) qemu_free(vs->output.buffer);
      audio_del(vs);
-@@ -1112,6 +1101,7 @@
+@@ -1112,6 +1101,7 @@ static void vnc_disconnect_finish(VncState *vs)
      qemu_free(vs->server.ds);
      qemu_free(vs->guest.ds);
      qemu_free(vs);
@@ -100,7 +101,7 @@ diff -r 3e18cc267db8 vnc.c
  }
  
  #ifdef CONFIG_VNC_TLS
-@@ -2327,6 +2317,38 @@
+@@ -2327,6 +2317,38 @@ static int protocol_version(VncState *vs, uint8_t *version, size_t len)
      return 0;
  }
  
@@ -139,7 +140,7 @@ diff -r 3e18cc267db8 vnc.c
  static void vnc_connect(VncDisplay *vd, int csock)
  {
      VncState *vs = qemu_mallocz(sizeof(VncState));
-@@ -2339,7 +2361,6 @@
+@@ -2339,7 +2361,6 @@ static void vnc_connect(VncDisplay *vd, int csock)
  
      vs->vd = vd;
      vs->ds = vd->ds;
@@ -147,7 +148,7 @@ diff -r 3e18cc267db8 vnc.c
      vs->last_x = -1;
      vs->last_y = -1;
  
-@@ -2357,6 +2378,7 @@
+@@ -2357,6 +2378,7 @@ static void vnc_connect(VncDisplay *vd, int csock)
      vs->next = vd->clients;
      vd->clients = vs;
  

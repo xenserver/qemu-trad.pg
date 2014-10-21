@@ -1,7 +1,8 @@
-diff -r c1ff188c83f1 block.c
---- a/block.c	Tue Nov 30 13:23:48 2010 +0000
-+++ b/block.c	Tue Nov 30 13:23:58 2010 +0000
-@@ -360,7 +360,6 @@ int bdrv_open2(BlockDriverState *bs, con
+diff --git a/block.c b/block.c
+index 1379b56..0266508 100644
+--- a/block.c
++++ b/block.c
+@@ -360,7 +360,6 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
      char tmp_filename[PATH_MAX];
      char backing_filename[PATH_MAX];
  
@@ -9,7 +10,7 @@ diff -r c1ff188c83f1 block.c
      bs->is_temporary = 0;
      bs->encrypted = 0;
      bs->valid_key = 0;
-@@ -419,11 +418,13 @@ int bdrv_open2(BlockDriverState *bs, con
+@@ -419,11 +418,13 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
      }
      bs->drv = drv;
      bs->opaque = qemu_mallocz(drv->instance_size);
@@ -28,7 +29,7 @@ diff -r c1ff188c83f1 block.c
          open_flags = flags & ~(BDRV_O_FILE | BDRV_O_SNAPSHOT);
      ret = drv->bdrv_open(bs, filename, open_flags);
      if ((ret == -EACCES || ret == -EPERM) && !(flags & BDRV_O_FILE)) {
-@@ -946,6 +947,11 @@ int bdrv_is_read_only(BlockDriverState *
+@@ -946,6 +947,11 @@ int bdrv_is_read_only(BlockDriverState *bs)
      return bs->read_only;
  }
  
@@ -40,10 +41,11 @@ diff -r c1ff188c83f1 block.c
  int bdrv_is_sg(BlockDriverState *bs)
  {
      return bs->sg;
-diff -r c1ff188c83f1 block.h
---- a/block.h	Tue Nov 30 13:23:48 2010 +0000
-+++ b/block.h	Tue Nov 30 13:23:58 2010 +0000
-@@ -129,6 +129,7 @@ int bdrv_get_type_hint(BlockDriverState 
+diff --git a/block.h b/block.h
+index fc0afbb..a41bc9d 100644
+--- a/block.h
++++ b/block.h
+@@ -129,6 +129,7 @@ int bdrv_get_type_hint(BlockDriverState *bs);
  int bdrv_get_translation_hint(BlockDriverState *bs);
  int bdrv_is_removable(BlockDriverState *bs);
  int bdrv_is_read_only(BlockDriverState *bs);
@@ -51,10 +53,11 @@ diff -r c1ff188c83f1 block.h
  int bdrv_is_sg(BlockDriverState *bs);
  int bdrv_is_inserted(BlockDriverState *bs);
  int bdrv_media_changed(BlockDriverState *bs);
-diff -r c1ff188c83f1 xenstore.c
---- a/xenstore.c	Tue Nov 30 13:23:48 2010 +0000
-+++ b/xenstore.c	Tue Nov 30 13:23:58 2010 +0000
-@@ -621,6 +621,12 @@ void xenstore_parse_domain_config(int hv
+diff --git a/xenstore.c b/xenstore.c
+index 0f59e23..42daefe 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -656,6 +656,12 @@ void xenstore_parse_domain_config(int hvm_domid)
          }
  #endif
  
@@ -67,7 +70,7 @@ diff -r c1ff188c83f1 xenstore.c
          bs = bdrv_new(dev);
          /* check if it is a cdrom */
          if (danger_type) {
-@@ -641,6 +647,9 @@ void xenstore_parse_domain_config(int hv
+@@ -676,6 +682,9 @@ void xenstore_parse_domain_config(int hvm_domid)
              }
          }
  

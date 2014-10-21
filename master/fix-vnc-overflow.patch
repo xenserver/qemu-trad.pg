@@ -1,10 +1,11 @@
 # HG changeset patch
 # Parent 7aa21a93f927b73119f683c3c808113c8823252b
 
-diff -r 7aa21a93f927 vnc.c
---- a/vnc.c	Tue Jan 17 13:35:02 2012 +0000
-+++ b/vnc.c	Tue Jan 17 14:23:19 2012 +0000
-@@ -593,8 +593,8 @@
+diff --git a/vnc.c b/vnc.c
+index 91f6ec6..06715b3 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -593,8 +593,8 @@ static int vnc_zlib_stop(VncState *vs, int stream_id)
      zstream->avail_in = vs->zlib.offset;
      zstream->next_out = vs->output.buffer + vs->output.offset;
      zstream->avail_out = vs->output.capacity - vs->output.offset;
@@ -14,7 +15,7 @@ diff -r 7aa21a93f927 vnc.c
  
      // start encoding
      if (deflate(zstream, Z_SYNC_FLUSH) != Z_OK) {
-@@ -603,7 +603,7 @@
+@@ -603,7 +603,7 @@ static int vnc_zlib_stop(VncState *vs, int stream_id)
      }
  
      vs->output.offset = vs->output.capacity - zstream->avail_out;

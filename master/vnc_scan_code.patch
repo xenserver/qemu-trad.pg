@@ -1,7 +1,8 @@
-diff -r ab9f7af9f991 vnc.c
---- a/vnc.c	Wed Jul 08 14:44:33 2009 +0100
-+++ b/vnc.c	Wed Jul 08 15:33:40 2009 +0100
-@@ -1331,6 +1331,18 @@
+diff --git a/vnc.c b/vnc.c
+index f7fa9e2..f9bf92c 100644
+--- a/vnc.c
++++ b/vnc.c
+@@ -1363,6 +1363,18 @@ static void ext_key_event(VncState *vs, int down,
          do_key_event(vs, down, keycode, sym);
  }
  
@@ -20,7 +21,7 @@ diff -r ab9f7af9f991 vnc.c
  static void framebuffer_update_request(VncState *vs, int incremental,
  				       int x_position, int y_position,
  				       int w, int h)
-@@ -1622,6 +1634,12 @@
+@@ -1659,6 +1671,12 @@ static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
  
  	client_cut_text(vs, read_u32(data, 4), data + 8);
  	break;

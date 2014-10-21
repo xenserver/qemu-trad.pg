@@ -1,7 +1,8 @@
-diff -r 7c8e9729cee8 vl.c
---- a/vl.c	Mon Jun 15 18:30:52 2009 +0100
-+++ b/vl.c	Mon Jun 15 18:31:51 2009 +0100
-@@ -5927,8 +5927,6 @@
+diff --git a/vl.c b/vl.c
+index f140c84..804e69a 100644
+--- a/vl.c
++++ b/vl.c
+@@ -6092,8 +6092,6 @@ int main(int argc, char **argv, char **envp)
          if (devname && strcmp(devname, "none")) {
              char label[32];
              snprintf(label, sizeof(label), "serial%d", i);
@@ -10,7 +11,7 @@ diff -r 7c8e9729cee8 vl.c
              xenstore_store_serial_port_info(i, serial_hds[i], devname);
          }
      }
-@@ -5938,8 +5936,6 @@
+@@ -6103,8 +6101,6 @@ int main(int argc, char **argv, char **envp)
          if (devname && strcmp(devname, "none")) {
              char label[32];
              snprintf(label, sizeof(label), "parallel%d", i);

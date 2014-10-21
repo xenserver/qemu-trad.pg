@@ -1,5 +1,5 @@
 diff --git a/hw/ide.c b/hw/ide.c
-index 62d9631..ace0a57 100644
+index 791666b..2c61dfd 100644
 --- a/hw/ide.c
 +++ b/hw/ide.c
 @@ -446,7 +446,7 @@ typedef struct IDEState {
@@ -114,7 +114,7 @@ index 62d9631..ace0a57 100644
          break;
      case GPCMD_MODE_SENSE_6:
      case GPCMD_MODE_SENSE_10:
-@@ -2303,6 +2340,46 @@ static void ide_atapi_cmd(IDEState *s)
+@@ -2299,6 +2336,46 @@ static void ide_atapi_cmd(IDEState *s)
              ide_atapi_cmd_reply(s, len, max_len);
              break;
          }
@@ -161,7 +161,7 @@ index 62d9631..ace0a57 100644
      default:
          ide_atapi_cmd_error(s, SENSE_ILLEGAL_REQUEST,
                              ASC_ILLEGAL_OPCODE);
-@@ -2374,9 +2451,7 @@ static void cdrom_change_cb(void *opaque)
+@@ -2370,9 +2447,7 @@ static void cdrom_change_cb(void *opaque)
      bdrv_get_geometry(s->bs, &nb_sectors);
      s->nb_sectors = nb_sectors;
  
@@ -172,7 +172,7 @@ index 62d9631..ace0a57 100644
      ide_set_irq(s);
  }
  
-@@ -3096,6 +3171,7 @@ static void ide_reset(IDEState *s)
+@@ -3092,6 +3167,7 @@ static void ide_reset(IDEState *s)
      s->end_transfer_func = ide_dummy_transfer_stop;
      ide_dummy_transfer_stop(s);
      s->media_changed = 0;

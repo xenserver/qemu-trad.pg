@@ -1,7 +1,8 @@
-diff -r a4944e137ac8 qemu-timer.h
---- a/qemu-timer.h	Tue Aug 04 17:12:18 2009 +0100
-+++ b/qemu-timer.h	Tue Aug 04 17:12:49 2009 +0100
-@@ -25,6 +25,7 @@
+diff --git a/qemu-timer.h b/qemu-timer.h
+index 181428f..dcbf1d1 100644
+--- a/qemu-timer.h
++++ b/qemu-timer.h
+@@ -25,6 +25,7 @@ void qemu_del_timer(QEMUTimer *ts);
  void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time);
  void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time);
  int qemu_timer_pending(QEMUTimer *ts);
@@ -9,10 +10,11 @@ diff -r a4944e137ac8 qemu-timer.h
  
  extern int64_t ticks_per_sec;
  
-diff -r a4944e137ac8 vl.c
---- a/vl.c	Tue Aug 04 17:12:18 2009 +0100
-+++ b/vl.c	Tue Aug 04 17:12:50 2009 +0100
-@@ -1204,7 +1204,7 @@
+diff --git a/vl.c b/vl.c
+index 41100d0..5d9f331 100644
+--- a/vl.c
++++ b/vl.c
+@@ -1212,7 +1212,7 @@ int qemu_timer_pending(QEMUTimer *ts)
      return 0;
  }
  
@@ -21,9 +23,10 @@ diff -r a4944e137ac8 vl.c
  {
      if (!timer_head)
          return 0;
-diff -r a4944e137ac8 vnc.c
---- a/vnc.c	Tue Aug 04 17:12:18 2009 +0100
-+++ b/vnc.c	Tue Aug 04 17:12:50 2009 +0100
+diff --git a/vnc.c b/vnc.c
+index 4f55625..98fa47a 100644
+--- a/vnc.c
++++ b/vnc.c
 @@ -31,7 +31,9 @@
  #include "audio/audio.h"
  #include <zlib.h>
@@ -35,7 +38,7 @@ diff -r a4944e137ac8 vnc.c
  
  #include "vnc.h"
  #include "vnc_keysym.h"
-@@ -101,6 +103,7 @@
+@@ -101,6 +103,7 @@ struct VncSurface
  struct VncDisplay
  {
      QEMUTimer *timer;
@@ -43,7 +46,7 @@ diff -r a4944e137ac8 vnc.c
      int lsock;
      DisplayState *ds;
      VncState *clients;
-@@ -208,7 +211,7 @@
+@@ -208,7 +211,7 @@ static void vnc_write_s32(VncState *vs, int32_t value);
  static void vnc_write_u16(VncState *vs, uint16_t value);
  static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
@@ -52,7 +55,7 @@ diff -r a4944e137ac8 vnc.c
  static void vnc_client_read(void *opaque);
  static void vnc_disconnect_start(VncState *vs);
  static void vnc_disconnect_finish(VncState *vs);
-@@ -745,7 +748,7 @@
+@@ -745,7 +748,7 @@ static int find_and_clear_dirty_height(struct VncState *vs,
      return h;
  }
  
@@ -61,7 +64,7 @@ diff -r a4944e137ac8 vnc.c
  {
      if (vs->need_update && vs->csock != -1) {
          VncDisplay *vd = vs->vd;
-@@ -755,10 +758,10 @@
+@@ -755,10 +758,10 @@ static void vnc_update_client(VncState *vs, int has_dirty)
  
          if (vs->output.offset && !vs->audio_cap && !vs->force_update)
              /* kernel send buffers are full -> drop frames to throttle */
@@ -74,7 +77,7 @@ diff -r a4944e137ac8 vnc.c
  
          /*
           * Send screen updates to the vnc client using the server
-@@ -801,10 +804,13 @@
+@@ -801,10 +804,13 @@ static void vnc_update_client(VncState *vs, int has_dirty)
  	vnc_flush(vs);
          vs->force_update = 0;
  
@@ -88,7 +91,7 @@ diff -r a4944e137ac8 vnc.c
  }
  
  /* audio */
-@@ -1557,6 +1563,13 @@
+@@ -1557,6 +1563,13 @@ static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
  {
      int i;
      uint16_t limit;
@@ -102,7 +105,7 @@ diff -r a4944e137ac8 vnc.c
  
      switch (data[0]) {
      case 0:
-@@ -2356,7 +2369,7 @@
+@@ -2356,7 +2369,7 @@ static void vnc_refresh(void *opaque)
  {
      VncDisplay *vd = opaque;
      VncState *vs = NULL;
@@ -111,7 +114,7 @@ diff -r a4944e137ac8 vnc.c
  
      vga_hw_update();
  
-@@ -2364,15 +2377,25 @@
+@@ -2364,15 +2377,25 @@ static void vnc_refresh(void *opaque)
  
      vs = vd->clients;
      while (vs != NULL) {

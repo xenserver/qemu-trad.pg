@@ -1,6 +1,7 @@
-diff -r 5baf469f44ee hw/piix4acpi.c
---- a/hw/piix4acpi.c	Wed May 25 13:33:53 2011 +0100
-+++ b/hw/piix4acpi.c	Thu Jun 09 17:25:00 2011 +0100
+diff --git a/hw/piix4acpi.c b/hw/piix4acpi.c
+index f3108b2..dca0032 100644
+--- a/hw/piix4acpi.c
++++ b/hw/piix4acpi.c
 @@ -30,9 +30,11 @@
  #include "qemu-xen.h"
  #include "battery_mgmt.h"
@@ -30,7 +31,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
  
      uint32_t pm1a_evt_blk_address;
  } PCIAcpiState;
-@@ -183,6 +188,248 @@ static int piix4acpi_load(QEMUFile *f, v
+@@ -183,6 +188,248 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
      return 0;
  }
  
@@ -279,7 +280,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
  static void acpiPm1Control_writeb(void *opaque, uint32_t addr, uint32_t val)
  {
      PCIAcpiState *s = opaque;
-@@ -196,24 +443,38 @@ static uint32_t acpiPm1Control_readb(voi
+@@ -196,24 +443,38 @@ static uint32_t acpiPm1Control_readb(void *opaque, uint32_t addr)
      return (uint8_t)(s->pm1_control & ~(GBL_RLS|SLP_EN));
  }
  
@@ -289,10 +290,25 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 -    if (!(val & SLP_EN))
 -        return;
 +    PCIAcpiState *s = opaque;
- 
--    switch (val & SLP_TYP_Sx) {
++
 +    fprintf(stderr, "RTC alarm fired\n");
 +
++    switch (s->pm1_control & SLP_TYP_Sx) {
++    case SLP_TYP_S3_V0:
++    case SLP_TYP_S3_V1:
++        wake_from_s3(s);
++        break;
++    case SLP_TYP_S4_V0:
++        wake_from_s4(s);
++        break;
++    default:
++        break;
++    }
++}
+ 
+-    switch (val & SLP_TYP_Sx) {
++static void acpi_shutdown(PCIAcpiState *s)
++{
 +    switch (s->pm1_control & SLP_TYP_Sx) {
      case SLP_TYP_S3_V0:
      case SLP_TYP_S3_V1:
@@ -301,24 +317,9 @@ diff -r 5baf469f44ee hw/piix4acpi.c
 -        s3_shutdown_flag = 0;
 -        cmos_set_s3_resume();
 -        xc_set_hvm_param(xc_handle, domid, HVM_PARAM_ACPI_S_STATE, 3);
-+        wake_from_s3(s);
++        acpi_s3(s);
          break;
      case SLP_TYP_S4_V0:
-+        wake_from_s4(s);
-+        break;
-+    default:
-+        break;
-+    }
-+}
-+
-+static void acpi_shutdown(PCIAcpiState *s)
-+{
-+    switch (s->pm1_control & SLP_TYP_Sx) {
-+    case SLP_TYP_S3_V0:
-+    case SLP_TYP_S3_V1:
-+        acpi_s3(s);
-+        break;
-+    case SLP_TYP_S4_V0:
 +        acpi_s4(s);
 +        break;
      case SLP_TYP_S5_V0:
@@ -328,7 +329,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
          break;
      default:
          break;
-@@ -227,12 +488,14 @@ static void acpiPm1ControlP1_writeb(void
+@@ -227,12 +488,14 @@ static void acpiPm1ControlP1_writeb(void *opaque, uint32_t addr, uint32_t val)
      val <<= 8;
      s->pm1_control = ((s->pm1_control & 0xff) | val) & ~SLP_EN;
  
@@ -344,7 +345,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
      /* Mask out the write-only bits */
      return (uint8_t)((s->pm1_control & ~(GBL_RLS|SLP_EN)) >> 8);
  }
-@@ -243,7 +506,8 @@ static void acpiPm1Control_writew(void *
+@@ -243,7 +506,8 @@ static void acpiPm1Control_writew(void *opaque, uint32_t addr, uint32_t val)
  
      s->pm1_control = val & ~SLP_EN;
  
@@ -354,7 +355,7 @@ diff -r 5baf469f44ee hw/piix4acpi.c
  }
  
  static uint32_t acpiPm1Control_readw(void *opaque, uint32_t addr)
-@@ -745,6 +1009,10 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int 
+@@ -745,6 +1009,10 @@ i2c_bus *piix4_pm_init(PCIBus *bus, int devfn, uint32_t smb_io_base,
          bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
          devfn, NULL, NULL);
  
@@ -365,10 +366,11 @@ diff -r 5baf469f44ee hw/piix4acpi.c
      pci_conf = d->dev.config;
      pci_conf[0x00] = 0x86;  /* Intel */
      pci_conf[0x01] = 0x80;
-diff -r 5baf469f44ee vl.c
---- a/vl.c	Wed May 25 13:33:53 2011 +0100
-+++ b/vl.c	Thu Jun 09 17:25:00 2011 +0100
-@@ -3673,8 +3673,10 @@ void qemu_system_reset(void)
+diff --git a/vl.c b/vl.c
+index fce7236..61b87d5 100644
+--- a/vl.c
++++ b/vl.c
+@@ -3682,8 +3682,10 @@ void qemu_system_reset(void)
  void qemu_system_reset_request(void)
  {
      if (no_reboot) {
@@ -379,7 +381,7 @@ diff -r 5baf469f44ee vl.c
          reset_requested = 1;
      }
      if (cpu_single_env)
-@@ -3684,6 +3686,7 @@ void qemu_system_reset_request(void)
+@@ -3693,6 +3695,7 @@ void qemu_system_reset_request(void)
  void qemu_system_shutdown_request(void)
  {
      shutdown_requested = 1;
@@ -387,7 +389,7 @@ diff -r 5baf469f44ee vl.c
      if (cpu_single_env)
          cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
  }
-@@ -3691,6 +3694,7 @@ void qemu_system_shutdown_request(void)
+@@ -3700,6 +3703,7 @@ void qemu_system_shutdown_request(void)
  void qemu_system_powerdown_request(void)
  {
      powerdown_requested = 1;
@@ -395,7 +397,7 @@ diff -r 5baf469f44ee vl.c
      if (cpu_single_env)
          cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
  }
-@@ -3905,6 +3909,7 @@ int main_loop(void)
+@@ -3914,6 +3918,7 @@ int main_loop(void)
              cur_cpu = env;
  
              if (shutdown_requested) {
@@ -403,7 +405,7 @@ diff -r 5baf469f44ee vl.c
                  ret = EXCP_INTERRUPT;
                  if (no_shutdown) {
                      vm_stop(0);
-@@ -3914,13 +3919,15 @@ int main_loop(void)
+@@ -3923,13 +3928,15 @@ int main_loop(void)
                      break;
              }
              if (reset_requested) {
