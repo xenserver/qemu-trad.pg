@@ -11,6 +11,13 @@
 #
 
 #
+# Build System
+#
+out-of-xen-build.patch
+xenserver-build-tweaks.patch
+builder-makefiles.patch
+
+#
 # Patches from upstream (qemu-traditional upstream)
 #
 
@@ -20,13 +27,9 @@
 qemu-d0395cc49b2ec6d1723c01f1daf2394b9264ca29.patch # free all the pirqs for msi/msix when driver unloads
 
 #
-# Build System
-#
-build-makefiles.patch
-
-#
 # Patches for upstream (qemu-traditional)
 #
+0003-virtio-blk-initialize-unused-blkcfg.size_max-field.patch
 fix-cdrom-eject.patch
 smbus-nuke-eeprom.patch
 clear-dynticks-sigevent.patch
