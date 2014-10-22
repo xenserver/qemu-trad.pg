@@ -63,18 +63,18 @@ index 09d9a62..451a094 100644
                                                int linesize, uint8_t *data)
  {
 diff --git a/console.h b/console.h
-index 28ef65f..63ebe30 100644
+index 79b9756..464962d 100644
 --- a/console.h
 +++ b/console.h
-@@ -70,6 +70,7 @@ void kbd_put_keysym(int keysym);
+@@ -69,6 +69,7 @@ void kbd_put_keysym(int keysym);
+ #define GUI_REFRESH_INTERVAL 30
  #define QEMU_BIG_ENDIAN_FLAG    0x01
  #define QEMU_ALLOCATED_FLAG     0x02
- #define QEMU_REALPIXELS_FLAG    0x04
 +#define QEMU_LAZY_FLAG    0x08
  
  struct PixelFormat {
      uint8_t bits_per_pixel;
-@@ -247,8 +248,19 @@ static inline int ds_get_linesize(DisplayState *ds)
+@@ -245,8 +246,19 @@ static inline int ds_get_linesize(DisplayState *ds)
      return ds->surface->linesize;
  }
  
@@ -108,7 +108,7 @@ index efe444c..2d5feb5 100644
          d = d1;
          for(x = 0; x < ds->width; x++) {
 diff --git a/vnc.c b/vnc.c
-index 4b337ee..4ba677c 100644
+index 4b337ee..ccc94e4 100644
 --- a/vnc.c
 +++ b/vnc.c
 @@ -341,6 +341,9 @@ static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
@@ -140,7 +140,7 @@ index 4b337ee..4ba677c 100644
 +    /* if we are using the default allocator and buffer is allocated
 +     * free and allocate lazily
 +     */
-+    if (data && (vd->ds->surface->flags & (QEMU_ALLOCATED_FLAG|QEMU_LAZY_FLAG|QEMU_REALPIXELS_FLAG))
++    if (data && (vd->ds->surface->flags & (QEMU_ALLOCATED_FLAG|QEMU_LAZY_FLAG))
 +        == (QEMU_ALLOCATED_FLAG|QEMU_LAZY_FLAG)) {
 +        qemu_free(vd->ds->surface->data);
 +        vd->ds->surface->data = NULL;

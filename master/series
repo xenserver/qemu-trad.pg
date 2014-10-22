@@ -83,7 +83,6 @@ sanify-usb-controller-setup.patch
 fix_cirrus_updates.patch
 extra_safe_cirrus_updates.patch
 monitor_on_xenstore.patch
-qemu-sdl-zoom.patch
 cdrom_insert_open_flags.patch
 fix_rtl_saverestore.patch
 vga-clear-fb-on-switch-to-graphic.patch
@@ -105,15 +104,12 @@ xen-platform-scsi-controller.patch
 xenstore_set_device_locked.patch
 close-and-flush-disconnected-emulated-devices.patch
 qemu-logconsole-to-file.patch
-qemu-sdl-nograb.patch
 qemu-dont-probe-disk-format.patch
 qemu-force-lba-geometry.patch
 qemu-fix-tap-open-race-CA-8496.patch
 CA-8472.patch
-qemu-sdl-hide-pointer-when-not-in-focus.patch
 CA-10912-silence-parallel-msg.patch
 qemu-enforce-read-only-CA-12833.patch
-qemu-sdl-geometry.patch
 acpi-wake-timer.patch
 qemu-keymap.patch
 vnc_clipboard.patch
