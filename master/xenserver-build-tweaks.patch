@@ -17,3 +17,18 @@ index afd2295..dfe271d 100644
 +
 +# Don't link against blktap1
 +CONFIG_BLKTAP1=n
+diff --git a/xen-setup b/xen-setup
+index c3af79b..2da3085 100755
+--- a/xen-setup
++++ b/xen-setup
+@@ -29,8 +29,8 @@ ln -sf ${QEMU_ROOT:-..}/xen-config.mak $target/config.mak
+ cat ${QEMU_ROOT:-.}/xen-config-host.mak >>config-host.mak
+ 
+ sed -e 's,qemu,xen/qemu,' config-host.h >config-host.h.new
+-echo "#define DEFAULT_NETWORK_SCRIPT      \"${XEN_SCRIPT_DIR}/qemu-ifup\"" >>config-host.h.new
+-echo "#define DEFAULT_NETWORK_DOWN_SCRIPT \"${XEN_SCRIPT_DIR}/qemu-ifdown\"" >>config-host.h.new
++echo "#define DEFAULT_NETWORK_SCRIPT      \"\"" >>config-host.h.new
++echo "#define DEFAULT_NETWORK_DOWN_SCRIPT \"\"" >>config-host.h.new
+ echo '#include "xen-config-host.h"' >>config-host.h.new
+ 
+ if test -f config-host.h~; then mv config-host.h~ config-host.h; fi

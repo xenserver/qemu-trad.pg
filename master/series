@@ -123,7 +123,6 @@ large_resolution.patch
 #
 # Product specific
 #
-disable-qemu-ifup.patch
 enable_cirrus_irq.patch
 xenstore-exit-on-domain-destruction.patch # does not work with stubdom
 set_timeoffset.patch
