@@ -6,7 +6,7 @@ Cache get_clock result to make it faster.
 This safe more than 50% clock_gettime syscalls.
 
 diff --git a/vl.c b/vl.c
-index 6b93354..2012f14 100644
+index fa30c3f..0624ccb 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -886,13 +886,25 @@ static void init_get_clock(void)
@@ -37,7 +37,7 @@ index 6b93354..2012f14 100644
  #endif
      {
 @@ -964,6 +976,7 @@ static int64_t cpu_get_clock(void)
- static void cpu_enable_ticks(void)
+ void cpu_enable_ticks(void)
  {
      if (!cpu_ticks_enabled) {
 +        update_get_clock();
