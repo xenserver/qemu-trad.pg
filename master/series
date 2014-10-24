@@ -150,6 +150,7 @@ CA-123830-reenable-O_DIRECT.patch
 CA-127361.patch
 vgpu.patch
 fixed-devfn.patch
+Xen-vm-kernel-crash-in-get_free_entries-workaround.patch
 vnc-dynamically-alloc-dirty-buffers.patch
 syslog_support.patch
 name2keysym_constant.patch
