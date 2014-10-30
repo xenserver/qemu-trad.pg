@@ -1,0 +1,23 @@
+From d9f437d6caeb34b7789b8409f24c1b63b1a2519e Mon Sep 17 00:00:00 2001
+From: Yunlei Ding <yunlei.ding@citrix.com>
+Date: Tue, 11 Mar 2014 09:55:59 +0000
+Subject: [PATCH 05/11] net: initialize addrlen param in getsockname() call
+ which CID is 24597.
+To: andrew.cooper3@citrix.com
+
+Use sizeof function to initialize saddr_len variable.
+
+Signed-off-by: Yunlei Ding <yunlei.ding@citrix.com>
+diff --git a/net.c b/net.c
+index 4bd7184..6d52817 100644
+--- a/net.c
++++ b/net.c
+@@ -1322,7 +1322,7 @@ static NetSocketState *net_socket_fd_init_dgram(VLANState *vlan,
+ {
+     struct sockaddr_in saddr;
+     int newfd;
+-    socklen_t saddr_len;
++    socklen_t saddr_len = sizeof(saddr);
+     NetSocketState *s;
+ 
+     /* fd passed: multicast: "learn" dgram_dst address from bound address and save it

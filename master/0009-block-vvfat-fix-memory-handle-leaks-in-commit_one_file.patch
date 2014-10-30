@@ -1,0 +1,60 @@
+From f18a3679317b22f52d924685234d79ff4fa1bc6b Mon Sep 17 00:00:00 2001
+From: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+Date: Fri, 7 Mar 2014 16:44:33 +0000
+Subject: [PATCH 09/10] block-vvfat: fix memory/handle leaks in commit_one_file()
+To: andrew.cooper3@citrix.com
+
+Some handles and memory in commit_one_file are going to be leaked if
+certain function calls failed.
+Coverity issue id: 22542 and 22543.
+
+Signed-off-by: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+diff --git a/block-vvfat.c b/block-vvfat.c
+index 9eb676b..7822b1a 100644
+--- a/block-vvfat.c
++++ b/block-vvfat.c
+@@ -2222,11 +2222,15 @@ static int commit_one_file(BDRVVVFATState* s,
+     if (fd < 0) {
+ 	fprintf(stderr, "Could not open %s... (%s, %d)\n", mapping->path,
+ 		strerror(errno), errno);
++	qemu_free(cluster);
+ 	return fd;
+     }
+     if (offset > 0)
+-	if (lseek(fd, offset, SEEK_SET) != offset)
++	if (lseek(fd, offset, SEEK_SET) != offset) {
++	    close(fd);
++	    qemu_free(cluster);
+ 	    return -3;
++	}
+ 
+     while (offset < size) {
+ 	uint32_t c1;
+@@ -2242,11 +2246,17 @@ static int commit_one_file(BDRVVVFATState* s,
+ 	ret = vvfat_read(s->bs, cluster2sector(s, c),
+ 	    (uint8_t*)cluster, (rest_size + 0x1ff) / 0x200);
+ 
+-	if (ret < 0)
++	if (ret < 0) {
++	    close(fd);
++	    qemu_free(cluster);
+ 	    return ret;
++	}
+ 
+-	if (qemu_write_ok(fd, cluster, rest_size) < 0)
++	if (qemu_write_ok(fd, cluster, rest_size) < 0) {
++	    close(fd);
++	    qemu_free(cluster);
+ 	    return -2;
++	}
+ 
+ 	offset += rest_size;
+ 	c = c1;
+@@ -2254,6 +2264,7 @@ static int commit_one_file(BDRVVVFATState* s,
+ 
+     ftruncate(fd, size);
+     close(fd);
++    qemu_free(cluster);
+ 
+     return commit_mappings(s, first_cluster, dir_index);
+ }

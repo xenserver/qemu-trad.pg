@@ -59,6 +59,25 @@ smbus-nuke-eeprom.patch
 # Valgrind/Coverity fixes
 clear-dynticks-sigevent.patch
 reduce-memory-leaks.patch
+hw-msmouse-Fix-deref_after_free.patch
+0001-readline-fix-memory-corruption-when-adding-history.patch
+0002-block-cow-dont-close-cow_fd-twice-on-error.patch
+0003-console-font_data-is-only-8-bits.patch
+0004-hw-device-hotplug-fix-test-of-drive_add-return.patch
+0005-qemu-char-fix-memory-leak-in-qemu_char_open_pty.patch
+0006-hw-ide-fix-memory-leak-from-qemu_allocate_irqs.patch
+0007-net-dont-leak-an-fd-after-an-error.patch
+0008-net-fix-memory-handle-leaks-in-net_socket_listen_init.patch
+0009-block-vvfat-fix-memory-handle-leaks-in-commit_one_file.patch
+0010-block-vvfat-fix-memory-leak-in-check_directory_consistenccy.patch
+0004-virtio-blk-correctly-link-new-request-in-virtio_blk_load.patch
+0005-net-initialize-addrlen-param-in-getsockname-call.patch
+0006-net-initialize-saddr-before-getsockname-call.patch
+0007-ide-dont-leak-irq-array-in_pci_cmd646_ide_init.patch
+0008-block-nbd-close-sock-in-nbd_open-error_path.patch
+0009-block-raw-posix-Fix-memory-leak-in-posix_aio_init.patch
+0010-block-vvfat-fix-memory-leak-in-read_directory.patch
+0011-block-vvfat-close-dir-in-read_directory-error-path.patch
 
 #
 # Non-upstreamable patches

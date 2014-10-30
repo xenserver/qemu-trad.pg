@@ -1,0 +1,22 @@
+From e28bd4bed4d97a2f3713dfb0cc3bd2c915539cd0 Mon Sep 17 00:00:00 2001
+From: Yunlei Ding <yunlei.ding@citrix.com>
+Date: Tue, 11 Mar 2014 10:14:56 +0000
+Subject: [PATCH 09/11] block-raw-posix: Fix memory leak in posix_aio_init()
+ is 23012
+To: andrew.cooper3@citrix.com
+
+Free allocated memory s before return.
+
+Signed-off-by: Yunlei Ding <yunlei.ding@citrix.com>
+diff --git a/block-raw-posix.c b/block-raw-posix.c
+index 82a9c50..ef65db3 100644
+--- a/block-raw-posix.c
++++ b/block-raw-posix.c
+@@ -612,6 +612,7 @@ static int posix_aio_init(void)
+     s->first_aio = NULL;
+     if (pipe(fds) == -1) {
+         fprintf(stderr, "failed to create pipe\n");
++        qemu_free(s);
+         return -errno;
+     }
+ 
