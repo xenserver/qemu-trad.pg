@@ -1,0 +1,27 @@
+From 4e7d50fe9ad009b759cdff7f3be1e247b9cc4f26 Mon Sep 17 00:00:00 2001
+From: David Vrabel <david.vrabel@citrix.com>
+Date: Tue, 4 Nov 2014 11:39:43 +0000
+Subject: [PATCH 2/4] cirrus_vga: default all I/O port reads to 0xff
+
+Some error paths in vga_ioport_read() would return undefined values.
+Always default the result to 0xff.
+---
+ hw/cirrus_vga.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 235fc16..57ab2a7 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -2687,7 +2687,7 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
+ static uint32_t vga_ioport_read(void *opaque, uint32_t addr)
+ {
+     CirrusVGAState *s = opaque;
+-    int val, index;
++    int val = 0xff, index;
+ 
+     /* check port range access depending on color/monochrome mode */
+     if ((addr >= 0x3b0 && addr <= 0x3bf && (s->msr & MSR_COLOR_EMULATION))
+-- 
+1.7.10.4
+

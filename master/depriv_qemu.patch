@@ -1,7 +1,16 @@
 diff --git a/Makefile.target b/Makefile.target
-index 85cea08..be96388 100644
+index 85cea08..4532375 100644
 --- a/Makefile.target
 +++ b/Makefile.target
+@@ -117,7 +117,7 @@ CFLAGS+=$(OS_CFLAGS) $(ARCH_CFLAGS)
+ LDFLAGS+=$(OS_LDFLAGS) $(ARCH_LDFLAGS)
+ 
+ CPPFLAGS+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
+-LIBS+=-lm
++LIBS+=-lm -ldl
+ ifdef CONFIG_WIN32
+ LIBS+=-lwinmm -lws2_32 -liphlpapi
+ endif
 @@ -503,7 +503,7 @@ endif #CONFIG_BSD_USER
  # System emulator target
  ifndef CONFIG_USER_ONLY
@@ -2510,10 +2519,10 @@ index e3c4045..60f3a60 100644
  {
      BlockDriverState *bs;
 diff --git a/sysemu.h b/sysemu.h
-index d30cbff..b342b58 100644
+index 7ea0df5..92b7411 100644
 --- a/sysemu.h
 +++ b/sysemu.h
-@@ -41,6 +41,7 @@ void qemu_system_reset(void);
+@@ -43,6 +43,7 @@ void qemu_system_reset(void);
  
  void do_savevm(const char *name);
  void do_loadvm(const char *name);
@@ -3375,7 +3384,7 @@ index fc8104d..87e02eb 100644
      return s;
  }
 diff --git a/vl.c b/vl.c
-index 2012f14..f7363f7 100644
+index 0624ccb..35211a9 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -48,6 +48,7 @@
@@ -3386,7 +3395,7 @@ index 2012f14..f7363f7 100644
  #include "qemu-xen.h"
  
  #include <xen/hvm/hvm_info_table.h>
-@@ -3878,6 +3879,7 @@ enum {
+@@ -3875,6 +3876,7 @@ enum {
      QEMU_OPTION_tb_size,
      QEMU_OPTION_incoming,
      QEMU_OPTION_chroot,
@@ -3394,7 +3403,7 @@ index 2012f14..f7363f7 100644
      QEMU_OPTION_runas,
      QEMU_OPTION_crashdump_dir,
      QEMU_OPTION_crashdump_quota,
-@@ -4042,6 +4044,7 @@ static const QEMUOption qemu_options[] = {
+@@ -4037,6 +4039,7 @@ static const QEMUOption qemu_options[] = {
      { "tb-size", HAS_ARG, QEMU_OPTION_tb_size },
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
@@ -3402,7 +3411,7 @@ index 2012f14..f7363f7 100644
      { "runas", HAS_ARG, QEMU_OPTION_runas },
      { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
      { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -4413,6 +4416,7 @@ int main(int argc, char **argv, char **envp)
+@@ -4408,6 +4411,7 @@ int main(int argc, char **argv, char **envp)
      const char *run_as = NULL;
      char *crashdump_dir = NULL;
      long long crashdump_quota = 0;
@@ -3410,7 +3419,7 @@ index 2012f14..f7363f7 100644
  
      logfile = stderr; /* initial value */
  
-@@ -5220,6 +5224,9 @@ geometry_error:
+@@ -5190,6 +5194,9 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_chroot:
                  chroot_dir = optarg;
                  break;
@@ -3420,7 +3429,7 @@ index 2012f14..f7363f7 100644
              case QEMU_OPTION_runas:
                  run_as = optarg;
                  break;
-@@ -5308,6 +5315,9 @@ geometry_error:
+@@ -5278,6 +5285,9 @@ int main(int argc, char **argv, char **envp)
      }
  #endif
  
@@ -3430,7 +3439,7 @@ index 2012f14..f7363f7 100644
      if (pid_file && qemu_create_pidfile(pid_file) != 0) {
          if (daemonize) {
              uint8_t status = 1;
-@@ -5515,6 +5525,8 @@ geometry_error:
+@@ -5485,6 +5495,8 @@ int main(int argc, char **argv, char **envp)
          provision_crashdump(crashdump_dir, crashdump_quota);
      }
  
@@ -3439,7 +3448,7 @@ index 2012f14..f7363f7 100644
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-@@ -5614,11 +5626,13 @@ geometry_error:
+@@ -5584,11 +5596,13 @@ int main(int argc, char **argv, char **envp)
          }
      }
  
@@ -3458,7 +3467,7 @@ index 2012f14..f7363f7 100644
  
      /* init USB devices */
      if (usb_enabled) {
-@@ -5757,6 +5771,30 @@ geometry_error:
+@@ -5727,6 +5741,30 @@ int main(int argc, char **argv, char **envp)
          qemu_start_incoming_migration(incoming);
      }
  
@@ -3489,7 +3498,7 @@ index 2012f14..f7363f7 100644
      if (autostart)
          vm_start();
  
-@@ -5773,9 +5811,6 @@ geometry_error:
+@@ -5743,9 +5781,6 @@ int main(int argc, char **argv, char **envp)
  	    exit(1);
  
  	chdir("/");

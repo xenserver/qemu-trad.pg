@@ -33,6 +33,9 @@ qemu-d0395cc49b2ec6d1723c01f1daf2394b9264ca29.patch # free all the pirqs for msi
 fix-cdrom-eject.patch
 smbus-nuke-eeprom.patch
 clear-dynticks-sigevent.patch
+cirrus_vga-default-all-I-O-port-reads-to-0xff.patch
+lm832x-don-t-overrun-file-buffer-on-save-restore.patch
+block-vvfat-fix-fat_chksum-buffer-overrun-warning.patch
 
 #
 # Non-upstreamable patches
