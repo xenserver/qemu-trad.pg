@@ -296,10 +296,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..93e3a42
+index 0000000..75004cc
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2077 @@
+@@ -0,0 +1,2070 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -1637,15 +1637,8 @@ index 0000000..93e3a42
 +    memset (&sigxfsz_handler, 0, sizeof(struct sigaction));
 +    sigterm_handler.sa_handler = sigterm_handler_f;
 +    sigxfsz_handler.sa_handler = sigxfsz_handler_f;
-+    struct rlimit rlim;
 +    char name[64];
 +    int f;
-+
-+    if (!crashdump_enabled()) {
-+        rlim.rlim_cur = 64 * 1024 * 1024;
-+        rlim.rlim_max = 64 * 1024 * 1024 + 64;
-+        setrlimit(RLIMIT_FSIZE, &rlim);
-+    }
 +
 +    /* restrict network */
 +    if (unshare(CLONE_NEWNET))
@@ -2450,7 +2443,7 @@ index 0000000..c49f4db
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
-index a8d0e50..3143883 100644
+index 9b6b818..fa1483d 100644
 --- a/qemu-xen.h
 +++ b/qemu-xen.h
 @@ -73,12 +73,10 @@ void xenstore_parse_pf_config(struct pci_config_header *pch);
@@ -2474,7 +2467,7 @@ index a8d0e50..3143883 100644
  char *xenstore_vm_read(int domid, const char *key, unsigned int *len);
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len);
  char *xenstore_read_battery_data(int battery_status);
-@@ -146,8 +143,8 @@ int xenfb_connect_vfb(const char *path);
+@@ -146,7 +143,7 @@ int xenfb_connect_vfb(const char *path);
  
  int has_tpm_device_danger(void);
  
@@ -2483,8 +2476,7 @@ index a8d0e50..3143883 100644
 +static inline void vga_dirty_log_start(void *s) { }
 +static inline void vga_dirty_log_stop(void *s) { }
  
- /* crashdump.c */
- void provision_crashdump(const char *crashdump_dir, long long crashdump_quota);
+ #endif /*QEMU_XEN_H*/
 diff --git a/savevm.c b/savevm.c
 index e3c4045..60f3a60 100644
 --- a/savevm.c
@@ -3384,7 +3376,7 @@ index fc8104d..87e02eb 100644
      return s;
  }
 diff --git a/vl.c b/vl.c
-index 0624ccb..35211a9 100644
+index 75bfb56..cccd85e 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -48,6 +48,7 @@
@@ -3395,31 +3387,31 @@ index 0624ccb..35211a9 100644
  #include "qemu-xen.h"
  
  #include <xen/hvm/hvm_info_table.h>
-@@ -3875,6 +3876,7 @@ enum {
+@@ -3874,6 +3875,7 @@ enum {
      QEMU_OPTION_tb_size,
      QEMU_OPTION_incoming,
      QEMU_OPTION_chroot,
 +    QEMU_OPTION_priv,
      QEMU_OPTION_runas,
-     QEMU_OPTION_crashdump_dir,
-     QEMU_OPTION_crashdump_quota,
-@@ -4037,6 +4039,7 @@ static const QEMUOption qemu_options[] = {
+ #ifdef CONFIG_SYSLOG
+     QEMU_OPTION_syslog,
+@@ -4034,6 +4036,7 @@ static const QEMUOption qemu_options[] = {
      { "tb-size", HAS_ARG, QEMU_OPTION_tb_size },
      { "incoming", HAS_ARG, QEMU_OPTION_incoming },
      { "chroot", HAS_ARG, QEMU_OPTION_chroot },
 +    { "priv", 0, QEMU_OPTION_priv },
      { "runas", HAS_ARG, QEMU_OPTION_runas },
-     { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
-     { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
-@@ -4408,6 +4411,7 @@ int main(int argc, char **argv, char **envp)
+ #ifdef CONFIG_SYSLOG
+     { syslog_option, 0, QEMU_OPTION_syslog },
+@@ -4401,6 +4404,7 @@ int main(int argc, char **argv, char **envp)
+     struct passwd *pwd = NULL;
+     const char *chroot_dir = NULL;
      const char *run_as = NULL;
-     char *crashdump_dir = NULL;
-     long long crashdump_quota = 0;
 +    QEMUFile *load_f = NULL;
  
      logfile = stderr; /* initial value */
  
-@@ -5190,6 +5194,9 @@ int main(int argc, char **argv, char **envp)
+@@ -5183,6 +5187,9 @@ int main(int argc, char **argv, char **envp)
              case QEMU_OPTION_chroot:
                  chroot_dir = optarg;
                  break;
@@ -3429,7 +3421,7 @@ index 0624ccb..35211a9 100644
              case QEMU_OPTION_runas:
                  run_as = optarg;
                  break;
-@@ -5278,6 +5285,9 @@ int main(int argc, char **argv, char **envp)
+@@ -5265,6 +5272,9 @@ int main(int argc, char **argv, char **envp)
      }
  #endif
  
@@ -3439,16 +3431,16 @@ index 0624ccb..35211a9 100644
      if (pid_file && qemu_create_pidfile(pid_file) != 0) {
          if (daemonize) {
              uint8_t status = 1;
-@@ -5485,6 +5495,8 @@ int main(int argc, char **argv, char **envp)
-         provision_crashdump(crashdump_dir, crashdump_quota);
-     }
+@@ -5463,6 +5473,8 @@ int main(int argc, char **argv, char **envp)
+     register_savevm("timer", 0, 2, timer_save, timer_load, NULL);
+     register_savevm_live("ram", 0, 3, ram_save_live, NULL, ram_load, NULL);
  
 +    init_privxsh();
 +
  #ifndef _WIN32
  #ifndef CONFIG_DM
      /* must be after terminal init, SDL library changes signal handlers */
-@@ -5584,11 +5596,13 @@ int main(int argc, char **argv, char **envp)
+@@ -5562,11 +5574,13 @@ int main(int argc, char **argv, char **envp)
          }
      }
  
@@ -3467,7 +3459,7 @@ index 0624ccb..35211a9 100644
  
      /* init USB devices */
      if (usb_enabled) {
-@@ -5727,6 +5741,30 @@ int main(int argc, char **argv, char **envp)
+@@ -5705,6 +5719,30 @@ int main(int argc, char **argv, char **envp)
          qemu_start_incoming_migration(incoming);
      }
  
@@ -3498,7 +3490,7 @@ index 0624ccb..35211a9 100644
      if (autostart)
          vm_start();
  
-@@ -5743,9 +5781,6 @@ int main(int argc, char **argv, char **envp)
+@@ -5721,9 +5759,6 @@ int main(int argc, char **argv, char **envp)
  	    exit(1);
  
  	chdir("/");

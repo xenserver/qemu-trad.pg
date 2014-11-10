@@ -6,10 +6,10 @@ Add support for --syslog to redirect all output to syslog instead of
 stdout/stderr.
 
 diff --git a/Makefile b/Makefile
-index 74ef4f8..b170ed1 100644
+index 8834df5..6906127 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -265,6 +265,10 @@ endif
+@@ -263,6 +263,10 @@ endif
  test speed: all
  	$(MAKE) -C tests $@
  
@@ -421,10 +421,10 @@ index 0000000..fc8104d
 +}
 +
 diff --git a/vl.c b/vl.c
-index 1047e9a..596298e 100644
+index 076f6f6..8385a5d 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -123,6 +123,10 @@
+@@ -122,6 +122,10 @@
  #endif
  #endif
  
@@ -435,17 +435,17 @@ index 1047e9a..596298e 100644
  #include "qemu_socket.h"
  
  #if defined(CONFIG_SLIRP)
-@@ -4367,6 +4371,9 @@ enum {
+@@ -4361,6 +4365,9 @@ enum {
+     QEMU_OPTION_incoming,
+     QEMU_OPTION_chroot,
      QEMU_OPTION_runas,
-     QEMU_OPTION_crashdump_dir,
-     QEMU_OPTION_crashdump_quota,
 +#ifdef CONFIG_SYSLOG
 +    QEMU_OPTION_syslog,
 +#endif
  };
  
  typedef struct QEMUOption {
-@@ -4375,6 +4382,10 @@ typedef struct QEMUOption {
+@@ -4369,6 +4376,10 @@ typedef struct QEMUOption {
      int index;
  } QEMUOption;
  
@@ -456,22 +456,21 @@ index 1047e9a..596298e 100644
  static const QEMUOption qemu_options[] = {
      /* Please keep in synch with help, QEMU_OPTION_ enums, and
         qemu-doc.texi */
-@@ -4524,6 +4535,9 @@ static const QEMUOption qemu_options[] = {
+@@ -4514,6 +4525,9 @@ static const QEMUOption qemu_options[] = {
+     { "incoming", HAS_ARG, QEMU_OPTION_incoming },
+     { "chroot", HAS_ARG, QEMU_OPTION_chroot },
      { "runas", HAS_ARG, QEMU_OPTION_runas },
-     { "dumpdir", HAS_ARG, QEMU_OPTION_crashdump_dir },
-     { "dumpquota", HAS_ARG, QEMU_OPTION_crashdump_quota },
 +#ifdef CONFIG_SYSLOG
 +    { syslog_option, 0, QEMU_OPTION_syslog },
 +#endif
      { NULL },
  };
  
-@@ -4889,9 +4903,37 @@ int main(int argc, char **argv, char **envp)
+@@ -4878,9 +4892,36 @@ int main(int argc, char **argv, char **envp)
+     const char *chroot_dir = NULL;
      const char *run_as = NULL;
-     char *crashdump_dir = NULL;
-     long long crashdump_quota = 0;
+ 
 -    qemu_cache_utils_init(envp);
-+
      logfile = stderr; /* initial value */
  
 +#ifdef CONFIG_SYSLOG

@@ -102,7 +102,6 @@ product-nr-1-blacklist.patch
 #
 qemu-3.4-fdc.patch
 hvm-late-unpause.patch
-crashdump-to-qemu.patch
 xen-platform-scsi-controller.patch
 xenstore_set_device_locked.patch
 close-and-flush-disconnected-emulated-devices.patch
