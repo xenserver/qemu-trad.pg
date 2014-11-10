@@ -89,7 +89,7 @@ index 0000000..0c7fa4a
 +
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
 new file mode 100644
-index 0000000..5a616a5
+index 0000000..9485b03
 --- /dev/null
 +++ b/mk/xen-device-model.spec.in
 @@ -0,0 +1,38 @@
@@ -112,11 +112,11 @@ index 0000000..5a616a5
 +
 +%build
 +./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl --enable-werror
-+%{__make}
++%{?cov_wrap} %{__make}
 +
 +%install
 +rm -rf $RPM_BUILD_ROOT
-+%{__make} install DESTDIR=$RPM_BUILD_ROOT
++%{?cov_wrap} %{__make} install DESTDIR=$RPM_BUILD_ROOT
 +mkdir -p $RPM_BUILD_ROOT/var/xen/qemu
 +
 +%clean

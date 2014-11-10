@@ -110,7 +110,7 @@ index 5a616a5..c8328cf 100644
 @@ -18,6 +19,7 @@ This package contains qemu-dm, the Xen device model.
  %build
  ./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl --enable-werror
- %{__make}
+ %{?cov_wrap} %{__make}
 +%{__make} unittests
  
  %install
