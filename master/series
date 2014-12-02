@@ -58,6 +58,7 @@ smbus-nuke-eeprom.patch
 
 # Valgrind/Coverity fixes
 clear-dynticks-sigevent.patch
+reduce-memory-leaks.patch
 
 #
 # Non-upstreamable patches
