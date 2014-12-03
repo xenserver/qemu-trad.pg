@@ -51,6 +51,7 @@ CVE-2010-0297-usb-overflow.patch
 fix-cdrom-eject.patch
 fix-pasprintf.patch
 CP-10662-pciemulation.patch
+less-leaky-xenstore-handling.patch
 
 # Scalability fixes
 smbus-nuke-eeprom.patch
