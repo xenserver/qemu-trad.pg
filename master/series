@@ -15,6 +15,7 @@
 #
 out-of-xen-build.patch
 xenserver-build-tweaks.patch
+coverity-model.patch
 builder-makefiles.patch
 
 #
