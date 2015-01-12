@@ -41,6 +41,7 @@ block-vvfat-fix-fat_chksum-buffer-overrun-warning.patch
 fix-cdrom-eject.patch
 fix-pasprintf.patch
 CP-10662-pciemulation.patch
+CA-156663-ioperms.patch
 
 # Scalability fixes
 smbus-nuke-eeprom.patch

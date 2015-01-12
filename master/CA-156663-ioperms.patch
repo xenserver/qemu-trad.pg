@@ -1,0 +1,47 @@
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index db3d7ed..7c531f0 100644
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -1116,6 +1116,33 @@ uint8_t pci_intx(struct pt_dev *ptdev)
+     return r_val;
+ }
+ 
++static int wrapped_xc_domain_memory_mapping(
++    xc_interface *xch, uint32_t domid, unsigned long first_gfn,
++    unsigned long first_mfn, unsigned long nr_mfns, uint32_t add_mapping)
++{
++    int rc;
++
++    if ( add_mapping )
++    {
++        rc = xc_domain_iomem_permission(xch, domid, first_mfn, nr_mfns, add_mapping);
++        if ( rc )
++            return rc;
++    }
++
++    rc = xc_domain_memory_mapping(xch, domid, first_gfn, first_mfn, nr_mfns, add_mapping);
++
++    if ( !add_mapping )
++    {
++        rc = xc_domain_iomem_permission(xch, domid, first_mfn, nr_mfns, add_mapping);
++        if ( rc )
++            return rc;
++    }
++
++    return rc;
++}
++
++#define xc_domain_memory_mapping wrapped_xc_domain_memory_mapping
++
+ static int _pt_iomem_helper(struct pt_dev *assigned_device, int i,
+                             uint32_t e_base, uint32_t e_size, int op)
+ {
+@@ -1154,6 +1181,8 @@ static int _pt_iomem_helper(struct pt_dev *assigned_device, int i,
+         (e_size + XC_PAGE_SIZE - 1) >> XC_PAGE_SHIFT, op);
+ }
+ 
++#undef xc_domain_memory_mapping
++
+ /* Being called each time a mmio region has been updated */
+ static void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
+                          int type)
