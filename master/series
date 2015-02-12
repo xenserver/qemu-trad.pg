@@ -25,7 +25,6 @@ builder-makefiles.patch
 #
 # Patches from upstream (qemu-upstream upstream)
 #
-qemu-d0395cc49b2ec6d1723c01f1daf2394b9264ca29.patch # free all the pirqs for msi/msix when driver unloads
 
 #
 # Patches for upstream (qemu-traditional)

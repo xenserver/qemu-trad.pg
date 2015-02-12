@@ -1,8 +1,8 @@
 diff --git a/Rules.mk b/Rules.mk
-index afd2295..dfe271d 100644
+index afd2295..c4c2032 100644
 --- a/Rules.mk
 +++ b/Rules.mk
-@@ -25,3 +25,14 @@ CFLAGS += -Wstrict-prototypes
+@@ -25,3 +25,15 @@ CFLAGS += -Wstrict-prototypes
  CFLAGS += -Wno-unused-value
  CFLAGS += -m64
  CFLAGS += -Wdeclaration-after-statement
@@ -10,6 +10,7 @@ index afd2295..dfe271d 100644
 +# XenServer hacks
 +# Override target output
 +LIBEXEC := ${prefix}/lib64/xen/bin
++LIBEXEC_BIN := $(LIBEXEC)
 +XEN_SCRIPT_DIR := /etc/xen/scripts
 +
 +# Don't build img utilities

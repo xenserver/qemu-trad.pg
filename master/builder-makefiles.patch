@@ -2,7 +2,7 @@ Build system integration.
 
 diff --git a/mk/Makefile b/mk/Makefile
 new file mode 100644
-index 0000000..0c7fa4a
+index 0000000..68e90d0
 --- /dev/null
 +++ b/mk/Makefile
 @@ -0,0 +1,81 @@
@@ -11,7 +11,7 @@ index 0000000..0c7fa4a
 +include $(B_BASE)/common.mk
 +include $(B_BASE)/rpmbuild.mk
 +
-+REPO_NAME= qemu-xen-4.4
++REPO_NAME := $(shell echo "$$PWD" | awk -F/ '{print $$3}')
 +RPM_BUILD_COOKIE= $(MY_OBJ_DIR)/.rpm_build_cookie
 +REPO_STAMP = $(call git_req,$(REPO_NAME))
 +REPO = $(call git_loc,$(REPO_NAME))
