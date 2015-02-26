@@ -42,6 +42,11 @@ CVE-2010-0297-usb-overflow.patch
 0002-CVE-2014-7815-vnc-sanitize-bits_per_pixel-from-the-c.patch
 0003-CVE-2014-3615-vbe-rework-sanity-checks.patch
 
+# Crash fixes
+0001-cirrus_vga-fix-division-by-0-for-color-expansion-rop.patch
+0001-cancel-dma-operation-if-command-abort-or-error.patch
+0002-fix-incorrect-bh-schedule.patch
+
 # Functional fixes
 fix-cdrom-eject.patch
 fix-pasprintf.patch
@@ -186,3 +191,5 @@ notify.patch
 CA-144613-vnc.patch
 CA-147808-vnc.patch
 CA-156663-ioperms.patch
+0001-vnc-handle-guest-ds-with-strange-width.patch
+0002-vga-fix-invalid-memory-accesses-with-bad-register-state.patch

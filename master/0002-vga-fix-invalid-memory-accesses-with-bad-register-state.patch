@@ -1,0 +1,358 @@
+From e6198e4662abe39347acd8ee5f2b6a8a4a204127 Mon Sep 17 00:00:00 2001
+From: Chunjie Zhu <chunjie.zhu@citrix.com>
+Date: Tue, 11 Mar 2014 22:55:31 -0700
+Subject: [PATCH 2/3] vga: fix invalid memory accesses with bad register state
+To: david.vrabel@citrix.com
+
+Video driver inside guest os might set incorrect values for graphics
+registers, sequencer registers and other registers.  Under some
+circumstance, video scan or update memory area would cross video RAM
+boundary, afterwards, qemu process exits abnormally due to memory
+access protection fault.
+
+This patch follows the philosophy of validate-before-use, adds enough
+sanity check before memory access, and corrects memory access loop end
+condition.
+
+Signed-off-by: Chunjie Zhu <chunjie.zhu@citrix.com>
+diff --git a/hw/cirrus_vga.c b/hw/cirrus_vga.c
+index 235fc16..b1df375 100644
+--- a/hw/cirrus_vga.c
++++ b/hw/cirrus_vga.c
+@@ -649,13 +649,12 @@ static inline void cirrus_bitblt_bgcol(CirrusVGAState *s)
+     }
+ }
+ 
+-static void cirrus_invalidate_region(CirrusVGAState * s, int off_begin,
+-				     int off_pitch, int bytesperline,
+-				     int lines)
++static void cirrus_invalidate_region(CirrusVGAState * s,
++         uint32_t off_begin, int off_pitch,
++         int bytesperline, int lines)
+ {
+     int y;
+-    int off_cur;
+-    int off_cur_end;
++    uint32_t off_cur, off_cur_end;
+ 
+     for (y = 0; y < lines; y++) {
+ 	off_cur = off_begin;
+@@ -1704,13 +1703,19 @@ cirrus_hook_write_cr(CirrusVGAState * s, unsigned reg_index, int reg_value)
+     if(reg_index == 0x1b) {
+         static int cr1b = 0;
+         if (cr1b != s->cr[0x1b]) {
+-            int width, height;
++            int width, height, msize;
+             int line_offset, start_addr, line_compare;
+             s->get_resolution((VGAState *)s, &width, &height);
+             s->get_offsets((VGAState *)s, &line_offset, &start_addr, &line_compare);
+             /* Windows expects off-screen areas initialized to 0xff */
+             memset(s->vram_ptr, 0xff, s->vram_size);
+-            memset (s->vram_ptr + (start_addr * 4), 0x00, line_offset * height);
++
++            msize = line_offset * height + start_addr * 4;
++            msize = (msize > s->vram_size - 1) ? \
++                    (s->vram_size - 1 - start_addr * 4) : \
++                    line_offset * height;
++            memset (s->vram_ptr + (start_addr * 4), 0x00, msize);
++
+             cr1b = s->cr[0x1b];
+             fprintf(stderr, "cirrus: blanking the screen line_offset=%d height=%d\n", line_offset, height);
+         }
+@@ -1978,6 +1983,8 @@ static void cirrus_mem_writeb_mode4and5_8bpp(CirrusVGAState * s,
+     uint8_t *dst;
+ 
+     dst = s->vram_ptr + (offset &= s->cirrus_addr_mask);
++    if ((unsigned long)dst + 7 >= s->vram_size)
++        return;
+     for (x = 0; x < 8; x++) {
+ 	if (val & 0x80) {
+ 	    *dst = s->cirrus_shadow_gr1;
+@@ -2001,6 +2008,8 @@ static void cirrus_mem_writeb_mode4and5_16bpp(CirrusVGAState * s,
+     uint8_t *dst;
+ 
+     dst = s->vram_ptr + (offset &= s->cirrus_addr_mask);
++    if ((unsigned long)dst + 14 >= s->vram_size)
++        return;
+     for (x = 0; x < 8; x++) {
+ 	if (val & 0x80) {
+ 	    *dst = s->cirrus_shadow_gr1;
+diff --git a/hw/cirrus_vga_rop.h b/hw/cirrus_vga_rop.h
+index f76e8d7..1ff55d9 100644
+--- a/hw/cirrus_vga_rop.h
++++ b/hw/cirrus_vga_rop.h
+@@ -73,7 +73,7 @@ glue(cirrus_bitblt_rop_bkwd_, ROP_NAME)(CirrusVGAState *s,
+                                         int bltwidth,int bltheight)
+ {
+     int x,y;
+-    uint32_t dst, src;
++    int32_t dst, src;
+     uint8_t *dst_base, *src_base;
+     get_base(dst_, s, dst_base);
+     get_base(src_, s, src_base);
+@@ -82,7 +82,7 @@ glue(cirrus_bitblt_rop_bkwd_, ROP_NAME)(CirrusVGAState *s,
+     dstpitch += bltwidth;
+     srcpitch += bltwidth;
+     for (y = 0; y < bltheight; y++) {
+-        for (x = 0; x < bltwidth; x++) {
++        for (x = 0; x < bltwidth && dst >= 0 && src >= 0; x++) {
+             ROP_OP(*(dst_base + m(dst)), *(src_base + m(src)));
+             dst--;
+             src--;
+@@ -129,7 +129,7 @@ glue(glue(cirrus_bitblt_rop_bkwd_transp_, ROP_NAME),_8)(CirrusVGAState *s,
+ {
+     int x,y;
+     uint8_t p;
+-    uint32_t dst, src;
++    int32_t dst, src;
+     uint8_t *dst_base, *src_base;
+     get_base(dst_, s, dst_base);
+     get_base(src_, s, src_base);
+@@ -138,7 +138,7 @@ glue(glue(cirrus_bitblt_rop_bkwd_transp_, ROP_NAME),_8)(CirrusVGAState *s,
+     dstpitch += bltwidth;
+     srcpitch += bltwidth;
+     for (y = 0; y < bltheight; y++) {
+-        for (x = 0; x < bltwidth; x++) {
++        for (x = 0; x < bltwidth && dst >= 0 && src >= 0; x++) {
+ 	    p = *(dst_base + m(dst));
+             ROP_OP(p, *(src_base + m(src)));
+ 	    if (p != s->gr[0x34]) *(dst_base + m(dst)) = p;
+@@ -192,7 +192,7 @@ glue(glue(cirrus_bitblt_rop_bkwd_transp_, ROP_NAME),_16)(CirrusVGAState *s,
+ {
+     int x,y;
+     uint8_t p1, p2;
+-    uint32_t dst, src;
++    int32_t dst, src;
+     uint8_t *dst_base, *src_base;
+     get_base(dst_, s, dst_base);
+     get_base(src_, s, src_base);
+@@ -201,7 +201,7 @@ glue(glue(cirrus_bitblt_rop_bkwd_transp_, ROP_NAME),_16)(CirrusVGAState *s,
+     dstpitch += bltwidth;
+     srcpitch += bltwidth;
+     for (y = 0; y < bltheight; y++) {
+-        for (x = 0; x < bltwidth; x+=2) {
++        for (x = 0; x < bltwidth && dst > 0 && src > 0; x+=2) {
+ 	    p1 = *(dst_base + m(dst-1));
+ 	    p2 = *(dst_base + m(dst));
+             ROP_OP(p1, *(src_base + m(src-1)));
+diff --git a/hw/cirrus_vga_rop2.h b/hw/cirrus_vga_rop2.h
+index 47bbf70..ca522b4 100644
+--- a/hw/cirrus_vga_rop2.h
++++ b/hw/cirrus_vga_rop2.h
+@@ -25,13 +25,16 @@
+ #if DEPTH == 8
+ #define PUTPIXEL()    ROP_OP((dst_base + m(d))[0], col)
+ #elif DEPTH == 16
+-#define PUTPIXEL()    ROP_OP(((uint16_t *)(dst_base + m(d)))[0], col);
++#define n(x) ((x) & s->cirrus_addr_mask & 0xfffffffe)
++#define PUTPIXEL()    ROP_OP(((uint16_t *)(dst_base + n(d)))[0], col);
+ #elif DEPTH == 24
+-#define PUTPIXEL()    ROP_OP((dst_base + m(d))[0], col); \
+-                      ROP_OP((dst_base + m(d))[1], (col >> 8)); \
+-                      ROP_OP((dst_base + m(d))[2], (col >> 16))
++#define n(x) ((x) & s->cirrus_addr_mask & 0xfffffffc)
++#define PUTPIXEL()    ROP_OP((dst_base + n(d))[0], col); \
++                      ROP_OP((dst_base + n(d))[1], (col >> 8)); \
++                      ROP_OP((dst_base + n(d))[2], (col >> 16))
+ #elif DEPTH == 32
+-#define PUTPIXEL()    ROP_OP(((uint32_t *)(dst_base + m(d)))[0], col)
++#define n(x) ((x) & s->cirrus_addr_mask & 0xfffffffc)
++#define PUTPIXEL()    ROP_OP(((uint32_t *)(dst_base + n(d)))[0], col)
+ #else
+ #error unsupported DEPTH
+ #endif
+@@ -311,5 +314,6 @@ glue(glue(glue(cirrus_fill_, ROP_NAME), _),DEPTH)
+     }
+ }
+ 
++#undef n
+ #undef DEPTH
+ #undef PUTPIXEL
+diff --git a/hw/vga.c b/hw/vga.c
+index a0930f2..371c68a 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -1273,6 +1273,7 @@ static void vga_draw_text(VGAState *s, int full_update)
+     full_update |= update_basic_params(s);
+ 
+     line_offset = s->line_offset;
++    /* start_addr * 4 is always smaller than vram_size */
+     s1 = s->vram_ptr + (s->start_addr * 4);
+ 
+     /* total width & height */
+@@ -1300,7 +1301,15 @@ static void vga_draw_text(VGAState *s, int full_update)
+     if (width != s->last_width || height != s->last_height ||
+         cw != s->last_cw || cheight != s->last_ch || s->last_depth) {
+         s->last_scr_width = width * cw;
++        if (s->last_scr_width > VGA_MAX_WIDTH) {
++            s->last_scr_width = VGA_MAX_WIDTH;
++            width = VGA_MAX_WIDTH / cw;
++        }
+         s->last_scr_height = height * cheight;
++        if (s->last_scr_height > VGA_MAX_HEIGHT) {
++            s->last_scr_height = VGA_MAX_HEIGHT;
++            height = VGA_MAX_HEIGHT / cheight;
++        }
+         qemu_console_resize(s->ds, s->last_scr_width, s->last_scr_height);
+         s->last_depth = 0;
+         s->last_width = width;
+@@ -1339,6 +1348,25 @@ static void vga_draw_text(VGAState *s, int full_update)
+         vga_draw_glyph8 = vga_draw_glyph8_table[depth_index];
+     vga_draw_glyph9 = vga_draw_glyph9_table[depth_index];
+ 
++    /*
++     * In theory, line_offset = width * 4, if line_offset is
++     * less than width * 4, then afterwards, memory operation
++     * on server surface might overflow
++     */
++    if (s->line_offset < 4 * width) {
++        s->line_offset = 4 * width;
++        line_offset = s->line_offset;
++    }
++
++    /*
++     * The above if statement might introduce overflow since it
++     * might increase s->line_offset
++     */
++    if (s->start_addr * 4 + line_offset * height >= \
++            s->vram_size) {
++        height = (s->vram_size - 1 - s->start_addr * 4) / line_offset;
++    }
++
+     dest = ds_get_data(s->ds);
+     linesize = ds_get_linesize(s->ds);
+     ch_attr_ptr = s->last_ch_attr;
+@@ -1556,6 +1584,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+     vga_draw_line_func *vga_draw_line;
+     ram_addr_t page_min, page_max;
+     unsigned long start, end;
++    int bpp, shift_count = 0;
+ 
+     full_update |= update_basic_params(s);
+ 
+@@ -1580,18 +1609,33 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+     }
+     if (shift_control == 1 && (s->sr[0x01] & 8)) {
+         disp_width <<= 1;
++        shift_count ++;
+     }
+ 
+     if (shift_control == 0) {
+         if (s->sr[0x01] & 8) {
+             disp_width <<= 1;
++            shift_count ++;
+         }
+     } else if (shift_control == 1) {
+         if (s->sr[0x01] & 8) {
+             disp_width <<= 1;
++            shift_count ++;
+         }
+     }
+ 
++    /*
++     * VGA surface data would be copied to vnc surface buffer,
++     * while vnc surface buffer size is restricted by the 2 macro
++     * constants. We should avoid buffer overflow.
++     */
++    if (disp_width > VGA_MAX_WIDTH) {
++        disp_width = VGA_MAX_WIDTH;
++        width = disp_width >> shift_count;
++    }
++    if (height > VGA_MAX_HEIGHT)
++        height = VGA_MAX_HEIGHT;
++
+     depth = s->get_bpp(s);
+     if (s->line_offset != s->last_line_offset || 
+         disp_width != s->last_width ||
+@@ -1603,6 +1647,15 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+         if (depth == 32) {
+ #endif
+             if (is_graphic_console()) {
++                bpp = depth / 8;
++                if (s->line_offset < disp_width * bpp)
++                    s->line_offset = disp_width * bpp;
++
++                if (s->start_addr * 4 + s->line_offset * height >= \
++                        s->vram_size) {
++                    height = (s->vram_size - 1 - s->start_addr * 4) / s->line_offset;
++                }
++
+                 qemu_free_displaysurface(s->ds);
+                 s->ds->surface = qemu_create_displaysurface_from(disp_width, height, depth,
+                                                                s->line_offset,
+@@ -1626,6 +1679,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+         full_update = 1;
+     } else if (is_graphic_console() && is_buffer_shared(s->ds->surface) &&
+                (full_update || s->ds->surface->data != s->vram_ptr + (s->start_addr * 4))) {
++        /* start_addr * 4 is always smaller than vram_size */
+         s->ds->surface->data = s->vram_ptr + (s->start_addr * 4);
+         dpy_setdata(s->ds);
+     }
+@@ -1702,6 +1756,9 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+             /* use page table dirty bit tracking for the LFB plus border */
+             start = (s->start_addr * 4) & TARGET_PAGE_MASK;
+             end = ((s->start_addr * 4 + height * line_offset) + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK;
++            /* start_addr * 4 is always smaller than vram_size */
++            /* end pointer might excceed vram_size */
++            if (end > s->vram_size) end = s->vram_size;
+         }
+ 
+         for (y = 0 ; y < start; y += TARGET_PAGE_SIZE)
+@@ -1757,6 +1814,8 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+         if (!(s->cr[0x17] & 2)) {
+             addr = (addr & ~0x8000) | ((y1 & 2) << 14);
+         }
++        if (addr > s->vram_size || (addr + bwidth) > s->vram_size)
++            break; /* beyond vram memory page */
+         page0 = s->vram_offset + (addr & TARGET_PAGE_MASK);
+         page1 = s->vram_offset + ((addr + bwidth - 1) & TARGET_PAGE_MASK);
+         update = full_update |
+@@ -1818,7 +1877,7 @@ static void vga_draw_graphic(VGAState *s, int full_update)
+ 
+ static void vga_draw_blank(VGAState *s, int full_update)
+ {
+-    int i, w, val;
++    int i, w, h, val;
+     uint8_t *d;
+ 
+     if (!full_update)
+@@ -1836,14 +1895,21 @@ static void vga_draw_blank(VGAState *s, int full_update)
+         val = s->rgb_to_pixel(0, 0, 0);
+     else
+         val = 0;
+-    w = s->last_scr_width * ds_get_bytes_per_pixel(s->ds);
++    /*
++     * surface data might share the vram_ptr pointer or be allocted
++     * with a new memory block
++     */
+     d = ds_get_data(s->ds);
+-    for(i = 0; i < s->last_scr_height; i++) {
++    w = s->last_scr_width * ds_get_bytes_per_pixel(s->ds);
++    if (w > ds_get_linesize(s->ds))
++        w = ds_get_linesize(s->ds);
++    h = s->last_scr_height < ds_get_height(s->ds) ? \
++        s->last_scr_height : ds_get_height(s->ds);
++    for(i = 0; i < h; i++) {
+         memset(d, val, w);
+         d += ds_get_linesize(s->ds);
+     }
+-    dpy_update(s->ds, 0, 0,
+-               s->last_scr_width, s->last_scr_height);
++    dpy_update(s->ds, 0, 0, w, h);
+ }
+ 
+ #define GMODE_TEXT     0
+diff --git a/hw/vga_int.h b/hw/vga_int.h
+index 96465ac..606408b 100644
+--- a/hw/vga_int.h
++++ b/hw/vga_int.h
+@@ -80,7 +80,8 @@
+ #endif /* !CONFIG_BOCHS_VBE */
+ 
+ #define CH_ATTR_SIZE (160 * 100)
+-#define VGA_MAX_HEIGHT 2048
++#define VGA_MAX_HEIGHT 2048 /* must be equal to VNC_MAX_HEIGHT, see 'vnc.c' */
++#define VGA_MAX_WIDTH 2560  /* must be equal to VNC_MAX_WIDTH, see 'vnc.c' */
+ 
+ struct vga_precise_retrace {
+     int64_t ticks_per_char;
