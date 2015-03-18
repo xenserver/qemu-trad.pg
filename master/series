@@ -218,3 +218,4 @@ CA-156663-ioperms.patch
 # future Intel drivers will not require this patch but it is required to 
 # support existing vm upgrade to dundee
 igd_passthrough.patch
+CP-12149-xen-pvdriver.patch
