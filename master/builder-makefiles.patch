@@ -89,10 +89,10 @@ index 0000000..68e90d0
 +
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
 new file mode 100644
-index 0000000..9485b03
+index 0000000..91d4f58
 --- /dev/null
 +++ b/mk/xen-device-model.spec.in
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,44 @@
 +Summary: qemu-dm device model
 +Name: xen-device-model
 +Version: @IOEMU_VERSION@
@@ -119,12 +119,18 @@ index 0000000..9485b03
 +%{?cov_wrap} %{__make} install DESTDIR=$RPM_BUILD_ROOT
 +mkdir -p $RPM_BUILD_ROOT/var/xen/qemu
 +
++# CA-157601 - Leave Qemu where xenops expects to find it until qemu-dm-wrapper can be fixed
++mkdir -p $RPM_BUILD_ROOT%{_libdir}/xen/bin/
++ln $RPM_BUILD_ROOT%{_libexecdir}/xen/bin/qemu-dm $RPM_BUILD_ROOT%{_libdir}/xen/bin/qemu-dm
++
 +%clean
 +rm -rf $RPM_BUILD_ROOT
 +
 +%files
 +%defattr(-,root,root,-)
 +%doc
++%{_libexecdir}/xen/bin/qemu-dm
++# CA-157601 - Leave Qemu where xenops expects to find it until qemu-dm-wrapper can be fixed
 +%{_libdir}/xen/bin/qemu-dm
 +%{_datadir}/xen/qemu/keymaps
 +%exclude /etc/xen/scripts/qemu-ifup
