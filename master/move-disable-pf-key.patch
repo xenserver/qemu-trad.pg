@@ -1,13 +1,13 @@
 CA-32958: Move location of disable_pf key to allow for easy setting by XAPI
 diff --git a/xenstore.c b/xenstore.c
-index 3038c11..c8fde32 100644
+index 3411a41..93e5cb6 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -910,7 +910,7 @@ int xenstore_parse_disable_pf_config ()
+@@ -909,7 +909,7 @@ int xenstore_parse_disable_pf_config ()
      int disable_pf = 0;
      unsigned int len;
  
--    if (pasprintf(&buf, "/local/domain/0/device-model/%u/disable_pf",domid) == -1)
+-    if (pasprintf(&buf, "device-model/%u/disable_pf",domid) == -1)
 +    if (pasprintf(&buf, "/local/domain/%u/vm-data/disable_pf",domid) == -1)
          goto out;
  
