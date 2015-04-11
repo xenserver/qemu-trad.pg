@@ -296,10 +296,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..75004cc
+index 0000000..e5bb30b
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2070 @@
+@@ -0,0 +1,2095 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -1917,6 +1917,31 @@ index 0000000..75004cc
 +    return strncmp(path, s, l) == 0 && (path[l] == 0 || path[l] == '/');
 +}
 +
++/*
++ * Check a xenstore path which may or may not be relative to /local/domain/0.
++ * 's' must be non-relative.  Returns NULL, or a pointer in 'path' with 's'
++ * chopped off.
++ */
++static inline const char *
++relpath_starts_with(const char *path, const char *s)
++{
++    static const char relpath[] = "/local/domain/0";
++    char fqpath[sizeof(relpath) + strlen(path) + 1];
++
++    if (path_starts_with(path, s))
++        return path + strlen(s);
++
++    /*
++     * Permit 'path' if, when prepending with 'relpath', matches 's'.
++     */
++    sprintf(fqpath, "%s/%s", relpath, path);
++
++    if (path_starts_with(fqpath, s))
++        return path + strlen(s) - sizeof(relpath);
++
++    return NULL;
++}
++
 +static bool
 +check_xs_path(const char *path, check_type_t check)
 +{
@@ -1947,8 +1972,7 @@ index 0000000..75004cc
 +            return true;
 +    }
 +
-+    if (path_starts_with(path, dm_d0)) {
-+        s = path + strlen(dm_d0);
++    if ((s = relpath_starts_with(path, dm_d0)) != NULL) {
 +        sprintf(dom_num, "/%u", domid);
 +        if (!path_starts_with(s, dom_num))
 +            goto fail;
@@ -1963,13 +1987,13 @@ index 0000000..75004cc
 +            || strcmp(s, "parameter") == 0
 +            || strcmp(s, "state") == 0)
 +            return true;
++        goto fail;
 +    }
 +
 +    if (check != CHECK_READ)
 +        goto fail;
 +
-+    if (path_starts_with(path, backend_d0)) {
-+        s = path + strlen(backend_d0);
++    if ((s = relpath_starts_with(path, backend_d0)) != NULL) {
 +        if (s[0] != '/' || s[1] == 0 || s[1] == '/')
 +            return false;
 +        s = strchr(s+2, '/');
@@ -1977,6 +2001,7 @@ index 0000000..75004cc
 +        sprintf(dom_num, "%u", domid);
 +        if (path_starts_with(s+1, dom_num))
 +            return true;
++        goto fail;
 +    }
 +
 +    if (vm_path && path_starts_with(path, vm_path))
@@ -2720,10 +2745,10 @@ index 0000000..1d48502
 +#endif
 diff --git a/unittests/sep.c b/unittests/sep.c
 new file mode 100644
-index 0000000..222a376
+index 0000000..8973620
 --- /dev/null
 +++ b/unittests/sep.c
-@@ -0,0 +1,630 @@
+@@ -0,0 +1,645 @@
 +#include <check.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -3162,6 +3187,9 @@ index 0000000..222a376
 +    path_ok  ("/local/domain/0/backend/vbd3/123/5696/params", READ);
 +    path_fail("/local/domain/0/backend/vbd3/1234/5696/params", READ);
 +    path_fail("/local/domain/0/backend/vbd3/123/5696/params", WRITE);
++    path_ok  ("backend/vbd3/123/5696/params", READ);
++    path_fail("backend/vbd3/1234/5696/params", READ);
++    path_fail("backend/vbd3/123/5696/params", WRITE);
 +
 +    path_ok  ("/local/domain/123/data/report_clipboard", READ);
 +    path_ok  ("/local/domain/123/data/report_clipboard", WRITE);
@@ -3209,6 +3237,15 @@ index 0000000..222a376
 +    path_fail("/local/domain/0/backend/x/1234", READ);
 +    path_fail("/local/domain/0/backend/x/ 123", READ);
 +    path_fail("/local/domain/0/backend/x/123 ", READ);
++    path_fail("backend", READ);
++    path_fail("backend//123", READ);
++    path_fail("backend//12", READ);
++    path_fail("backend//1234", READ);
++    path_ok  ("backend/x/123", READ);
++    path_fail("backend/x/12", READ);
++    path_fail("backend/x/1234", READ);
++    path_fail("backend/x/ 123", READ);
++    path_fail("backend/x/123 ", READ);
 +
 +    path_fail("/local/domain/17/keymap", READ);
 +    path_ok  ("/local/domain/123/keymap", READ);
@@ -3247,6 +3284,9 @@ index 0000000..222a376
 +    path_ok  ("/local/domain/0/device-model/123/logdirty/ret", WRITE);
 +    path_ok  ("/local/domain/0/device-model/123/logdirty/cmd", WRITE);
 +    path_fail("/local/domain/0/device-model/123/a/b", WRITE);
++    path_ok  ("device-model/123/logdirty/ret", WRITE);
++    path_ok  ("device-model/123/logdirty/cmd", WRITE);
++    path_fail("device-model/123/a/b", WRITE);
 +}
 +END_TEST
 +
