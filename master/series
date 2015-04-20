@@ -38,6 +38,9 @@ block-vvfat-fix-fat_chksum-buffer-overrun-warning.patch
 
 # CVE fixes
 CVE-2010-0297-usb-overflow.patch
+0001-CVE-2014-8106-cirrus-fix-blit-region-check.patch
+0002-CVE-2014-7815-vnc-sanitize-bits_per_pixel-from-the-c.patch
+0003-CVE-2014-3615-vbe-rework-sanity-checks.patch
 
 # Functional fixes
 fix-cdrom-eject.patch
