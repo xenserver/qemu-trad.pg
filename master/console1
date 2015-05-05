@@ -1,0 +1,287 @@
+diff --git a/Makefile b/Makefile
+index b170ed1..b4e9f90 100644
+--- a/Makefile
++++ b/Makefile
+@@ -34,6 +34,8 @@ ifdef CONFIG_WIN32
+ LIBS+=-lwinmm -lws2_32 -liphlpapi
+ endif
+ 
++LIBS+=-ldrm
++
+ all: $(TOOLS) $(DOCS) recurse-all
+ 
+ SUBDIR_RULES=$(patsubst %,subdir-%, $(TARGET_DIRS))
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index b4436b3..d4436cb 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -38,6 +38,12 @@ typedef uint32_t pci_addr_t;
+ #include "pass-through.h"
+ #include "assert.h"
+ 
++#include <sys/ioctl.h>
++#include <drm/drm.h>
++#include <drm/i915_drm.h>
++#include <xf86drm.h>
++
++#if 0
+ typedef struct vgt_vga_state {
+     PCIDevice dev;
+     //struct VGACommonState state;
+@@ -45,6 +51,7 @@ typedef struct vgt_vga_state {
+     struct pci_dev host_dev;
+     bool instance_created;
+ } vgt_vga_state_t;
++#endif
+ 
+ #define EDID_SIZE 128
+ #define MAX_INPUT_NUM 3
+@@ -68,7 +75,7 @@ typedef struct vgt_monitor_info {
+ }vgt_monitor_info_t;
+ 
+ vgt_monitor_info_t monitor_config = {
+-    .port_type = 1,
++    .port_type = 2,
+     .port_is_dp = 1,
+     .port_override = 1,
+     /* Generic 1024x768 default EDID from linux/Documentation/EDID */
+@@ -215,6 +222,142 @@ static void config_hvm_monitors(void)
+     }
+ }
+ 
++int drm_fd;
++
++static void xengt_drm_init(void)
++{
++    drm_fd = open("/dev/dri/card0", O_RDWR);
++    if (drm_fd < 0) {
++        qemu_log("vGT: %s failed: errno=%d\n", __func__, errno);
++        exit(-1);
++    }
++
++    qemu_log("vGT: %s done\n", __func__);
++}
++
++static int xengt_enabled;
++
++int xengt_is_enabled(void)
++{
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++    int rc;
++
++    if (xengt_enabled)
++        goto done;
++
++    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
++
++    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
++    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.pipe_id = 0;
++    gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
++  
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
++    if (rc < 0)
++        goto done;
++
++    xengt_enabled = !!gem_vgtbuffer.start;
++
++    if (xengt_enabled)
++        qemu_log("vGT: enabled\n");
++
++done:
++    return xengt_enabled;
++}
++
++typedef struct xengt_fb {
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++} xengt_fb_t;
++
++#define XENGT_NR_FB 8
++
++static xengt_fb_t xengt_fb[XENGT_NR_FB];
++
++static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
++{
++    xengt_fb_t *fb;
++    int i;
++
++    for (i = 0; i < XENGT_NR_FB; i++) {
++        fb = &xengt_fb[i];
++
++        if (fb->gem_vgtbuffer.handle == 0)
++            goto empty_slot;
++    }
++
++    goto fail1;
++
++empty_slot:
++    qemu_log("vGT: %s %d -> %u\n", __func__, i, gem_vgtbuffer->handle);
++
++    fb->gem_vgtbuffer = *gem_vgtbuffer;
++
++    return fb;
++
++fail1:
++    return NULL;
++        
++}
++
++static xengt_fb_t *xengt_lookup_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
++{
++    int i;
++
++    for (i = 0; i < XENGT_NR_FB; i++) {
++        xengt_fb_t *fb = &xengt_fb[i];
++
++        if (memcmp(&fb->gem_vgtbuffer,
++                   gem_vgtbuffer,
++                   offsetof(struct drm_i915_gem_vgtbuffer, handle)) == 0)
++            return fb;
++    }
++
++    return NULL;
++}
++
++static xengt_fb_t *xengt_get_fb(void)
++{
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++    void *fb = NULL;
++    int rc;
++
++    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
++    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
++    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.pipe_id = 0;
++  
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
++    if (rc < 0)
++        goto done;
++
++    if ((fb = xengt_lookup_fb(&gem_vgtbuffer)) != NULL) {
++        struct drm_gem_close gem_close;
++
++        /* We don't need the new object so close it */
++        memset(&gem_close, 0, sizeof (gem_close));
++        gem_close.handle = gem_vgtbuffer.handle;
++
++        (void) drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
++        goto done;
++    }
++
++    fb = xengt_new_fb(&gem_vgtbuffer);
++
++done:
++    return fb;
++}
++
++void xengt_draw_primary(DisplayState *ds)
++{
++    uint32_t start;
++    xengt_fb_t *fb;
++
++    if ((fb = xengt_get_fb()) == NULL)
++        return;
++
++    qemu_log("vGT: %s %u\n", __func__, fb->gem_vgtbuffer.handle);
++}
++
+ /*
+  *  Inform vGT driver to create a vGT instance
+  */
+@@ -259,6 +402,7 @@ static void create_vgt_instance(void)
+     }
+ 
+     config_hvm_monitors();
++    xengt_drm_init();
+ }
+ 
+ /*
+@@ -400,14 +544,14 @@ uint32_t vgt_bridge_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len)
+     return val;
+ }
+ 
+-static void vgt_cleanupfn(PCIDevice *dev)
++/*static void vgt_cleanupfn(PCIDevice *dev)
+ {
+     vgt_vga_state_t *d = DO_UPCAST(vgt_vga_state_t, dev, dev);
+ 
+     if (d->instance_created) {
+         destroy_vgt_instance();
+     }
+-}
++    }*/
+ 
+ static void vgt_cleanupfn2(void *unused)
+ {
+diff --git a/hw/vga-xengt.h b/hw/vga-xengt.h
+index eef464c..fd4ed52 100644
+--- a/hw/vga-xengt.h
++++ b/hw/vga-xengt.h
+@@ -1,6 +1,8 @@
+ #ifndef __XENGT_H__
+ #define __XENGT_H__
+ 
++int xengt_is_enabled(void);
++void xengt_draw_primary(DisplayState *ds);
+ void xengt_vga_init(PCIBus *pci_bus, ram_addr_t vga_ram_addr, int
+ 		vga_ram_size);
+ void vgt_bridge_pci_conf_init(PCIDevice *dev);
+diff --git a/hw/vga.c b/hw/vga.c
+index 97b1b84..a1354c4 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -26,6 +26,7 @@
+ #include "pc.h"
+ #include "pci.h"
+ #include "vga_int.h"
++#include "vga-xengt.h"
+ 
+ #include <sys/mman.h>
+ #include "sysemu.h"
+@@ -1857,7 +1858,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
+ 
+ #define GMODE_TEXT     0
+ #define GMODE_GRAPH    1
+-#define GMODE_BLANK 2
++#define GMODE_BLANK    2
++#define GMODE_XENGT    4
+ 
+ static void vga_update_display(void *opaque)
+ {
+@@ -1868,16 +1870,21 @@ static void vga_update_display(void *opaque)
+         /* nothing to do */
+     } else {
+         full_update = 0;
+-        if (!(s->ar_index & 0x20)) {
++        if (xengt_is_enabled())
++            graphic_mode = GMODE_XENGT;
++        else if (!(s->ar_index & 0x20))
+             graphic_mode = GMODE_BLANK;
+-        } else {
++        else
+             graphic_mode = s->gr[6] & 1;
+-        }
++        
+         if (graphic_mode != s->graphic_mode) {
+             s->graphic_mode = graphic_mode;
+             full_update = 1;
+         }
+         switch(graphic_mode) {
++        case GMODE_XENGT:
++            xengt_draw_primary(s->ds);
++            break;
+         case GMODE_TEXT:
+             vga_draw_text(s, full_update);
+             break;
+diff --git a/xen-hooks.mak b/xen-hooks.mak
+index 746d06c..01cea1b 100644
+--- a/xen-hooks.mak
++++ b/xen-hooks.mak
+@@ -19,6 +19,7 @@ CFLAGS += $(CMDLINE_CFLAGS)
+ 
+ LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
+ LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
++LIBS += -ldrm
+ 
+ LDFLAGS := $(CFLAGS) $(LDFLAGS)
+ 

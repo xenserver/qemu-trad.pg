@@ -1,0 +1,94 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index 7afd214..f40a815 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -268,6 +268,7 @@ done:
+ 
+ typedef struct xengt_fb {
+     void *base;
++    size_t size;
+     struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
+ } xengt_fb_t;
+ 
+@@ -281,7 +282,6 @@ static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
+ {
+     struct drm_i915_gem_mmap_gtt gem_mmap_gtt;
+     xengt_fb_t *fb;
+-    size_t size;
+     int i;
+     int rc;
+ 
+@@ -302,9 +302,8 @@ empty_slot:
+     if (rc < 0)
+         goto fail2;
+ 
+-    size = gem_vgtbuffer->size * TARGET_PAGE_SIZE;
+-
+-    fb->base = mmap(NULL, size, PROT_READ, MAP_SHARED,
++    fb->size = gem_vgtbuffer->size * TARGET_PAGE_SIZE;
++    fb->base = mmap(NULL, fb->size, PROT_READ, MAP_SHARED,
+ 		    drm_fd, gem_mmap_gtt.offset);
+     if (fb->base == MAP_FAILED)
+         goto fail3;
+@@ -312,7 +311,7 @@ empty_slot:
+     qemu_log("vGT: %s %u (%ux%ux%u)-> %p(+%p)\n", __func__,
+ 	     gem_vgtbuffer->handle, gem_vgtbuffer->width,
+ 	     gem_vgtbuffer->height, gem_vgtbuffer->bpp,
+-             fb->base, (void *)size);
++             fb->base, (void *)fb->size);
+ 
+     fb->gem_vgtbuffer = *gem_vgtbuffer;
+     return fb;
+@@ -385,15 +384,51 @@ done:
+     return fb;
+ }
+ 
++typedef struct xengt_surface {
++    DisplayState *ds;
++    uint32_t     width;
++    uint32_t     height;
++} xengt_surface_t;
++
++static xengt_surface_t xengt_surface;
++
+ void xengt_draw_primary(DisplayState *ds)
+ {
+     uint32_t start;
+     xengt_fb_t *fb;
++    struct drm_i915_gem_vgtbuffer *gem_vgtbuffer;
++    xengt_surface_t *surface = &xengt_surface;
+ 
+     if ((fb = xengt_get_fb()) == NULL)
+         return;
+ 
+-    qemu_log("vGT: %s %u\n", __func__, fb->gem_vgtbuffer.handle);
++    gem_vgtbuffer = &fb->gem_vgtbuffer;
++
++    qemu_log("vGT: %s %u\n", __func__, gem_vgtbuffer->handle);
++
++    if (surface->ds != ds) {
++        surface->ds = ds;
++
++        qemu_free_displaysurface(ds);
++
++        ds->surface = qemu_create_displaysurface(ds, gem_vgtbuffer->width,
++                                                 gem_vgtbuffer->height);
++        dpy_resize(ds);
++
++        surface->width = gem_vgtbuffer->width;
++        surface->height = gem_vgtbuffer->height;
++    }
++
++    if (surface->width != gem_vgtbuffer->width ||
++        surface->height != gem_vgtbuffer->height) {
++        surface->width = gem_vgtbuffer->width;
++        surface->height = gem_vgtbuffer->height;
++
++        qemu_console_resize(ds, surface->width, surface->height);
++    }
++
++    memcpy(ds_get_data(ds), fb->base, fb->size);
++    dpy_update(ds, 0, 0, gem_vgtbuffer->width, gem_vgtbuffer->height);
+ }
+ 
+ /*

@@ -181,3 +181,13 @@ depriv_qemu.patch
 notify.patch
 CA-144613-vnc.patch
 CA-147808-vnc.patch
+intel-gvt-g.patch
+0001-Hardcode-monitor-config.patch
+0001-Always-destroy-the-kernel-vgt-instance.patch
+require-libdrm.patch
+fix_logging
+console1
+console2
+console3
+console4
+console5

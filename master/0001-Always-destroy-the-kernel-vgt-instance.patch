@@ -1,0 +1,183 @@
+From f5ebc28dc05d2fe76a88c4e9bd263e608e66c594 Mon Sep 17 00:00:00 2001
+From: Ross Lagerwall <ross.lagerwall@citrix.com>
+Date: Fri, 6 Feb 2015 09:51:22 +0000
+Subject: [PATCH] Always destroy the kernel vgt instance
+
+Set up a SIGTERM handler so that the vgt instance is destroyed regardless
+of how the VM is shutdown or rebooted.
+---
+ hw/hw.h           |    4 ++++
+ hw/vga-xengt.c    |    6 ++++++
+ i386-dm/helper2.c |    3 ---
+ vl.c              |   51 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ 4 files changed, 58 insertions(+), 6 deletions(-)
+
+diff --git a/hw/hw.h b/hw/hw.h
+index d29cc9b..d219708 100644
+--- a/hw/hw.h
++++ b/hw/hw.h
+@@ -246,6 +246,10 @@ typedef void QEMUResetHandler(void *opaque);
+ 
+ void qemu_register_reset(QEMUResetHandler *func, void *opaque);
+ 
++typedef void QEMUExitHandler(void *opaque);
++
++void qemu_register_exit(QEMUExitHandler *func, void *opaque);
++
+ /* handler to set the boot_device for a specific type of QEMUMachine */
+ /* return 0 if success */
+ typedef int QEMUBootSetHandler(void *opaque, const char *boot_device);
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index e8ae651..40b01c1 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -409,6 +409,11 @@ static void vgt_cleanupfn(PCIDevice *dev)
+     }
+ }
+ 
++static void vgt_cleanupfn2(void *unused)
++{
++    destroy_vgt_instance();
++}
++
+ /*static int vgt_initfn(PCIDevice *dev)
+ {
+     vgt_vga_state_t *d = DO_UPCAST(vgt_vga_state_t, dev, dev);
+@@ -458,6 +463,7 @@ void xengt_vga_init(PCIBus *pci_bus, ram_addr_t vga_ram_addr, int vga_ram_size)
+     }
+ 
+     create_vgt_instance();
++    qemu_register_exit(vgt_cleanupfn2, NULL);
+     printf("Create xengt VGA successfully\n");
+     return;
+ }
+diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
+index 795b59e..f1d1c76 100644
+--- a/i386-dm/helper2.c
++++ b/i386-dm/helper2.c
+@@ -662,9 +662,6 @@ void destroy_hvm_domain(void)
+ {
+     int sts;
+ 
+-    /* HACK, force vgt instance to be destroyed */
+-    if (xengt_vga_enabled)
+-	    destroy_vgt_instance();
+     sts = xc_domain_shutdown(xc_handle, domid, SHUTDOWN_poweroff);
+     if (sts != 0)
+         fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, "
+diff --git a/vl.c b/vl.c
+index bac3a3a..952bac5 100644
+--- a/vl.c
++++ b/vl.c
+@@ -3136,6 +3136,16 @@ typedef struct QEMUResetEntry {
+ } QEMUResetEntry;
+ 
+ static QEMUResetEntry *first_reset_entry;
++
++typedef struct QEMUExitEntry {
++    QEMUExitHandler *func;
++    void *opaque;
++    struct QEMUExitEntry *next;
++} QEMUExitEntry;
++
++static QEMUExitEntry *first_exit_entry;
++
++static volatile sig_atomic_t sigterm_received;
+ static int reset_requested;
+ static int shutdown_requested;
+ static int powerdown_requested;
+@@ -3183,6 +3193,20 @@ void qemu_register_reset(QEMUResetHandler *func, void *opaque)
+     *pre = re;
+ }
+ 
++void qemu_register_exit(QEMUExitHandler *func, void *opaque)
++{
++    QEMUExitEntry **pre, *re;
++
++    pre = &first_exit_entry;
++    while (*pre != NULL)
++        pre = &(*pre)->next;
++    re = qemu_mallocz(sizeof(QEMUExitEntry));
++    re->func = func;
++    re->opaque = opaque;
++    re->next = NULL;
++    *pre = re;
++}
++
+ void qemu_system_reset(void)
+ {
+     QEMUResetEntry *re;
+@@ -3193,6 +3217,15 @@ void qemu_system_reset(void)
+     }
+ }
+ 
++static void qemu_handle_exit(void)
++{
++    QEMUExitEntry *re;
++
++    for(re = first_exit_entry; re != NULL; re = re->next) {
++        re->func(re->opaque);
++    }
++}
++
+ void qemu_system_reset_request(void)
+ {
+     if (no_reboot) {
+@@ -3289,6 +3322,11 @@ void main_loop_wait(int timeout)
+ 
+     qemu_bh_update_timeout(&timeout);
+ 
++    if (sigterm_received) {
++        qemu_handle_exit();
++        exit(0);
++    }
++
+     host_main_loop_wait(&timeout);
+ 
+     /* poll any events */
+@@ -4300,10 +4338,17 @@ static int qemu_uuid_parse(const char *str, uint8_t *uuid)
+ 
+ #ifndef _WIN32
+ 
++#ifdef CONFIG_DM
++static void termsig_handler(int signal)
++{
++    sigterm_received = 1;
++}
++#else
+ static void termsig_handler(int signal)
+ {
+     qemu_system_shutdown_request();
+ }
++#endif
+ 
+ static void termsig_setup(void)
+ {
+@@ -4311,9 +4356,11 @@ static void termsig_setup(void)
+ 
+     memset(&act, 0, sizeof(act));
+     act.sa_handler = termsig_handler;
++    sigaction(SIGTERM, &act, NULL);
++#ifndef CONFIG_DM
+     sigaction(SIGINT,  &act, NULL);
+     sigaction(SIGHUP,  &act, NULL);
+-    sigaction(SIGTERM, &act, NULL);
++#endif
+ }
+ 
+ #endif
+@@ -5570,11 +5617,9 @@ geometry_error:
+     init_privxsh();
+ 
+ #ifndef _WIN32
+-#ifndef CONFIG_DM
+     /* must be after terminal init, SDL library changes signal handlers */
+     termsig_setup();
+ #endif
+-#endif
+ 
+     /* Maintain compatibility with multiple stdio monitors */
+     if (!strcmp(monitor_device,"stdio")) {
+-- 
+1.7.10.4
+
