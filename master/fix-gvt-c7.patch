@@ -1,12 +1,12 @@
-diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
-index fcb9bed..b57ebfe 100644
---- a/hw/vga-xengt.c
-+++ b/hw/vga-xengt.c
-@@ -42,7 +42,6 @@ typedef uint32_t pci_addr_t;
- #include <sys/mman.h>
- #include <drm/drm.h>
- #include <drm/i915_drm.h>
--#include <xf86drm.h>
- #include <sys/time.h>
- 
- #if 0
+diff --git a/Makefile.target b/Makefile.target
+index 8c07dd9..2cf50b4 100644
+--- a/Makefile.target
++++ b/Makefile.target
+@@ -586,6 +586,7 @@ ifdef CONFIG_AUDIO
+ OBJS+= $(SOUND_HW) pcspk.o
+ CPPFLAGS += -DHAS_AUDIO -DHAS_AUDIO_CHOICE
+ endif
++CPPFLAGS += -I/usr/include/libdrm
+ OBJS+= ide.o pckbd.o ps2.o vga.o vgpu_fb.o dma.o
+ OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pc.o
+ OBJS+= cirrus_vga.o apic.o parallel.o acpi.o piix_pci.o
