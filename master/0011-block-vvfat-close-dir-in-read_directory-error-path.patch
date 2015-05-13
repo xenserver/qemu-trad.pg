@@ -1,0 +1,21 @@
+From 1c2bfd73c5b941ccc3e209f8beb2047ae2990f96 Mon Sep 17 00:00:00 2001
+From: Yunlei Ding <yunlei.ding@citrix.com>
+Date: Tue, 11 Mar 2014 10:23:26 +0000
+Subject: [PATCH 11/11] block-vvfat.c: close dir in read_directory() error path
+To: andrew.cooper3@citrix.com
+
+Close dir handle before return.
+
+Signed-off-by: Yunlei Ding <yunlei.ding@citrix.com>
+diff --git a/block-vvfat.c b/block-vvfat.c
+index b6b5cc4..fe92cfe 100644
+--- a/block-vvfat.c
++++ b/block-vvfat.c
+@@ -753,6 +753,7 @@ static int read_directory(BDRVVVFATState* s, int mapping_index)
+         if (st.st_size > 0x7fffffff) {
+ 	    fprintf(stderr, "File %s is larger than 2GB\n", buffer);
+ 	    free(buffer);
++            closedir(dir);
+ 	    return -2;
+         }
+ 	direntry->size=cpu_to_le32(S_ISDIR(st.st_mode)?0:st.st_size);

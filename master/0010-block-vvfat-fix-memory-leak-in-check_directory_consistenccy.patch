@@ -1,0 +1,23 @@
+From f1cbcd5d1dac0a889c6ca0a8c40eacaef79f4bd0 Mon Sep 17 00:00:00 2001
+From: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+Date: Fri, 7 Mar 2014 16:52:47 +0000
+Subject: [PATCH 10/10] block-vvfat: fix memory leak in check_directory_consistency()
+To: andrew.cooper3@citrix.com
+
+Memory pointed by cluster leaks in error handling code.
+Coverity issue id: 22473.
+
+Signed-off-by: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+diff --git a/block-vvfat.c b/block-vvfat.c
+index 7822b1a..0ab4176 100644
+--- a/block-vvfat.c
++++ b/block-vvfat.c
+@@ -1762,7 +1762,7 @@ static int check_directory_consistency(BDRVVVFATState *s,
+ 
+ 	if (s->used_clusters[cluster_num] & USED_ANY) {
+ 	    fprintf(stderr, "cluster %d used more than once\n", (int)cluster_num);
+-	    return 0;
++	    goto fail;
+ 	}
+ 	s->used_clusters[cluster_num] = USED_DIRECTORY;
+ 

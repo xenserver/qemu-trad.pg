@@ -1,0 +1,37 @@
+From 36bdd49d2f558ea0650993d39931c38108b11084 Mon Sep 17 00:00:00 2001
+From: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+Date: Tue, 22 Apr 2014 07:38:24 +0100
+Subject: net: Fix memory/handle leaks in net_socket_listen_init()
+To: david.vrabel@citrix.com
+
+fd and s could be leaked in case bind/listen failed.
+
+Signed-off-by: Kaifeng Zhu <kaifeng.zhu@citrix.com>
+diff --git a/net.c b/net.c
+index a9ba781..4bd7184 100644
+--- a/net.c
++++ b/net.c
+@@ -1466,6 +1466,7 @@ static int net_socket_listen_init(VLANState *vlan,
+     fd = socket(PF_INET, SOCK_STREAM, 0);
+     if (fd < 0) {
+         perror("socket");
++        qemu_free(s);
+         return -1;
+     }
+     socket_set_nonblock(fd);
+@@ -1477,11 +1478,15 @@ static int net_socket_listen_init(VLANState *vlan,
+     ret = bind(fd, (struct sockaddr *)&saddr, sizeof(saddr));
+     if (ret < 0) {
+         perror("bind");
++        closesocket(fd);
++        qemu_free(s);
+         return -1;
+     }
+     ret = listen(fd, 0);
+     if (ret < 0) {
+         perror("listen");
++        closesocket(fd);
++        qemu_free(s);
+         return -1;
+     }
+     s->vlan = vlan;

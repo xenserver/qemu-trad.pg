@@ -36,17 +36,48 @@ cirrus_vga-default-all-I-O-port-reads-to-0xff.patch
 lm832x-don-t-overrun-file-buffer-on-save-restore.patch
 block-vvfat-fix-fat_chksum-buffer-overrun-warning.patch
 
+# CVE fixes
+CVE-2010-0297-usb-overflow.patch
+0001-CVE-2014-8106-cirrus-fix-blit-region-check.patch
+0002-CVE-2014-7815-vnc-sanitize-bits_per_pixel-from-the-c.patch
+0003-CVE-2014-3615-vbe-rework-sanity-checks.patch
+
+# Crash fixes
+0001-cirrus_vga-fix-division-by-0-for-color-expansion-rop.patch
+0001-cancel-dma-operation-if-command-abort-or-error.patch
+0002-fix-incorrect-bh-schedule.patch
+
 # Functional fixes
 fix-cdrom-eject.patch
 fix-pasprintf.patch
 CP-10662-pciemulation.patch
-CA-156663-ioperms.patch
+less-leaky-xenstore-handling.patch
 
 # Scalability fixes
 smbus-nuke-eeprom.patch
 
 # Valgrind/Coverity fixes
 clear-dynticks-sigevent.patch
+reduce-memory-leaks.patch
+hw-msmouse-Fix-deref_after_free.patch
+0001-readline-fix-memory-corruption-when-adding-history.patch
+0002-block-cow-dont-close-cow_fd-twice-on-error.patch
+0003-console-font_data-is-only-8-bits.patch
+0004-hw-device-hotplug-fix-test-of-drive_add-return.patch
+0005-qemu-char-fix-memory-leak-in-qemu_char_open_pty.patch
+0006-hw-ide-fix-memory-leak-from-qemu_allocate_irqs.patch
+0007-net-dont-leak-an-fd-after-an-error.patch
+0008-net-fix-memory-handle-leaks-in-net_socket_listen_init.patch
+0009-block-vvfat-fix-memory-handle-leaks-in-commit_one_file.patch
+0010-block-vvfat-fix-memory-leak-in-check_directory_consistenccy.patch
+0004-virtio-blk-correctly-link-new-request-in-virtio_blk_load.patch
+0005-net-initialize-addrlen-param-in-getsockname-call.patch
+0006-net-initialize-saddr-before-getsockname-call.patch
+0007-ide-dont-leak-irq-array-in_pci_cmd646_ide_init.patch
+0008-block-nbd-close-sock-in-nbd_open-error_path.patch
+0009-block-raw-posix-Fix-memory-leak-in-posix_aio_init.patch
+0010-block-vvfat-fix-memory-leak-in-read_directory.patch
+0011-block-vvfat-close-dir-in-read_directory-error-path.patch
 
 #
 # Non-upstreamable patches
@@ -77,7 +108,6 @@ qemu-24cf0a6e36402f3bbab1d7317de6c4d511c832e1.patch # vnc: no need to set force_
 qemu-afd3216027e3b28b0e180ac99d87e981d169b91c.patch # vnc: Fix memory allocation (wrong structure size).
 qemu-198a0039c5fca224a77e9761e2350dd9cc102ad0.patch # vnc: rework VncState release workflow.
 qemu-f22f5b077c164b864dae9776f63ed9e48a973fb6.patch # vga: fix shadow GR regression
-qemu-babd03fde68093482528010a5435c14ce9128e3f-fixed.patch # usb-linux.c: fix buffer overflow
 
 vnc_copyrect.patch # where does this come from?
 vnc_timer.patch
@@ -181,6 +211,9 @@ depriv_qemu.patch
 notify.patch
 CA-144613-vnc.patch
 CA-147808-vnc.patch
+CA-156663-ioperms.patch
+0001-vnc-handle-guest-ds-with-strange-width.patch
+0002-vga-fix-invalid-memory-accesses-with-bad-register-state.patch
 intel-gvt-g.patch
 0001-Hardcode-monitor-config.patch
 0001-Always-destroy-the-kernel-vgt-instance.patch

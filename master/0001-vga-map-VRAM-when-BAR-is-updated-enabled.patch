@@ -23,10 +23,10 @@ so map it when the BAR is enabled or updated.
 
 Signed-off-by: David Vrabel <david.vrabel@citrix.com>
 diff --git a/hw/vga.c b/hw/vga.c
-index fed2c54..e82a1df 100644
+index 390c8a8..5b38e0d 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
-@@ -619,10 +619,6 @@ static void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
+@@ -697,10 +697,6 @@ static void vbe_ioport_write_data(void *opaque, uint32_t addr, uint32_t val)
                  !(s->vbe_regs[VBE_DISPI_INDEX_ENABLE] & VBE_DISPI_ENABLED)) {
                  int h, shift_control;
                  
@@ -34,10 +34,10 @@ index fed2c54..e82a1df 100644
 -                     set_vram_mapping(s, s->lfb_addr, s->lfb_end);
 -                }
 -
-                 s->vbe_regs[VBE_DISPI_INDEX_VIRT_WIDTH] =
-                     s->vbe_regs[VBE_DISPI_INDEX_XRES];
-                 s->vbe_regs[VBE_DISPI_INDEX_VIRT_HEIGHT] =
-@@ -2330,6 +2326,9 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
+                 s->vbe_regs[VBE_DISPI_INDEX_VIRT_WIDTH] = 0;
+                 s->vbe_regs[VBE_DISPI_INDEX_X_OFFSET] = 0;
+                 s->vbe_regs[VBE_DISPI_INDEX_Y_OFFSET] = 0;
+@@ -2366,6 +2362,9 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
          cpu_register_physical_memory(addr, s->vram_size, s->vram_offset);
          s->lfb_addr = addr;
          s->lfb_end = addr + size;
