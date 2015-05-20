@@ -21,6 +21,7 @@ builder-makefiles.patch
 #
 # Patches from upstream (qemu-traditional upstream)
 #
+xsa128-qemut.patch # xen: properly gate host writes of modified PCI CFG contents
 
 #
 # Patches from upstream (qemu-upstream upstream)
