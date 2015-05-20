@@ -23,6 +23,7 @@ builder-makefiles.patch
 #
 xsa128-qemut.patch # xen: properly gate host writes of modified PCI CFG contents
 xsa129-qemut.patch # xen: don't allow guest to control MSI mask register
+xsa130-qemut.patch # xen/MSI-X: disable logging by default
 
 #
 # Patches from upstream (qemu-upstream upstream)
