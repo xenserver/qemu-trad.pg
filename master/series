@@ -24,6 +24,14 @@ builder-makefiles.patch
 xsa128-qemut.patch # xen: properly gate host writes of modified PCI CFG contents
 xsa129-qemut.patch # xen: don't allow guest to control MSI mask register
 xsa130-qemut.patch # xen/MSI-X: disable logging by default
+xsa131-qemut-1.patch # xen/MSI: don't open-code pass-through of enable bit modifications
+xsa131-qemut-2.patch # xen/pt: consolidate PM capability emu_mask
+xsa131-qemut-3.patch # xen/pt: correctly handle PM status bit
+xsa131-qemut-4.patch # xen/pt: split out calculation of throughable mask in PCI config space handling
+xsa131-qemut-5.patch # xen/pt: mark all PCIe capability bits read-only
+xsa131-qemut-6.patch # xen/pt: mark reserved bits in PCI config space fields
+xsa131-qemut-7.patch # xen/pt: add a few PCI config space field descriptions
+xsa131-qemut-8.patch # xen/pt: unknown PCI config space fields should be read-only
 
 #
 # Patches from upstream (qemu-upstream upstream)
