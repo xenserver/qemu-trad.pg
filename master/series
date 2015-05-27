@@ -21,7 +21,6 @@ builder-makefiles.patch
 #
 # Patches from upstream (qemu-traditional upstream)
 #
-xsa133-qemut.patch # fdc: force the fifo access to be in bounds of the allocated buffer
 
 #
 # Patches from upstream (qemu-upstream upstream)
