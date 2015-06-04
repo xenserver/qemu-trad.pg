@@ -160,9 +160,6 @@ vnc_scan_code.patch
 vnc_xencenter_no_copyrect.patch
 large_resolution.patch
 
-# future Intel drivers will not require this patch but it is required to 
-# support existing vm upgrade to dundee
-igd_passthrough.patch
 
 #
 # Product specific
@@ -217,3 +214,6 @@ CA-147808-vnc.patch
 CA-156663-ioperms.patch
 0001-vnc-handle-guest-ds-with-strange-width.patch
 0002-vga-fix-invalid-memory-accesses-with-bad-register-state.patch
+# future Intel drivers will not require this patch but it is required to 
+# support existing vm upgrade to dundee
+igd_passthrough.patch
