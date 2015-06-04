@@ -4,10 +4,10 @@ Whilst the opregion is 2 pages in size, it is not page aligned so it can touch 3
 
 Windows 8 code perserves the ACPI NVS regions by memcpying the entire space. This previuosly resulted in a BSOD due to a page fault when copying the end of the NVS region. 
 diff --git a/hw/pass-through.c b/hw/pass-through.c
-index 7fd4465..76ffd28 100644
+index c1e0142..1aef39c 100644
 --- a/hw/pass-through.c
 +++ b/hw/pass-through.c
-@@ -243,6 +243,12 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
+@@ -244,6 +244,12 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
          uint32_t *value, uint32_t dev_value, uint32_t valid_mask);
  static uint8_t pt_reg_grp_header0_size_init(struct pt_dev *ptdev,
          struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset);
@@ -20,7 +20,7 @@ index 7fd4465..76ffd28 100644
  
  /* pt_reg_info_tbl declaration
   * - only for emulated register (either a part or whole bit).
-@@ -459,6 +465,18 @@ static struct pt_reg_info_tbl pt_emu_reg_header0_tbl[] = {
+@@ -461,6 +467,17 @@ static struct pt_reg_info_tbl pt_emu_reg_header0_tbl[] = {
          .u.dw.write  = pt_intel_opregion_write,
          .u.dw.restore  = NULL,
      },
@@ -31,7 +31,6 @@ index 7fd4465..76ffd28 100644
 +        .init_val   = 0,
 +        .ro_mask    = 0xFFFF,
 +        .emu_mask   = 0xFFFF,
-+        .no_wb      = 1,
 +        .u.w.read   = pt_vga_pci_subclass_read,
 +        .u.w.write  = pt_vga_pci_subclass_write,
 +        .u.w.restore  = NULL,
@@ -39,7 +38,7 @@ index 7fd4465..76ffd28 100644
      {
          .size = 0,
      },
-@@ -4210,6 +4228,31 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
+@@ -4368,6 +4385,31 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
      return 0;
  }
  
