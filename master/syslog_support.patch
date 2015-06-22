@@ -6,7 +6,7 @@ Add support for --syslog to redirect all output to syslog instead of
 stdout/stderr.
 
 diff --git a/Makefile b/Makefile
-index 8834df5..6906127 100644
+index 439a7e0..626e090 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -263,6 +263,10 @@ endif
@@ -94,20 +94,21 @@ index b63a235..8d1263d 100644
  /* actual backend drivers */
  extern struct XenDevOps xen_console_ops;      /* xen_console.c     */
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index 5a616a5..c8328cf 100644
+index e44e9f0..debc12f 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
-@@ -7,7 +7,8 @@ Group: System/Hypervisor
+@@ -7,8 +7,9 @@ Group: System/Hypervisor
  Source0: xen-device-model-%{version}.tar.bz2
  Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 -BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel
 +BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
+ Requires(pre): shadow-utils
 +Provides: qemu-xen(syslog) = 1
  
  %description
  This package contains qemu-dm, the Xen device model.
-@@ -18,6 +19,7 @@ This package contains qemu-dm, the Xen device model.
+@@ -19,6 +20,7 @@ This package contains qemu-dm, the Xen device model.
  %build
  ./xen-setup --disable-opengl --disable-vnc-tls --disable-blobs --disable-sdl --enable-werror
  %{?cov_wrap} %{__make}
@@ -142,7 +143,7 @@ index 50dfb6b..52e7fa7 100644
 +
  #endif
 diff --git a/readline.c b/readline.c
-index 8572841..4294af9 100644
+index 4b68726..e08b459 100644
 --- a/readline.c
 +++ b/readline.c
 @@ -32,6 +32,7 @@
@@ -421,7 +422,7 @@ index 0000000..fc8104d
 +}
 +
 diff --git a/vl.c b/vl.c
-index 076f6f6..8385a5d 100644
+index d838667..b6ec68a 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -122,6 +122,10 @@

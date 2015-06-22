@@ -121,6 +121,7 @@ qemu-83755c173f4608764e3ee92428247d1c5e962e6a.patch # vnc_refresh: return if vd-
 #
 # to go upstream
 #
+xsa-126-workaround-sbr-side-effect.patch
 fix_savevm_v1_compatibility.patch
 savevm_george_compatibility.patch
 sanify-usb-controller-setup.patch
@@ -225,3 +226,6 @@ intel-gvt-g.patch
 #console4
 #console5
 #fix-gvt-c7.patch
+# future Intel drivers will not require this patch but it is required to 
+# support existing vm upgrade to dundee
+igd_passthrough.patch

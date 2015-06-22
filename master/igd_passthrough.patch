@@ -1,0 +1,325 @@
+Increase the size of the opregion mapping to 3 pages because HVM loader creates an ACPI NVS region of three pages. 
+
+Whilst the opregion is 2 pages in size, it is not page aligned so it can touch 3 pages in total. 
+
+Windows 8 code perserves the ACPI NVS regions by memcpying the entire space. This previuosly resulted in a BSOD due to a page fault when copying the end of the NVS region. 
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index c1e0142..1aef39c 100644
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -244,6 +244,12 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
+         uint32_t *value, uint32_t dev_value, uint32_t valid_mask);
+ static uint8_t pt_reg_grp_header0_size_init(struct pt_dev *ptdev,
+         struct pt_reg_grp_info_tbl *grp_reg, uint32_t base_offset);
++static int pt_vga_pci_subclass_read(struct pt_dev *ptdev,
++        struct pt_reg_tbl *cfg_entry,
++        uint16_t *value, uint16_t valid_mask);
++static int pt_vga_pci_subclass_write(struct pt_dev *ptdev,
++        struct pt_reg_tbl *cfg_entry,
++        uint16_t *value, uint16_t dev_value, uint16_t valid_mask);
+ 
+ /* pt_reg_info_tbl declaration
+  * - only for emulated register (either a part or whole bit).
+@@ -461,6 +467,17 @@ static struct pt_reg_info_tbl pt_emu_reg_header0_tbl[] = {
+         .u.dw.write  = pt_intel_opregion_write,
+         .u.dw.restore  = NULL,
+     },
++    /* VGA PCI SubClass*/
++    {
++        .offset     = PCI_CLASS_DEVICE,
++        .size       = 2,
++        .init_val   = 0,
++        .ro_mask    = 0xFFFF,
++        .emu_mask   = 0xFFFF,
++        .u.w.read   = pt_vga_pci_subclass_read,
++        .u.w.write  = pt_vga_pci_subclass_write,
++        .u.w.restore  = NULL,
++    },
+     {
+         .size = 0,
+     },
+@@ -4368,6 +4385,31 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
+     return 0;
+ }
+ 
++static int pt_vga_pci_subclass_read(struct pt_dev *ptdev,
++        struct pt_reg_tbl *cfg_entry,
++        uint16_t *value, uint16_t valid_mask)
++{
++    PCIDevice *dev = (PCIDevice *)&ptdev->dev;
++
++    if (*value == 0x300 || *value == 0x380)
++    {
++      /* Force IGD passthru device (00:02.0) to be primary VGA */
++      if (igd_passthru &&
++	  ((pci_bus_num(dev->bus) == 0) &&
++	   PCI_SLOT(dev->devfn) == 2 &&
++	   PCI_FUNC(dev->devfn) == 0))
++	  *value = 0x300;
++    }
++    return 0;
++}
++
++static int pt_vga_pci_subclass_write(struct pt_dev *ptdev,
++        struct pt_reg_tbl *cfg_entry,
++        uint16_t *value, uint16_t dev_value, uint16_t valid_mask)
++{
++    return 0;
++}
++
+ static struct pt_dev * register_real_device(PCIBus *e_bus,
+         const char *e_dev_name, int e_devfn, uint8_t r_bus, uint8_t r_dev,
+         uint8_t r_func, uint32_t machine_irq, struct pci_access *pci_access,
+diff --git a/hw/pc.c b/hw/pc.c
+index 53fb356..e805705 100644
+--- a/hw/pc.c
++++ b/hw/pc.c
+@@ -990,7 +990,13 @@ vga_bios_error:
+ 
+     if (cirrus_vga_enabled) {
+         if (pci_enabled) {
+-	    pci_cirrus_vga_init(pci_bus, piix3_devfn + 8,
++	    int devfn = piix3_devfn + 8;
++	    if (gfx_passthru) {
++		/* gfx_passthru option moves device from 02:00 to 0C:00
++		   emulated NIC use device's 04:00 through to 0B:00 */
++		devfn = (0xc * 8);
++	    }
++	    pci_cirrus_vga_init(pci_bus, devfn,
+                                 phys_ram_base + vga_ram_addr,
+                                 vga_ram_addr, vga_ram_size);
+         } else {
+@@ -1008,7 +1014,13 @@ vga_bios_error:
+ #endif
+     } else if (std_vga_enabled) {
+         if (pci_enabled) {
+-	    pci_vga_init(pci_bus, piix3_devfn + 8,
++	    int devfn = piix3_devfn + 8;
++	    if (gfx_passthru) {
++		/* gfx_passthru option moves device from 02:00 to 0C:00
++		   emulated NIC use device's 04:00 through to 0B:00 */
++		devfn = (0xc * 8);
++	    }
++	    pci_vga_init(pci_bus, devfn,
+ 			 phys_ram_base + vga_ram_addr,
+                          vga_ram_addr, vga_ram_size, 0, 0);
+         } else {
+diff --git a/hw/pt-graphics.c b/hw/pt-graphics.c
+index 7302b25..087c20d 100644
+--- a/hw/pt-graphics.c
++++ b/hw/pt-graphics.c
+@@ -16,6 +16,34 @@ extern int igd_passthru;
+ 
+ static uint32_t igd_guest_opregion = 0;
+ 
++static int wrapped_xc_domain_memory_mapping(
++    xc_interface *xch, uint32_t domid, unsigned long first_gfn,
++    unsigned long first_mfn, unsigned long nr_mfns, uint32_t add_mapping)
++{
++    int rc;
++
++    if ( add_mapping )
++    {
++        rc = xc_domain_iomem_permission(xch, domid, first_mfn, nr_mfns, add_mapping);
++        if ( rc )
++            return rc;
++    }
++
++    rc = xc_domain_memory_mapping(xch, domid, first_gfn, first_mfn, nr_mfns, add_mapping);
++
++    if ( !add_mapping )
++    {
++        rc = xc_domain_iomem_permission(xch, domid, first_mfn, nr_mfns, add_mapping);
++        if ( rc )
++            return rc;
++    }
++
++    return rc;
++}
++
++#define xc_domain_memory_mapping wrapped_xc_domain_memory_mapping
++
++
+ static int pch_map_irq(PCIDevice *pci_dev, int irq_num)
+ {
+     PT_LOG("pch_map_irq called\n");
+@@ -81,7 +109,7 @@ void igd_write_opregion(struct pt_dev *real_dev, uint32_t val)
+     ret = xc_domain_memory_mapping(xc_handle, domid,
+             igd_guest_opregion >> XC_PAGE_SHIFT,
+             host_opregion >> XC_PAGE_SHIFT,
+-            2,
++            3,
+             DPCI_ADD_MAPPING);
+ 
+     if ( ret != 0 )
+@@ -150,8 +178,8 @@ uint32_t igd_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len)
+         case 0xa0:        /* top of memory */
+         case 0xb0:        /* ILK: BSM: should read from dev 2 offset 0x5c */
+         case 0x58:        /* SNB: PAVPC Offset */
+-        case 0xa4:        /* SNB: graphics base of stolen memory */
+-        case 0xa8:        /* SNB: base of GTT stolen memory */
++        case 0xb4:        /* SNB: graphics base of stolen memory */
++        case 0xb8:        /* SNB: base of GTT stolen memory */
+             break;
+         default:
+             goto read_default;
+@@ -181,27 +209,8 @@ read_default:
+  */
+ int register_vga_regions(struct pt_dev *real_device)
+ {
+-    u16 vendor_id;
+     int ret = 0;
+ 
+-    if ( !gfx_passthru || real_device->pci_dev->device_class != 0x0300 )
+-        return ret;
+-
+-    ret |= xc_domain_ioport_mapping(xc_handle, domid, 0x3B0,
+-            0x3B0, 0xC, DPCI_ADD_MAPPING);
+-
+-    ret |= xc_domain_ioport_mapping(xc_handle, domid, 0x3C0,
+-            0x3C0, 0x20, DPCI_ADD_MAPPING);
+-
+-    ret |= xc_domain_memory_mapping(xc_handle, domid,
+-            0xa0000 >> XC_PAGE_SHIFT,
+-            0xa0000 >> XC_PAGE_SHIFT,
+-            0x20,
+-            DPCI_ADD_MAPPING);
+-
+-    if ( ret != 0 )
+-        PT_LOG("VGA region mapping failed\n");
+-
+     return ret;
+ }
+ 
+@@ -216,25 +225,13 @@ int unregister_vga_regions(struct pt_dev *real_device)
+     if ( !gfx_passthru || real_device->pci_dev->device_class != 0x0300 )
+         return ret;
+ 
+-    ret |= xc_domain_ioport_mapping(xc_handle, domid, 0x3B0,
+-            0x3B0, 0xC, DPCI_REMOVE_MAPPING);
+-
+-    ret |= xc_domain_ioport_mapping(xc_handle, domid, 0x3C0,
+-            0x3C0, 0x20, DPCI_REMOVE_MAPPING);
+-
+-    ret |= xc_domain_memory_mapping(xc_handle, domid,
+-            0xa0000 >> XC_PAGE_SHIFT,
+-            0xa0000 >> XC_PAGE_SHIFT,
+-            20,
+-            DPCI_REMOVE_MAPPING);
+-
+     vendor_id = pt_pci_host_read(real_device->pci_dev, PCI_VENDOR_ID, 2);
+     if ( (vendor_id == PCI_VENDOR_ID_INTEL) && igd_guest_opregion )
+     {
+         ret |= xc_domain_memory_mapping(xc_handle, domid,
+                 igd_guest_opregion >> XC_PAGE_SHIFT,
+                 igd_guest_opregion >> XC_PAGE_SHIFT,
+-                2,
++                3,
+                 DPCI_REMOVE_MAPPING);
+     }
+ 
+@@ -244,90 +241,14 @@ int unregister_vga_regions(struct pt_dev *real_device)
+     return ret;
+ }
+ 
+-static int get_vgabios(unsigned char *buf)
+-{
+-    int fd;
+-    uint32_t bios_size = 0;
+-    uint32_t start = 0xC0000;
+-    uint16_t magic = 0;
+-
+-    if ( (fd = open("/dev/mem", O_RDONLY)) < 0 )
+-    {
+-        PT_LOG("Error: Can't open /dev/mem: %s\n", strerror(errno));
+-        return 0;
+-    }
+-
+-    /*
+-     * Check if it a real bios extension.
+-     * The magic number is 0xAA55.
+-     */
+-    if ( start != lseek(fd, start, SEEK_SET) )
+-        goto out;
+-    if ( read(fd, &magic, 2) != 2 )
+-        goto out;
+-    if ( magic != 0xAA55 )
+-        goto out;
+-
+-    /* Find the size of the rom extension */
+-    if ( start != lseek(fd, start, SEEK_SET) )
+-        goto out;
+-    if ( lseek(fd, 2, SEEK_CUR) != (start + 2) )
+-        goto out;
+-    if ( read(fd, &bios_size, 1) != 1 )
+-        goto out;
+-
+-    /* This size is in 512 bytes */
+-    bios_size *= 512;
+-
+-    /*
+-     * Set the file to the begining of the rombios,
+-     * to start the copy.
+-     */
+-    if ( start != lseek(fd, start, SEEK_SET) )
+-        goto out;
+-
+-    if ( bios_size != read(fd, buf, bios_size))
+-        bios_size = 0;
+-
+-out:
+-    close(fd);
+-    return bios_size;
+-}
+-
+ int setup_vga_pt(struct pt_dev *real_device)
+ {
+-    unsigned char *bios = NULL;
+-    int bios_size = 0;
+-    char *c = NULL;
+-    char checksum = 0;
+     int rc = 0;
+ 
+     if ( !gfx_passthru || real_device->pci_dev->device_class != 0x0300 )
+         return rc;
+ 
+-    /* Allocated 64K for the vga bios */
+-    if ( !(bios = malloc(64 * 1024)) )
+-        return -1;
+-
+-    bios_size = get_vgabios(bios);
+-    if ( bios_size == 0 || bios_size > 64 * 1024)
+-    {
+-        PT_LOG("vga bios size (0x%x) is invalid!\n", bios_size);
+-        rc = -1;
+-        goto out;
+-    }
+-
+-    /* Adjust the bios checksum */
+-    for ( c = (char*)bios; c < ((char*)bios + bios_size); c++ )
+-        checksum += *c;
+-    if ( checksum )
+-    {
+-        bios[bios_size - 1] -= checksum;
+-        PT_LOG("vga bios checksum is adjusted!\n");
+-    }
++    real_device->dev.config[0xa] = 0x80;
+ 
+-    cpu_physical_memory_rw(0xc0000, bios, bios_size, 1);
+-out:
+-    free(bios);
+     return rc;
+ }
+diff --git a/vl.c b/vl.c
+index fa6bd40..6b40edf 100644
+--- a/vl.c
++++ b/vl.c
+@@ -4205,8 +4205,6 @@ static void select_vgahw (const char *p)
+         vmsvga_enabled = 1;
+         vgpu_enabled = 0;
+     } else if (strstart(p, "passthrough", &opts)) {
+-        cirrus_vga_enabled = 0;
+-        std_vga_enabled = 0;
+         vmsvga_enabled = 0;
+         gfx_passthru = 1;
+         vgpu_enabled = 0;

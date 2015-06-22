@@ -1,0 +1,35 @@
+# HG changeset patch
+# Parent d0e656e2e2ceb74ae2680c69c7344f3431bfe416
+
+diff -r d0e656e2e2ce hw/pass-through.c
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -3391,6 +3391,9 @@ static int pt_cmd_reg_write(struct pt_de
+     pt_bar_mapping(ptdev, wr_value & PCI_COMMAND_IO,
+                           wr_value & PCI_COMMAND_MEMORY);
+ 
++    /* Restore command enables in case they cleared by PCI SBR */
++    *value |= ptdev->cmd_enables;
++
+ #ifndef CONFIG_STUBDOM
+     if ( pt_is_iomul(ptdev) )
+     {
+@@ -4298,6 +4301,7 @@ static struct pt_dev * register_real_dev
+     }
+ 
+ out:
++    assigned_device->cmd_enables = cmd;
+     if (cmd)
+         pci_write_word(pci_dev, PCI_COMMAND,
+             *(uint16_t *)(&assigned_device->dev.config[PCI_COMMAND]) | cmd);
+diff -r d0e656e2e2ce hw/pass-through.h
+--- a/hw/pass-through.h
++++ b/hw/pass-through.h
+@@ -232,6 +232,7 @@ struct pt_dev {
+ #define PCI_IOMUL_INVALID_FD    (-1)
+     int fd;
+     unsigned io_enable:1;
++    uint16_t cmd_enables;
+ };
+ 
+ static inline int pt_is_iomul(struct pt_dev *dev)
