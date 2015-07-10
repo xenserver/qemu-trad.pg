@@ -189,6 +189,7 @@ XOP-403-usb-blue-fix.patch
 CA-123830-reenable-O_DIRECT.patch
 CA-127361.patch
 vgpu.patch
+vgpu_migrate.patch
 fixed-devfn.patch
 Xen-vm-kernel-crash-in-get_free_entries-workaround.patch
 vnc-dynamically-alloc-dirty-buffers.patch
@@ -230,3 +231,4 @@ fix-gvt-c7.patch
 # support existing vm upgrade to dundee
 igd_passthrough.patch
 bitblt.patch
+CP-12149-xen-pvdriver.patch

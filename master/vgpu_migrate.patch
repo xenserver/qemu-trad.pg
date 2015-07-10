@@ -1,0 +1,88 @@
+diff --git a/hw/vgpu_fb.c b/hw/vgpu_fb.c
+index 6a27504..47e5601 100644
+--- a/hw/vgpu_fb.c
++++ b/hw/vgpu_fb.c
+@@ -13,6 +13,7 @@
+ #include "exec-all.h"
+ 
+ #include "qemu-timer.h"
++#include "qemu-xen.h"
+ 
+ #pragma pack(1)
+ 
+@@ -99,6 +100,14 @@ vgpu_fb_init(void)
+     int i;
+     vgpu_fb_state *s;
+     int fd;
++    int defaulted = 0;
++
++    uint64_t address = xenstore_parse_vgpu_address();
++
++    if (address == ~0ULL) {
++        address = SURFACE_RESERVED_ADDRESS;
++        defaulted = 1;
++    }
+ 
+     s = qemu_mallocz(sizeof(vgpu_fb_state));
+     if (!s)
+@@ -111,13 +120,14 @@ vgpu_fb_init(void)
+                                  s);
+ 
+     for (i = 0; i < n; i++)
+-        pfn[i] = (SURFACE_RESERVED_ADDRESS >> TARGET_PAGE_BITS) + i;
++        pfn[i] = (address >> TARGET_PAGE_BITS) + i;
+ 
+     s->surface_buffer = xc_map_foreign_pages(xc_handle, domid,
+                                              PROT_READ | PROT_WRITE,
+                                              pfn, n);
+     if (s->surface_buffer == NULL) {
+-        fprintf(stderr, "mmap failed\n");
++        fprintf(stderr, "mmap failed. address = 0x%jx %s\n", 
++                        address, defaulted?"(Default)":"");
+         exit(1);
+     }
+ 
+diff --git a/qemu-xen.h b/qemu-xen.h
+index 9b6b818..14cf220 100644
+--- a/qemu-xen.h
++++ b/qemu-xen.h
+@@ -68,6 +68,7 @@ void xenstore_init(void);
+ uint32_t xenstore_read_target(void);
+ void xenstore_parse_domain_config(int domid);
+ int xenstore_parse_disable_pf_config(void);
++uint64_t xenstore_parse_vgpu_address(void);
+ struct pci_config_header;
+ void xenstore_parse_pf_config(struct pci_config_header *pch);
+ int xenstore_fd(void);
+diff --git a/xenstore.c b/xenstore.c
+index 1241b1d..974832b 100644
+--- a/xenstore.c
++++ b/xenstore.c
+@@ -911,6 +911,27 @@ void xenstore_parse_domain_config(int hvm_domid)
+     return;
+ }
+ 
++uint64_t xenstore_parse_vgpu_address()
++{
++    char *params = NULL, *buf = NULL;
++    uint64_t address = ~0ULL;
++    unsigned int len;
++
++    if (pasprintf(&buf, "/local/domain/%u/vm-data/vram",domid) == -1) {
++        goto out;
++    }
++
++    params = xs_read(xsh, XBT_NULL, buf, &len);
++    if (params != NULL) {
++        address = strtoull(params, NULL, 16);
++    }
++
++ out:
++    free(buf);
++    free(params);
++    return address;
++}
++
+ int xenstore_parse_disable_pf_config ()
+ {
+     char *params = NULL, *buf = NULL;
