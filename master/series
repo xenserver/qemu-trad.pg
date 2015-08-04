@@ -29,6 +29,13 @@ builder-makefiles.patch
 #
 # Patches for upstream (qemu-traditional)
 #
+xsa140-qemut-1.patch # rtl8139: avoid nested ifs in IP header parsing
+xsa140-qemut-2.patch # rtl8139: drop tautologous if (ip) {...} statement
+xsa140-qemut-3.patch # rtl8139: skip offload on short Ethernet/IP header
+xsa140-qemut-4.patch # rtl8139: check IP Header Length field
+xsa140-qemut-5.patch # rtl8139: check IP Total Length field
+xsa140-qemut-6.patch # rtl8139: skip offload on short TCP header
+xsa140-qemut-7.patch # rtl8139: check TCP Data Offset field
 
 # Build fixes
 0003-virtio-blk-initialize-unused-blkcfg.size_max-field.patch
