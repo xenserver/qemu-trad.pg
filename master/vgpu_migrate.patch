@@ -1,5 +1,5 @@
 diff --git a/hw/vgpu_fb.c b/hw/vgpu_fb.c
-index 6a27504..47e5601 100644
+index 6a27504..f9b81c2 100644
 --- a/hw/vgpu_fb.c
 +++ b/hw/vgpu_fb.c
 @@ -13,6 +13,7 @@
@@ -10,7 +10,15 @@ index 6a27504..47e5601 100644
  
  #pragma pack(1)
  
-@@ -99,6 +100,14 @@ vgpu_fb_init(void)
+@@ -52,6 +53,7 @@ static void vgpu_fb_update(void *opaque)
+     vgpu_fb_state *s = (vgpu_fb_state *)opaque;
+     char buf = 'S';
+ 
++    s->server.sin_port = htons(s->shared->port);
+     sendto(s->surface_fd, &buf, 1, MSG_DONTWAIT, &s->server, sizeof (s->server));
+ 
+     if (s->surface_offset != s->shared->offset ||
+@@ -99,6 +101,14 @@ vgpu_fb_init(void)
      int i;
      vgpu_fb_state *s;
      int fd;
@@ -25,7 +33,7 @@ index 6a27504..47e5601 100644
  
      s = qemu_mallocz(sizeof(vgpu_fb_state));
      if (!s)
-@@ -111,13 +120,14 @@ vgpu_fb_init(void)
+@@ -111,13 +121,14 @@ vgpu_fb_init(void)
                                   s);
  
      for (i = 0; i < n; i++)
@@ -42,6 +50,12 @@ index 6a27504..47e5601 100644
          exit(1);
      }
  
+@@ -137,5 +148,4 @@ vgpu_fb_init(void)
+ 
+     s->server.sin_family = AF_INET;
+     s->server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+-    s->server.sin_port = htons(s->shared->port);
+ }
 diff --git a/qemu-xen.h b/qemu-xen.h
 index 9b6b818..14cf220 100644
 --- a/qemu-xen.h
