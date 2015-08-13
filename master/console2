@@ -7,8 +7,8 @@ index d4436cb..7afd214 100644
  
  #include <sys/ioctl.h>
 +#include <sys/mman.h>
- #include <drm/drm.h>
- #include <drm/i915_drm.h>
+ #include <libdrm/drm.h>
+ #include <libdrm/i915_drm.h>
  #include <xf86drm.h>
 @@ -266,6 +267,7 @@ done:
  }

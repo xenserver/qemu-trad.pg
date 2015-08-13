@@ -3,8 +3,8 @@ index f7b3286..fcb9bed 100644
 --- a/hw/vga-xengt.c
 +++ b/hw/vga-xengt.c
 @@ -43,6 +43,7 @@ typedef uint32_t pci_addr_t;
- #include <drm/drm.h>
- #include <drm/i915_drm.h>
+ #include <libdrm/drm.h>
+ #include <libdrm/i915_drm.h>
  #include <xf86drm.h>
 +#include <sys/time.h>
  

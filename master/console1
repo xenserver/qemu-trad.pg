@@ -20,8 +20,8 @@ index b4436b3..d4436cb 100644
  #include "assert.h"
  
 +#include <sys/ioctl.h>
-+#include <drm/drm.h>
-+#include <drm/i915_drm.h>
++#include <libdrm/drm.h>
++#include <libdrm/i915_drm.h>
 +#include <xf86drm.h>
 +
 +#if 0
