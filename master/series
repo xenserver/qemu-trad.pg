@@ -216,19 +216,12 @@ CA-147808-vnc.patch
 CA-156663-ioperms.patch
 0001-vnc-handle-guest-ds-with-strange-width.patch
 0002-vga-fix-invalid-memory-accesses-with-bad-register-state.patch
-intel-gvt-g.patch
-0001-Hardcode-monitor-config.patch
-0001-Always-destroy-the-kernel-vgt-instance.patch
-require-libdrm.patch
-fix_logging
-console1
-console2
-console3
-console4
-console5
-fix-gvt-c7.patch
+initialize-vga-vbe_LFB-regs-at-init.patch
+intel-gvt-g-initial-backport.patch
+intel-gvt-g-hardcode-monitor-config.patch
+intel-gvt-g-add-vnc-console-support.patch
+intel-gvt-g-use-bitblt-for-vnc-console.patch
 # future Intel drivers will not require this patch but it is required to 
 # support existing vm upgrade to dundee
 igd_passthrough.patch
-bitblt.patch
 CP-12149-xen-pvdriver.patch

@@ -1,0 +1,443 @@
+diff --git a/Makefile b/Makefile
+index 626e090..0652a5b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -34,6 +34,8 @@ ifdef CONFIG_WIN32
+ LIBS+=-lwinmm -lws2_32 -liphlpapi
+ endif
+ 
++LIBS+=-ldrm
++
+ all: $(TOOLS) $(DOCS) recurse-all
+ 
+ SUBDIR_RULES=$(patsubst %,subdir-%, $(TARGET_DIRS))
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index b4436b3..9860653 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -38,6 +38,14 @@ typedef uint32_t pci_addr_t;
+ #include "pass-through.h"
+ #include "assert.h"
+ 
++#include <sys/ioctl.h>
++#include <sys/mman.h>
++#include <libdrm/drm.h>
++#include <libdrm/i915_drm.h>
++#include <xf86drm.h>
++#include <sys/time.h>
++
++#if 0
+ typedef struct vgt_vga_state {
+     PCIDevice dev;
+     //struct VGACommonState state;
+@@ -45,6 +53,7 @@ typedef struct vgt_vga_state {
+     struct pci_dev host_dev;
+     bool instance_created;
+ } vgt_vga_state_t;
++#endif
+ 
+ #define EDID_SIZE 128
+ #define MAX_INPUT_NUM 3
+@@ -68,7 +77,7 @@ typedef struct vgt_monitor_info {
+ }vgt_monitor_info_t;
+ 
+ vgt_monitor_info_t monitor_config = {
+-    .port_type = 1,
++    .port_type = 2,
+     .port_is_dp = 1,
+     .port_override = 1,
+     /* Generic 1024x768 default EDID from linux/Documentation/EDID */
+@@ -215,6 +224,279 @@ static void config_hvm_monitors(void)
+     }
+ }
+ 
++int drm_fd;
++
++static void xengt_drm_init(void)
++{
++    drm_fd = open("/dev/dri/card0", O_RDWR);
++    if (drm_fd < 0) {
++        qemu_log("vGT: %s failed: errno=%d\n", __func__, errno);
++        exit(-1);
++    }
++
++    qemu_log("vGT: %s done\n", __func__);
++}
++
++static int xengt_enabled;
++
++int xengt_is_enabled(void)
++{
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++    int rc;
++
++    if (xengt_enabled)
++        goto done;
++
++    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
++
++    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
++    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.pipe_id = 0;
++    gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
++  
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
++    if (rc < 0)
++        goto done;
++
++    xengt_enabled = !!gem_vgtbuffer.start;
++
++    if (xengt_enabled)
++        qemu_log("vGT: enabled\n");
++
++done:
++    return xengt_enabled;
++}
++
++typedef struct xengt_fb {
++    uint64_t epoch;
++    void *base;
++    size_t size;
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++} xengt_fb_t;
++
++#define XENGT_NR_FB 16
++
++static xengt_fb_t xengt_fb[XENGT_NR_FB];
++
++#define	P2ROUNDUP(_x, _a) -(-(_x) & -(_a))
++
++static void xengt_close_object(uint32_t handle)
++{
++    struct drm_gem_close gem_close;
++
++    memset(&gem_close, 0, sizeof (gem_close));
++    gem_close.handle = handle;
++
++    (void) drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
++}
++
++static void xengt_release_fb(unsigned int i)
++{
++    xengt_fb_t *fb = &xengt_fb[i];
++
++    qemu_log("vGT: %s %u (epoch %lu)\n", __func__, i, fb->epoch);
++
++    munmap(fb->base, fb->size);
++    xengt_close_object(fb->gem_vgtbuffer.handle);
++
++    memset(fb, 0, sizeof(*fb));
++}
++
++static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
++{
++    struct drm_i915_gem_mmap_gtt gem_mmap_gtt;
++    xengt_fb_t *fb;
++    static uint64_t epoch = 1;
++    uint64_t oldest_epoch;
++    unsigned int i, oldest;
++    int rc;
++
++    oldest_epoch = epoch;
++    oldest = XENGT_NR_FB;
++
++    for (i = 0; i < XENGT_NR_FB; i++) {
++        fb = &xengt_fb[i];
++
++        if (fb->epoch < oldest_epoch) {
++            oldest_epoch = fb->epoch;
++            oldest = i;
++        }
++    }
++    assert(oldest < XENGT_NR_FB);
++
++    i = oldest;
++    fb = &xengt_fb[i];
++
++    if (fb->gem_vgtbuffer.handle != 0)
++        xengt_release_fb(i);
++
++    memset(&gem_mmap_gtt, 0, sizeof (gem_mmap_gtt));
++    gem_mmap_gtt.handle = gem_vgtbuffer->handle;
++
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &gem_mmap_gtt);
++    if (rc < 0)
++        goto fail2;
++
++    fb->epoch = epoch++;
++    fb->size = gem_vgtbuffer->size * TARGET_PAGE_SIZE;
++    fb->base = mmap(NULL, fb->size, PROT_READ, MAP_SHARED,
++		    drm_fd, gem_mmap_gtt.offset);
++    if (fb->base == MAP_FAILED)
++        goto fail3;
++
++    qemu_log("vGT: %s %u (epoch %lu) %ux%ux%u -> %p(+%p)\n", __func__,
++	     i, fb->epoch,
++             gem_vgtbuffer->width, gem_vgtbuffer->height, gem_vgtbuffer->bpp,
++             fb->base, (void *)fb->size);
++
++    fb->gem_vgtbuffer = *gem_vgtbuffer;
++    return fb;
++
++fail3:
++    qemu_log("%s: fail3\n", __func__);
++
++fail2:
++    qemu_log("%s: fail2\n", __func__);
++
++fail1:
++    qemu_log("%s: fail1\n", __func__);
++
++    return NULL;       
++}
++
++static xengt_fb_t *xengt_lookup_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
++{
++    int i;
++
++    for (i = 0; i < XENGT_NR_FB; i++) {
++        xengt_fb_t *fb = &xengt_fb[i];
++
++        if (memcmp(&fb->gem_vgtbuffer,
++                   gem_vgtbuffer,
++                   offsetof(struct drm_i915_gem_vgtbuffer, handle)) == 0)
++            return fb;
++    }
++
++    return NULL;
++}
++
++static xengt_fb_t *xengt_get_fb(void)
++{
++    struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
++    void *fb = NULL;
++    int rc;
++
++    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
++    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
++    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.pipe_id = 0;
++    gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
++  
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
++    if (rc < 0)
++        goto done;
++
++    if ((fb = xengt_lookup_fb(&gem_vgtbuffer)) != NULL)
++        goto done;
++
++    gem_vgtbuffer.flags = 0;
++  
++    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
++    if (rc < 0)
++        goto done;
++
++    if (unlikely((fb = xengt_lookup_fb(&gem_vgtbuffer)) != NULL)) {
++        /* We don't need the new object so close it */
++        xengt_close_object(gem_vgtbuffer.handle);
++        goto done;
++    }
++
++    if ((fb = xengt_new_fb(&gem_vgtbuffer)) == NULL) {
++        /* We can't use the new object so close it */
++        xengt_close_object(gem_vgtbuffer.handle);
++    }
++
++done:
++    return fb;
++}
++
++typedef struct xengt_surface {
++    uint8_t *data;
++    struct timespec ts;
++} xengt_surface_t;
++
++static xengt_surface_t xengt_surface;
++
++void xengt_draw_primary(DisplayState *ds)
++{
++    xengt_surface_t *surface = &xengt_surface;
++    struct timespec ts;
++    uint64_t then, now, delta;
++    xengt_fb_t *fb;
++    struct drm_i915_gem_vgtbuffer *gem_vgtbuffer;
++    uint8_t *src, *dst;
++    int i;
++    uint32_t linesize;
++    int rc;
++
++    rc = clock_gettime(CLOCK_MONOTONIC, &ts);
++    if (rc < 0)
++        goto fail1;
++
++    /* calculate millisecond delta */
++    then = (surface->ts.tv_sec * 1000) + (surface->ts.tv_nsec / 1000000);
++    now = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
++    delta = now - then;
++
++    if (delta < 500)
++        return;
++
++    surface->ts = ts;
++
++    if ((fb = xengt_get_fb()) == NULL)
++        goto fail2;
++
++    gem_vgtbuffer = &fb->gem_vgtbuffer;
++
++    if (ds_get_width(ds) != gem_vgtbuffer->width ||
++        ds_get_height(ds) != gem_vgtbuffer->height ||
++        ds_get_bits_per_pixel(ds) != gem_vgtbuffer->bpp) {
++	if (surface->data)
++            qemu_free(surface->data);
++
++        qemu_free_displaysurface(ds);
++
++        linesize = gem_vgtbuffer->width * gem_vgtbuffer->bpp / 8;
++
++        surface->data = qemu_malloc(linesize * gem_vgtbuffer->height);
++        ds->surface = qemu_create_displaysurface_from(gem_vgtbuffer->width,
++                                                      gem_vgtbuffer->height,
++                                                      gem_vgtbuffer->bpp,
++                                                      linesize,
++                                                      surface->data);
++        dpy_resize(ds);
++    }
++
++    src = fb->base;
++    dst = ds_get_data(ds);
++    linesize = ds_get_linesize(ds);
++
++    for (i = 0; i < gem_vgtbuffer->height; i++) {
++        memcpy(dst, src, linesize);
++        dst += linesize;
++        src += gem_vgtbuffer->stride;
++    }
++
++    dpy_update(ds, 0, 0, gem_vgtbuffer->width, gem_vgtbuffer->height);
++    return;
++
++fail2:
++    qemu_log("%s: fail2\n", __func__);
++
++fail1:
++    qemu_log("%s: fail1\n", __func__);
++}
++
+ /*
+  *  Inform vGT driver to create a vGT instance
+  */
+@@ -259,6 +541,7 @@ static void create_vgt_instance(void)
+     }
+ 
+     config_hvm_monitors();
++    xengt_drm_init();
+ }
+ 
+ /*
+@@ -395,19 +678,18 @@ uint32_t vgt_bridge_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len)
+     uint32_t val;
+ 
+     val = pci_default_read_config(pci_dev, config_addr, len);
+-    PT_LOG_DEV(pci_dev, "addr=%x len=%x val=%x\n", config_addr, len, val);
+ 
+     return val;
+ }
+ 
+-static void vgt_cleanupfn(PCIDevice *dev)
++/*static void vgt_cleanupfn(PCIDevice *dev)
+ {
+     vgt_vga_state_t *d = DO_UPCAST(vgt_vga_state_t, dev, dev);
+ 
+     if (d->instance_created) {
+         destroy_vgt_instance();
+     }
+-}
++    }*/
+ 
+ static void vgt_cleanupfn2(void *unused)
+ {
+diff --git a/hw/vga-xengt.h b/hw/vga-xengt.h
+index eef464c..fd4ed52 100644
+--- a/hw/vga-xengt.h
++++ b/hw/vga-xengt.h
+@@ -1,6 +1,8 @@
+ #ifndef __XENGT_H__
+ #define __XENGT_H__
+ 
++int xengt_is_enabled(void);
++void xengt_draw_primary(DisplayState *ds);
+ void xengt_vga_init(PCIBus *pci_bus, ram_addr_t vga_ram_addr, int
+ 		vga_ram_size);
+ void vgt_bridge_pci_conf_init(PCIDevice *dev);
+diff --git a/hw/vga.c b/hw/vga.c
+index 0fce2fd..ea5c64d 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -26,6 +26,7 @@
+ #include "pc.h"
+ #include "pci.h"
+ #include "vga_int.h"
++#include "vga-xengt.h"
+ 
+ #include <sys/mman.h>
+ #include "sysemu.h"
+@@ -1959,7 +1960,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
+ 
+ #define GMODE_TEXT     0
+ #define GMODE_GRAPH    1
+-#define GMODE_BLANK 2
++#define GMODE_BLANK    2
++#define GMODE_XENGT    4
+ 
+ static void vga_update_display(void *opaque)
+ {
+@@ -1970,16 +1972,21 @@ static void vga_update_display(void *opaque)
+         /* nothing to do */
+     } else {
+         full_update = 0;
+-        if (!(s->ar_index & 0x20)) {
++        if (xengt_is_enabled())
++            graphic_mode = GMODE_XENGT;
++        else if (!(s->ar_index & 0x20))
+             graphic_mode = GMODE_BLANK;
+-        } else {
++        else
+             graphic_mode = s->gr[6] & 1;
+-        }
++        
+         if (graphic_mode != s->graphic_mode) {
+             s->graphic_mode = graphic_mode;
+             full_update = 1;
+         }
+         switch(graphic_mode) {
++        case GMODE_XENGT:
++            xengt_draw_primary(s->ds);
++            break;
+         case GMODE_TEXT:
+             vga_draw_text(s, full_update);
+             break;
+diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
+index debc12f..cec1236 100644
+--- a/mk/xen-device-model.spec.in
++++ b/mk/xen-device-model.spec.in
+@@ -9,6 +9,7 @@ Patch0: xen-device-model-development.patch
+ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+ BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
+ Requires(pre): shadow-utils
++Requires: libdrm
+ Provides: qemu-xen(syslog) = 1
+ 
+ %description
+diff --git a/xen-hooks.mak b/xen-hooks.mak
+index bc7f1f1..e1748bb 100644
+--- a/xen-hooks.mak
++++ b/xen-hooks.mak
+@@ -19,6 +19,7 @@ CFLAGS += $(CMDLINE_CFLAGS)
+ 
+ LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
+ LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
++LIBS += -ldrm
+ 
+ LDFLAGS := $(CFLAGS) $(LDFLAGS)
+ 

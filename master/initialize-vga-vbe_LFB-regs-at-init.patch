@@ -1,0 +1,50 @@
+diff --git a/hw/vga.c b/hw/vga.c
+index 2e509f3..0fce2fd 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -160,6 +160,8 @@ static uint8_t expand4to8[16];
+ 
+ static void vga_bios_init(VGAState *s);
+ static void vga_screen_dump(void *opaque, const char *filename);
++void vga_map(PCIDevice *pci_dev, int region_num,
++                    uint32_t addr, uint32_t size, int type);
+ 
+ static void vga_dumb_update_retrace_info(VGAState *s)
+ {
+@@ -642,7 +644,14 @@ static uint32_t vbe_ioport_read_data(void *opaque, uint32_t addr)
+             val = s->vbe_regs[s->vbe_index];
+         }
+     } else {
+-        val = 0;
++        switch (s->vbe_index) {
++            case VBE_DISPI_INDEX_LFB_ADDRESS_H:
++                val = VBE_DISPI_LFB_PHYSICAL_ADDRESS >> 16;
++                break;
++            default:
++                val = 0;
++                break;
++        }
+     }
+ #ifdef DEBUG_BOCHS_VBE
+     printf("VBE: read index=0x%x val=0x%x\n", s->vbe_index, val);
+@@ -2419,7 +2428,7 @@ typedef struct PCIVGAState {
+     VGAState vga_state;
+ } PCIVGAState;
+ 
+-static void vga_map(PCIDevice *pci_dev, int region_num,
++void vga_map(PCIDevice *pci_dev, int region_num,
+                     uint32_t addr, uint32_t size, int type)
+ {
+     PCIVGAState *d = (PCIVGAState *)pci_dev;
+@@ -2729,6 +2738,11 @@ static void vga_init(VGAState *s)
+ 
+ #ifdef CONFIG_BOCHS_VBE
+     s->vbe_regs[VBE_DISPI_INDEX_ID] = VBE_DISPI_ID0;
++    s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_H] = VRAM_RESERVED_ADDRESS >> 16;
++    s->vbe_regs[VBE_DISPI_INDEX_LFB_ADDRESS_L] = VRAM_RESERVED_ADDRESS & 0xFFFF;
++    s->vbe_regs[VBE_DISPI_INDEX_VIDEO_MEMORY_64K] = s->vram_size >> 16;
++    s->lfb_addr = VRAM_RESERVED_ADDRESS;
++    s->lfb_end = VRAM_RESERVED_ADDRESS + s->vram_size;
+     s->vbe_bank_mask = ((s->vram_size >> 16) - 1);
+ #if defined (TARGET_I386)
+     register_ioport_read(0x1ce, 1, 2, vbe_ioport_read_index, s);
