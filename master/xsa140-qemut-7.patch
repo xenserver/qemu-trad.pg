@@ -1,0 +1,25 @@
+From 9a084807bf6ca7c16d997a236d304111894a6539 Mon Sep 17 00:00:00 2001
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Wed, 15 Jul 2015 18:17:04 +0100
+Subject: [PATCH 7/7] rtl8139: check TCP Data Offset field
+
+The TCP Data Offset field contains the length of the header.  Make sure
+it is valid and does not exceed the IP data length.
+
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+diff --git a/hw/rtl8139.c b/hw/rtl8139.c
+index 0bb4583..2ca5a9b 100644
+--- a/hw/rtl8139.c
++++ b/hw/rtl8139.c
+@@ -2193,6 +2193,11 @@ static int rtl8139_cplus_transmit_one(RTL8139State *s)
+ 
+                 int tcp_hlen = TCP_HEADER_DATA_OFFSET(p_tcp_hdr);
+ 
++                /* Invalid TCP data offset? */
++                if (tcp_hlen < sizeof(tcp_header) || tcp_hlen > ip_data_len) {
++                    goto skip_offload;
++                }
++
+                 /* ETH_MTU = ip header len + tcp header len + payload */
+                 int tcp_data_len = ip_data_len - tcp_hlen;
+                 int tcp_chunk_size = ETH_MTU - hlen - tcp_hlen;
