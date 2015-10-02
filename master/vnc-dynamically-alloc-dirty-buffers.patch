@@ -1,5 +1,5 @@
 diff --git a/vnc.c b/vnc.c
-index 06715b3..2304080 100644
+index 27f6161..0a81fae 100644
 --- a/vnc.c
 +++ b/vnc.c
 @@ -88,17 +88,126 @@ typedef void VncSendHextileTile(VncState *vs,
@@ -94,7 +94,7 @@ index 06715b3..2304080 100644
 +        b += 32 - (b & 31);
 +    }
 +
-+    while (e - b >= 32) {
++    while ((e > b) && (e - b >= 32)) {
 +        *word++ = 0xffffffff;
 +        b += 32;
 +    }
@@ -276,7 +276,7 @@ index 06715b3..2304080 100644
      }
  }
  
-@@ -2375,7 +2443,6 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
+@@ -2385,7 +2453,6 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
      uint8_t *guest_row;
      uint8_t *server_row;
      int cmp_bytes;
@@ -284,7 +284,7 @@ index 06715b3..2304080 100644
      VncState *vs = NULL;
      int has_dirty = 0;
  
-@@ -2384,12 +2451,11 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
+@@ -2394,12 +2461,11 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
       * Check and copy modified bits from guest to server surface.
       * Update server dirty map.
       */
@@ -298,7 +298,7 @@ index 06715b3..2304080 100644
              int x;
              uint8_t *guest_ptr;
              uint8_t *server_ptr;
-@@ -2399,15 +2465,15 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
+@@ -2409,15 +2475,15 @@ static int vnc_refresh_server_surface(VncDisplay *vd)
  
              for (x = 0; x < vd->guest.ds->width;
                      x += 16, guest_ptr += cmp_bytes, server_ptr += cmp_bytes) {
@@ -317,7 +317,7 @@ index 06715b3..2304080 100644
                      vs = vs->next;
                  }
                  has_dirty++;
-@@ -2491,6 +2557,8 @@ static void vnc_connect(VncDisplay *vd, int csock)
+@@ -2501,6 +2567,8 @@ static void vnc_connect(VncDisplay *vd, int csock)
      vs->as.fmt = AUD_FMT_S16;
      vs->as.endianness = 0;
  
