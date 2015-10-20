@@ -2,7 +2,7 @@
 # Parent dd1474d4e909c8d71ad889aad0006c72548e712c
 
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index 2f3bb54..427b34b 100644
+index 6b6a7d2..e8bfc4a 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
 @@ -113,8 +113,13 @@ int send_vcpu = 0;
@@ -65,9 +65,9 @@ index 2f3bb54..427b34b 100644
 -    memset(&req, 0x00, sizeof(req));
 +    req.count = 0;
  
-     while (buffered_io_page->read_pointer !=
-            buffered_io_page->write_pointer) {
-@@ -530,7 +536,8 @@ static void handle_buffered_io(void *opaque)
+     for (;;) {
+         uint32_t rdptr = buffered_io_page->read_pointer, wrptr;
+@@ -538,7 +544,8 @@ static void handle_buffered_io(void *opaque)
  {
      CPUState *env = opaque;
  
@@ -77,7 +77,7 @@ index 2f3bb54..427b34b 100644
          qemu_mod_timer(buffered_io_timer,
                  BUFFER_IO_MAX_DELAY + qemu_get_clock(rt_clock));
      } else {
-@@ -596,6 +603,7 @@ int main_loop(void)
+@@ -604,6 +611,7 @@ int main_loop(void)
  
      buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
  				       cpu_single_env);
