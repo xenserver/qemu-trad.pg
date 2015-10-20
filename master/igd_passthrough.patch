@@ -4,7 +4,7 @@ Whilst the opregion is 2 pages in size, it is not page aligned so it can touch 3
 
 Windows 8 code perserves the ACPI NVS regions by memcpying the entire space. This previuosly resulted in a BSOD due to a page fault when copying the end of the NVS region. 
 diff --git a/hw/pass-through.c b/hw/pass-through.c
-index c1e0142..1aef39c 100644
+index 1ddf314..bd51fae 100644
 --- a/hw/pass-through.c
 +++ b/hw/pass-through.c
 @@ -244,6 +244,12 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
@@ -38,7 +38,7 @@ index c1e0142..1aef39c 100644
      {
          .size = 0,
      },
-@@ -4368,6 +4385,31 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
+@@ -4371,6 +4388,31 @@ static int pt_intel_opregion_write(struct pt_dev *ptdev,
      return 0;
  }
  
@@ -71,10 +71,10 @@ index c1e0142..1aef39c 100644
          const char *e_dev_name, int e_devfn, uint8_t r_bus, uint8_t r_dev,
          uint8_t r_func, uint32_t machine_irq, struct pci_access *pci_access,
 diff --git a/hw/pc.c b/hw/pc.c
-index 53fb356..e805705 100644
+index 4ef17c8..39ce390 100644
 --- a/hw/pc.c
 +++ b/hw/pc.c
-@@ -990,7 +990,13 @@ vga_bios_error:
+@@ -991,7 +991,13 @@ vga_bios_error:
  
      if (cirrus_vga_enabled) {
          if (pci_enabled) {
@@ -89,7 +89,7 @@ index 53fb356..e805705 100644
                                  phys_ram_base + vga_ram_addr,
                                  vga_ram_addr, vga_ram_size);
          } else {
-@@ -1008,7 +1014,13 @@ vga_bios_error:
+@@ -1009,7 +1015,13 @@ vga_bios_error:
  #endif
      } else if (std_vga_enabled) {
          if (pci_enabled) {
@@ -311,12 +311,12 @@ index 7302b25..087c20d 100644
      return rc;
  }
 diff --git a/vl.c b/vl.c
-index fa6bd40..6b40edf 100644
+index 09cbe97..47646c8 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -4205,8 +4205,6 @@ static void select_vgahw (const char *p)
-         vmsvga_enabled = 1;
+@@ -4255,8 +4255,6 @@ static void select_vgahw (const char *p)
          vgpu_enabled = 0;
+         xengt_vga_enabled = 0;
      } else if (strstart(p, "passthrough", &opts)) {
 -        cirrus_vga_enabled = 0;
 -        std_vga_enabled = 0;
