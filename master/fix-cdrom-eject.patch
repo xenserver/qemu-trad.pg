@@ -1,0 +1,182 @@
+diff --git a/hw/ide.c b/hw/ide.c
+index 791666b..2c61dfd 100644
+--- a/hw/ide.c
++++ b/hw/ide.c
+@@ -446,7 +446,7 @@ typedef struct IDEState {
+     /* CF-ATA metadata storage */
+     uint32_t mdata_size;
+     uint8_t *mdata_storage;
+-    int media_changed;
++    int media_changed, cdrom_changed;
+     /* for pmac */
+     int is_read;
+ } IDEState;
+@@ -1883,6 +1883,27 @@ static int ide_dvd_read_structure(IDEState *s, int format,
+     }
+ }
+ 
++static bool cmd_allow_UA(uint8_t cmd)
++{
++    return (cmd == GPCMD_REQUEST_SENSE ||
++            cmd == GPCMD_INQUIRY ||
++            cmd == GPCMD_GET_CONFIGURATION ||
++            cmd == GPCMD_GET_EVENT_STATUS_NOTIFICATION);
++}
++
++static bool cmd_check_ready(uint8_t cmd)
++{
++    return (cmd == GPCMD_TEST_UNIT_READY ||
++            cmd == GPCMD_READ_CDVD_CAPACITY ||
++            cmd == GPCMD_READ_10 ||
++            cmd == GPCMD_READ_12 ||
++            cmd == GPCMD_SEEK ||
++            cmd == GPCMD_READ_TOC_PMA_ATIP ||
++            cmd == GPCMD_READ_DISC_INFO ||
++            cmd == GPCMD_READ_DVD_STRUCTURE ||
++            cmd == GPCMD_READ_CD);
++}
++
+ static void ide_atapi_cmd(IDEState *s)
+ {
+     const uint8_t *packet;
+@@ -1892,36 +1913,52 @@ static void ide_atapi_cmd(IDEState *s)
+     packet = s->io_buffer;
+     buf = s->io_buffer;
+ #ifdef DEBUG_IDE_ATAPI
+-    {
+-        int i;
+-        printf("ATAPI limit=0x%x packet:", s->lcyl | (s->hcyl << 8));
+-        for(i = 0; i < ATAPI_PACKET_SIZE; i++) {
+-            printf(" %02x", packet[i]);
+-        }
+-        printf("\n");
+-    }
++    printf("ATAPI limit=0x%x packet: %02x %02x %02x %02x %02x %02x %02x "
++           "%02x %02x %02x %02x %02x\n",
++           s->lcyl | (s->hcyl << 8),
++           packet[0], packet[1], packet[2], packet[3],
++           packet[4], packet[5], packet[6], packet[7],
++           packet[8], packet[9], packet[10], packet[11]);
+ #endif
+     /* If there's a UNIT_ATTENTION condition pending, only
+        REQUEST_SENSE and INQUIRY commands are allowed to complete. */
+     if (s->sense_key == SENSE_UNIT_ATTENTION &&
+-	s->io_buffer[0] != GPCMD_REQUEST_SENSE &&
+-	s->io_buffer[0] != GPCMD_INQUIRY) {
+-	ide_atapi_cmd_check_status(s);
++        !cmd_allow_UA(s->io_buffer[0])) {
++        ide_atapi_cmd_check_status(s);
++        return;
++    }
++
++    /*
++     * When a CD gets changed, we have to report an ejected state and
++     * then a loaded state to guests so that they detect tray
++     * open/close and media change events.  Guests that do not use
++     * GET_EVENT_STATUS_NOTIFICATION to detect such tray open/close
++     * states rely on this behavior.
++     */
++    if (!cmd_allow_UA(s->io_buffer[0]) && s->is_cdrom &&
++        bdrv_is_inserted(s->bs) && s->cdrom_changed) {
++        if (s->cdrom_changed == 1) {
++            ide_atapi_cmd_error(s, SENSE_NOT_READY, ASC_MEDIUM_NOT_PRESENT);
++            s->cdrom_changed = 2;
++        } else {
++            ide_atapi_cmd_error(s, SENSE_UNIT_ATTENTION,
++                                ASC_MEDIUM_MAY_HAVE_CHANGED);
++            s->cdrom_changed = 0;
++        }
++	return;
++    }
++
++    /* Report a Not Ready condition if appropriate for the command */
++    if (cmd_check_ready(s->io_buffer[0]) &&
++	(!media_present(s) || !bdrv_is_inserted(s->bs))) {
++	ide_atapi_cmd_error(s, SENSE_NOT_READY, ASC_MEDIUM_NOT_PRESENT);
+ 	return;
+     }
++
+     switch(s->io_buffer[0]) {
+     case GPCMD_TEST_UNIT_READY:
+-        if (bdrv_is_inserted(s->bs)) {
+-            if (s->is_cdrom && s->sense_key == SENSE_NOT_READY) {
+-                ide_atapi_cmd_error(s, SENSE_UNIT_ATTENTION,
+-                                    ASC_MEDIUM_MAY_HAVE_CHANGED);
+-                break;
+-            }
+-            ide_atapi_cmd_ok(s);
+-        } else {
+-            ide_atapi_cmd_error(s, SENSE_NOT_READY,
+-                                ASC_MEDIUM_NOT_PRESENT);
+-        }
++        /* Checks above cover all the cases where the unit is not ready */
++        ide_atapi_cmd_ok(s);
+         break;
+     case GPCMD_MODE_SENSE_6:
+     case GPCMD_MODE_SENSE_10:
+@@ -2299,6 +2336,46 @@ static void ide_atapi_cmd(IDEState *s)
+             ide_atapi_cmd_reply(s, len, max_len);
+             break;
+         }
++    case GPCMD_GET_EVENT_STATUS_NOTIFICATION:
++        {
++            struct {
++                uint8_t opcode;
++                uint8_t polled;        /* lsb bit is polled; others are reserved */
++                uint8_t reserved2[2];
++                uint8_t class;
++                uint8_t reserved3[2];
++                uint16_t len;
++                uint8_t control;
++            } __attribute__((packed)) *gesn_cdb;
++
++            struct {
++                uint16_t len;
++                uint8_t notification_class;
++                uint8_t supported_events;
++            } __attribute__((packed)) *gesn_eh;
++
++            uint32_t used_len;
++
++            gesn_cdb = (void *)packet;
++            gesn_eh  = (void *)buf;
++
++            if (!(gesn_cdb->polled & 1)) { /* Fail non-polled requests */
++                ide_atapi_cmd_error(s, SENSE_ILLEGAL_REQUEST,
++                                    ASC_INV_FIELD_IN_CMD_PACKET);
++                break;
++            }
++
++            max_len = ube16_to_cpu(packet + 7);
++
++            gesn_eh->notification_class = 0x80; /* No Event Available */
++            gesn_eh->supported_events = 0; /* None */
++            used_len = sizeof(*gesn_eh); /* Data following header. */
++
++            cpu_to_ube16(buf, used_len - sizeof(*gesn_eh));
++
++            ide_atapi_cmd_reply(s, used_len, max_len);
++        }
++        break;
+     default:
+         ide_atapi_cmd_error(s, SENSE_ILLEGAL_REQUEST,
+                             ASC_ILLEGAL_OPCODE);
+@@ -2370,9 +2447,7 @@ static void cdrom_change_cb(void *opaque)
+     bdrv_get_geometry(s->bs, &nb_sectors);
+     s->nb_sectors = nb_sectors;
+ 
+-    s->sense_key = SENSE_UNIT_ATTENTION;
+-    s->asc = ASC_MEDIUM_MAY_HAVE_CHANGED;
+-
++    s->cdrom_changed = 1;
+     ide_set_irq(s);
+ }
+ 
+@@ -3092,6 +3167,7 @@ static void ide_reset(IDEState *s)
+     s->end_transfer_func = ide_dummy_transfer_stop;
+     ide_dummy_transfer_stop(s);
+     s->media_changed = 0;
++    s->cdrom_changed = 0;
+ }
+ 
+ /* Unplug all of the IDE hard disks, starting at index @start in the
