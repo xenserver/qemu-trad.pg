@@ -107,15 +107,15 @@ index 0000000..c1e74f9
 +#endif /* IGT_DEBUG_H */
 diff --git a/hw/intel-tools/intel_batchbuffer.c b/hw/intel-tools/intel_batchbuffer.c
 new file mode 100644
-index 0000000..b499864
+index 0000000..789a859
 --- /dev/null
 +++ b/hw/intel-tools/intel_batchbuffer.c
 @@ -0,0 +1,348 @@
 +/**************************************************************************
-+ * 
++ *
 + * Copyright 2006 Tungsten Graphics, Inc., Cedar Park, Texas.
 + * All Rights Reserved.
-+ * 
++ *
 + * Permission is hereby granted, free of charge, to any person obtaining a
 + * copy of this software and associated documentation files (the
 + * "Software"), to deal in the Software without restriction, including
@@ -123,11 +123,11 @@ index 0000000..b499864
 + * distribute, sub license, and/or sell copies of the Software, and to
 + * permit persons to whom the Software is furnished to do so, subject to
 + * the following conditions:
-+ * 
++ *
 + * The above copyright notice and this permission notice (including the
 + * next paragraph) shall be included in all copies or substantial portions
 + * of the Software.
-+ * 
++ *
 + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 + * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
@@ -135,7 +135,7 @@ index 0000000..b499864
 + * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 + * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 + * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-+ * 
++ *
 + **************************************************************************/
 +
 +#include <inttypes.h>
@@ -1230,7 +1230,7 @@ index 0000000..7f611ed
 +#endif /* _INTEL_CHIPSET_H */
 diff --git a/hw/intel-tools/intel_reg.h b/hw/intel-tools/intel_reg.h
 new file mode 100644
-index 0000000..0ffa803
+index 0000000..18a68e9
 --- /dev/null
 +++ b/hw/intel-tools/intel_reg.h
 @@ -0,0 +1,3618 @@
@@ -1272,8 +1272,8 @@ index 0000000..0ffa803
 + *   Eric Anholt <eric@anholt.net>
 + *
 + *   based on the i740 driver by
-+ *        Kevin E. Martin <kevin@precisioninsight.com> 
-+ *   
++ *        Kevin E. Martin <kevin@precisioninsight.com>
++ *
 + *
 + */
 +
@@ -1304,14 +1304,14 @@ index 0000000..0ffa803
 +#define EXT_HORIZ_TOTAL      0x35 /* p261 */
 +#define EXT_HORIZ_BLANK      0x39 /* p261 */
 +#define EXT_START_ADDR       0x40 /* p262 */
-+#define EXT_START_ADDR_ENABLE    0x80 
++#define EXT_START_ADDR_ENABLE    0x80
 +#define EXT_OFFSET           0x41 /* p263 */
 +#define EXT_START_ADDR_HI    0x42 /* p263 */
 +#define INTERLACE_CNTL       0x70 /* p264 */
-+#define INTERLACE_ENABLE         0x80 
-+#define INTERLACE_DISABLE        0x00 
++#define INTERLACE_ENABLE         0x80
++#define INTERLACE_DISABLE        0x00
 +
-+/* Miscellaneous Output Register 
++/* Miscellaneous Output Register
 + */
 +#define MSR_R          0x3CC	/* p207 */
 +#define MSR_W          0x3C2	/* p207 */
@@ -1364,7 +1364,7 @@ index 0000000..0ffa803
 +#define C1DRA01			0x10608
 +#define C1DRA23			0x1060a
 +
-+/* p375. 
++/* p375.
 + */
 +#define DISPLAY_CNTL       0x70008
 +#define VGA_WRAP_MODE          0x02
@@ -1584,11 +1584,11 @@ index 0000000..0ffa803
 +#define VCO_LOOP_DIV_BY_16M    0x04
 +
 +
-+/* Instruction Parser Mode Register 
++/* Instruction Parser Mode Register
 + *    - p281
 + *    - 2 new bits.
 + */
-+#define INST_PM                  0x20c0	
++#define INST_PM                  0x20c0
 +#define AGP_SYNC_PACKET_FLUSH_ENABLE 0x20 /* reserved */
 +#define SYNC_PACKET_FLUSH_ENABLE     0x10
 +#define TWO_D_INST_DISABLE           0x08
@@ -1617,7 +1617,7 @@ index 0000000..0ffa803
 +#define GEN6_INSTDONE_1		0x206c
 +#define INST_PS_I965                0x2070
 +
-+/* Current active ring head address: 
++/* Current active ring head address:
 + */
 +#define ACTHD_I965                 0x2074
 +#define ACTHD			   0x20C8
@@ -1702,7 +1702,7 @@ index 0000000..0ffa803
 +# define ERR_INSTRUCTION_ERROR			(1 << 0)
 +
 +
-+/* Interrupt Control Registers 
++/* Interrupt Control Registers
 + *   - new bits for i810
 + *   - new register hwstam (mask)
 + */
@@ -1738,7 +1738,7 @@ index 0000000..0ffa803
 +				  HOST_PORT_EVENT |	\
 +				  CAPTURE_EVENT )
 +
-+/* FIFO Watermark and Burst Length Control Register 
++/* FIFO Watermark and Burst Length Control Register
 + *
 + * - different offset and contents on i810 (p299) (fewer bits per field)
 + * - some overlay fields added
@@ -1899,7 +1899,7 @@ index 0000000..0ffa803
 +#define I830_RING_START_MASK	0xFFFFF000
 +
 +#define RING_LEN       0x0C
-+#define RING_NR_PAGES       0x001FF000 
++#define RING_NR_PAGES       0x001FF000
 +#define I830_RING_NR_PAGES	0x001FF000
 +#define RING_REPORT_MASK    0x00000006
 +#define RING_REPORT_64K     0x00000002
@@ -1985,7 +1985,7 @@ index 0000000..0ffa803
 +
 +
 +/* Registers in the i810 host-pci bridge pci config space which affect
-+ * the i810 graphics operations.  
++ * the i810 graphics operations.
 + */
 +#define SMRAM_MISCC         0x70
 +#define GMS                    0x000000c0
@@ -1993,11 +1993,11 @@ index 0000000..0ffa803
 +#define GMS_ENABLE_BARE        0x00000040
 +#define GMS_ENABLE_512K        0x00000080
 +#define GMS_ENABLE_1M          0x000000c0
-+#define USMM                   0x00000030 
++#define USMM                   0x00000030
 +#define USMM_DISABLE           0x00000000
 +#define USMM_TSEG_ZERO         0x00000010
 +#define USMM_TSEG_512K         0x00000020
-+#define USMM_TSEG_1M           0x00000030  
++#define USMM_TSEG_1M           0x00000030
 +#define GFX_MEM_WIN_SIZE       0x00010000
 +#define GFX_MEM_WIN_32M        0x00010000
 +#define GFX_MEM_WIN_64M        0x00000000
@@ -2272,7 +2272,7 @@ index 0000000..0ffa803
 + */
 +# define DPLL_MD_UDI_MULTIPLIER_MASK		0x00003f00
 +# define DPLL_MD_UDI_MULTIPLIER_SHIFT		8
-+/* SDVO/UDI pixel multiplier for VGA, same as DPLL_MD_UDI_MULTIPLIER_MASK. 
++/* SDVO/UDI pixel multiplier for VGA, same as DPLL_MD_UDI_MULTIPLIER_MASK.
 + * This best be set to the default value (3) or the CRT won't work. No,
 + * I don't entirely understand what this does...
 + */
@@ -3449,7 +3449,7 @@ index 0000000..0ffa803
 +# define SVBLANK_INT_STATUS	(1 << 2)
 +# define VBLANK_INT_STATUS	(1 << 1)
 +# define OREG_UPDATE_STATUS	(1 << 0)
-+				 
++
 +#define FW_BLC		0x020d8
 +#define FW_BLC2		0x020dc
 +#define FW_BLC_SELF	0x020e0 /* 915+ only */
@@ -3464,7 +3464,7 @@ index 0000000..0ffa803
 +#define DSPFW3			0x7003c
 +/*
 + * The two pipe frame counter registers are not synchronized, so
-+ * reading a stable value is somewhat tricky. The following code 
++ * reading a stable value is somewhat tricky. The following code
 + * should work:
 + *
 + *  do {
@@ -4853,7 +4853,7 @@ index 0000000..0ffa803
 +
 +#endif /* _I810_REG_H */
 diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
-index fcb9bed..8338d1e 100644
+index 0b45363..c9740b4 100644
 --- a/hw/vga-xengt.c
 +++ b/hw/vga-xengt.c
 @@ -45,6 +45,13 @@ typedef uint32_t pci_addr_t;
@@ -4977,17 +4977,17 @@ index fcb9bed..8338d1e 100644
 +        qemu_log("vGT: %s: Failed to link from handle %x!\n", __func__, gem_vgtbuffer->handle);
 +        return NULL;
 +    }
-+
-+    fb->bo =  drm_intel_bo_gem_create_from_name(gem_vgt_bufmgr,"src",  global_handle);
  
 -fail1:
 -    qemu_log("%s: fail1\n", __func__);
++    fb->bo =  drm_intel_bo_gem_create_from_name(gem_vgt_bufmgr,"src",  global_handle);
+ 
+-    return NULL;
 +    if (!fb->bo) {
 +         qemu_log("vGT: %s: Failed to create bo from handle %x!\n", __func__, global_handle);
 +         return NULL;
 +    }
- 
--    return NULL;       
++
 +    int linesize = gem_vgtbuffer->width * gem_vgtbuffer->bpp / 8;
 +    qemu_log("vGT: %s: Created bo, with size %ld, handle %d global handle %d.\n", __func__,
 +                         fb->bo->size ,fb->bo->handle, global_handle);
@@ -5034,12 +5034,12 @@ index fcb9bed..8338d1e 100644
 -    rc = clock_gettime(CLOCK_MONOTONIC, &ts);
 -    if (rc < 0)
 -        goto fail1;
--
+ 
 -    /* calculate millisecond delta */
 -    then = (surface->ts.tv_sec * 1000) + (surface->ts.tv_nsec / 1000000);
 -    now = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 -    delta = now - then;
- 
+-
 -    if (delta < 500)
 +    if ((fb = xengt_get_fb()) == NULL || (fb->bo == NULL)) {
 +        qemu_log("vGT: %s: no frame buffer.", __func__);
@@ -5080,7 +5080,9 @@ index fcb9bed..8338d1e 100644
 -        linesize = gem_vgtbuffer->width * gem_vgtbuffer->bpp / 8;
 +        width = P2ROUNDUP(gem_vgtbuffer->width, 16);
 +        linesize = width * gem_vgtbuffer->bpp / 8;
-+
+ 
+-        surface->data = qemu_malloc(linesize * gem_vgtbuffer->height);
+-        ds->surface = qemu_create_displaysurface_from(gem_vgtbuffer->width,
 +        surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc", gem_vgtbuffer->height*linesize,4096);
 +        drm_intel_bo_map(surface->bo, 1);
 +
@@ -5088,9 +5090,7 @@ index fcb9bed..8338d1e 100644
 +                                                      gem_vgtbuffer->height,
 +                                                      gem_vgtbuffer->bpp,
 +                                                      linesize);
- 
--        surface->data = qemu_malloc(linesize * gem_vgtbuffer->height);
--        ds->surface = qemu_create_displaysurface_from(gem_vgtbuffer->width,
++
 +        ds->surface = qemu_create_displaysurface_from(width,
                                                        gem_vgtbuffer->height,
                                                        gem_vgtbuffer->bpp,
@@ -5130,15 +5130,15 @@ index fcb9bed..8338d1e 100644
  
  /*
 diff --git a/xen-hooks.mak b/xen-hooks.mak
-index e1748bb..d145df8 100644
+index cd745ad..ba57a7a 100644
 --- a/xen-hooks.mak
 +++ b/xen-hooks.mak
-@@ -19,7 +19,7 @@ CFLAGS += $(CMDLINE_CFLAGS)
+@@ -18,7 +18,7 @@ endif
  
- LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
- LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
+ CFLAGS += $(CMDLINE_CFLAGS)
+ 
 -LIBS += -ldrm
 +LIBS += -ldrm -ldrm_intel
- 
- LDFLAGS := $(CFLAGS) $(LDFLAGS)
- 
+ LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
+ LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
+ LIBS += -Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog

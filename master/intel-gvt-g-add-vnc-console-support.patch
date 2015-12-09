@@ -12,7 +12,7 @@ index 626e090..0652a5b 100644
  
  SUBDIR_RULES=$(patsubst %,subdir-%, $(TARGET_DIRS))
 diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
-index b4436b3..9860653 100644
+index b4436b3..0b45363 100644
 --- a/hw/vga-xengt.c
 +++ b/hw/vga-xengt.c
 @@ -38,6 +38,14 @@ typedef uint32_t pci_addr_t;
@@ -77,10 +77,10 @@ index b4436b3..9860653 100644
 +    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
 +
 +    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
-+    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.vmid = xen_domid;
 +    gem_vgtbuffer.pipe_id = 0;
 +    gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
-+  
++
 +    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
 +    if (rc < 0)
 +        goto done;
@@ -188,7 +188,7 @@ index b4436b3..9860653 100644
 +fail1:
 +    qemu_log("%s: fail1\n", __func__);
 +
-+    return NULL;       
++    return NULL;
 +}
 +
 +static xengt_fb_t *xengt_lookup_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
@@ -215,10 +215,10 @@ index b4436b3..9860653 100644
 +
 +    memset(&gem_vgtbuffer, 0, sizeof (gem_vgtbuffer));
 +    gem_vgtbuffer.plane_id = I915_VGT_PLANE_PRIMARY;
-+    gem_vgtbuffer.vmid = xen_domid;	 
++    gem_vgtbuffer.vmid = xen_domid;
 +    gem_vgtbuffer.pipe_id = 0;
 +    gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
-+  
++
 +    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
 +    if (rc < 0)
 +        goto done;
@@ -227,7 +227,7 @@ index b4436b3..9860653 100644
 +        goto done;
 +
 +    gem_vgtbuffer.flags = 0;
-+  
++
 +    rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
 +    if (rc < 0)
 +        goto done;
@@ -371,7 +371,7 @@ index eef464c..fd4ed52 100644
  		vga_ram_size);
  void vgt_bridge_pci_conf_init(PCIDevice *dev);
 diff --git a/hw/vga.c b/hw/vga.c
-index 0fce2fd..ea5c64d 100644
+index 0fce2fd..e33a489 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
 @@ -26,6 +26,7 @@
@@ -405,7 +405,7 @@ index 0fce2fd..ea5c64d 100644
 +        else
              graphic_mode = s->gr[6] & 1;
 -        }
-+        
++
          if (graphic_mode != s->graphic_mode) {
              s->graphic_mode = graphic_mode;
              full_update = 1;
@@ -430,14 +430,14 @@ index debc12f..cec1236 100644
  
  %description
 diff --git a/xen-hooks.mak b/xen-hooks.mak
-index bc7f1f1..e1748bb 100644
+index bf7f027..cd745ad 100644
 --- a/xen-hooks.mak
 +++ b/xen-hooks.mak
-@@ -19,6 +19,7 @@ CFLAGS += $(CMDLINE_CFLAGS)
+@@ -18,6 +18,7 @@ endif
  
+ CFLAGS += $(CMDLINE_CFLAGS)
+ 
++LIBS += -ldrm
  LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
  LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
-+LIBS += -ldrm
- 
- LDFLAGS := $(CFLAGS) $(LDFLAGS)
- 
+ LIBS += -Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog
