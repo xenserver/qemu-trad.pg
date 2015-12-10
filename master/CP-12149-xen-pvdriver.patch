@@ -6,7 +6,7 @@ Subject: [PATCH] CP-12149: Implement the PCI device for PV Windows Update
 Command line -pciemulation doesn't work for this particular PCI device as
 it doesn't provide io_region.
 
-The PCI device is added if (and only if) VM.auto-update-drivers is 1.
+The PCI device is added if (and only if) VM.has-vendor-device is 1.
 ---
  hw/pc.c           |    7 +++
  hw/xen_pvdevice.c |  128 +++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -219,7 +219,7 @@ diff --git a/xenstore.c b/xenstore.c
 index a5a2434..a2bc683 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -983,6 +983,26 @@ done:
+@@ -983,7 +983,26 @@ done:
      platform_revision = pch->revision;
  }
  
@@ -229,7 +229,7 @@ index a5a2434..a2bc683 100644
 +    unsigned int len;
 +    int pvdevice_enabled = 0;  /* disabled by default */
 +
-+    if ( pasprintf(&node, "/local/domain/%u/control/auto-update-drivers", domid) < 0 )
++    if ( pasprintf(&node, "/local/domain/%u/control/has-vendor-device", domid) < 0 )
 +        goto out;
 +
 +    if ( (val = xs_read(xsh, XBT_NULL, node, &len)) == NULL )
