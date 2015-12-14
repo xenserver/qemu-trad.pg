@@ -188,3 +188,4 @@ intel-gvt-g-use-bitblt-for-vnc-console.patch
 # support existing vm upgrade to dundee
 igd_passthrough.patch
 CP-12149-xen-pvdriver.patch
+0001-Add-64-bit-support-to-QEMU.patch

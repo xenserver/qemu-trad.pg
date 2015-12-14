@@ -1,0 +1,594 @@
+Add 64-bit support to QEMU.
+
+Currently it is assumed PCI device BAR access < 4G memory. If there is such a
+device whose BAR size is larger than 4G, it must access > 4G memory address.
+This patch enable the 64bits big BAR support on qemu-xen.
+
+Signed-off-by: Xiantao Zhang <xiantao.zhang@intel.com>
+Signed-off-by: Xudong Hao <xudong.hao@intel.com>
+
+Tested-by: Michel Riviere <michel.riviere@oracle.com>
+Signed-off-by: Zhenzhong Duan<zhenzhong.duan@oracle.com>
+Oracle-Bug: 20140061
+Signed-off-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Committed-by: Zhenzhong Duan <zhenzhong.duan@oracle.com>
+patch_name: 0001-Add-64-bit-support-to-QEMU.patch
+
+Index: hw/pass-through.c
+===================================================================
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index bd51fae..020e121 100644
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -1247,13 +1247,13 @@ static int wrapped_xc_domain_memory_mapping(
+ #define xc_domain_memory_mapping wrapped_xc_domain_memory_mapping
+ 
+ static int _pt_iomem_helper(struct pt_dev *assigned_device, int i,
+-                            uint32_t e_base, uint32_t e_size, int op)
++                            unsigned long e_base, unsigned long e_size, int op)
+ {
+     if ( has_msix_mapping(assigned_device, i) )
+     {
+-        uint32_t msix_last_pfn = (assigned_device->msix->mmio_base_addr - 1 +
++        unsigned long msix_last_pfn = (assigned_device->msix->mmio_base_addr - 1 +
+             assigned_device->msix->total_entries * 16) >> XC_PAGE_SHIFT;
+-        uint32_t bar_last_pfn = (e_base + e_size - 1) >> XC_PAGE_SHIFT;
++        unsigned long bar_last_pfn = (e_base + e_size - 1) >> XC_PAGE_SHIFT;
+         int ret = 0;
+ 
+         if ( assigned_device->msix->table_off )
+@@ -1291,26 +1291,33 @@ static void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
+                          int type)
+ {
+     struct pt_dev *assigned_device  = (struct pt_dev *)d;
+-    uint32_t old_ebase = assigned_device->bases[i].e_physbase;
++    uint64_t e_phys64 = e_phys, e_size64 = e_size, old_ebase = assigned_device->bases[i].e_physbase;
+     int first_map = ( assigned_device->bases[i].e_size == 0 );
++    PCIIORegion *r = &d->io_regions[i];
+     int ret = 0;
+ 
+-    assigned_device->bases[i].e_physbase = e_phys;
+-    assigned_device->bases[i].e_size= e_size;
+-
+-    PT_LOG("e_phys=%08x maddr=%lx type=%d len=%d index=%d first_map=%d\n",
+-        e_phys, (unsigned long)assigned_device->bases[i].access.maddr,
+-        type, e_size, i, first_map);
+-
+-    if ( e_size == 0 )
++    if ( assigned_device->bases[i + 1].bar_flag == PT_BAR_FLAG_UPPER) {
++        uint64_t upper_addr = (r + 1)->addr;
++        uint64_t upper_size = (r + 1)->size;
++        e_phys64 += upper_addr << 32;
++        e_size64 += upper_size << 32;
++    } 
++    PT_LOG("e_phys64=%lx maddr=%lx type=%d len=%lx index=%d first_map=%d\n",
++        e_phys64, (unsigned long)assigned_device->bases[i].access.maddr,
++        type, e_size64, i, first_map);
++   
++    if(e_size64== 0 || !valid_addr(e_phys64))
+         return;
+ 
++    assigned_device->bases[i].e_physbase = e_phys64;
++    assigned_device->bases[i].e_size= e_size64;
++
+     if ( !first_map && old_ebase != -1 )
+     {
+         if ( has_msix_mapping(assigned_device, i) )
+             unregister_iomem(assigned_device->msix->mmio_base_addr);
+ 
+-        ret = _pt_iomem_helper(assigned_device, i, old_ebase, e_size,
++        ret = _pt_iomem_helper(assigned_device, i, old_ebase, e_size64,
+                                DPCI_REMOVE_MAPPING);
+         if ( ret != 0 )
+         {
+@@ -1320,7 +1327,7 @@ static void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
+     }
+ 
+     /* map only valid guest address */
+-    if (e_phys != -1)
++    if (e_phys64 != -1)
+     {
+         if ( has_msix_mapping(assigned_device, i) )
+         {
+@@ -1334,7 +1341,7 @@ static void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
+                  assigned_device->msix->mmio_index);
+         }
+ 
+-        ret = _pt_iomem_helper(assigned_device, i, e_phys, e_size,
++        ret = _pt_iomem_helper(assigned_device, i, e_phys64, e_size64,
+                                DPCI_ADD_MAPPING);
+         if ( ret != 0 )
+         {
+@@ -1342,7 +1349,7 @@ static void pt_iomem_map(PCIDevice *d, int i, uint32_t e_phys, uint32_t e_size,
+             return;
+         }
+ 
+-        if ( old_ebase != e_phys && old_ebase != -1 )
++        if ( old_ebase != e_phys64 && old_ebase != -1 )
+             pt_msix_update_remap(assigned_device, i);
+     }
+ }
+@@ -2031,7 +2038,7 @@ exit:
+ 
+ static void pt_libpci_fixup(struct pci_dev *dev)
+ {
+-#if !defined(PCI_LIB_VERSION) || PCI_LIB_VERSION < 0x030100
++#if !defined(PCI_LIB_VERSION) || PCI_LIB_VERSION <= 0x030100
+     int i;
+     FILE *fp;
+     char path[PATH_MAX], buf[256];
+@@ -2085,7 +2092,7 @@ static int pt_dev_is_virtfn(struct pci_dev *dev)
+ 
+ static int pt_register_regions(struct pt_dev *assigned_device, uint16_t *cmd)
+ {
+-    int i = 0;
++    int i = 0, current_bar, bar_flag;
+     uint32_t bar_data = 0;
+     struct pci_dev *pci_dev = assigned_device->pci_dev;
+     PCIDevice *d = &assigned_device->dev;
+@@ -2094,6 +2101,7 @@ static int pt_register_regions(struct pt_dev *assigned_device, uint16_t *cmd)
+     /* Register PIO/MMIO BARs */
+     for ( i = 0; i < PCI_BAR_ENTRIES; i++ )
+     {
++        current_bar = i;
+         if ( pt_pci_base_addr(pci_dev->base_addr[i]) )
+         {
+             assigned_device->bases[i].e_physbase =
+@@ -2109,24 +2117,32 @@ static int pt_register_regions(struct pt_dev *assigned_device, uint16_t *cmd)
+                     pt_ioport_map);
+                 *cmd |= PCI_COMMAND_IO;
+             }
+-            else if ( pci_dev->base_addr[i] & PCI_ADDRESS_SPACE_MEM_PREFETCH )
++            else if ( pci_dev->base_addr[i] & PCI_ADDRESS_SPACE_MEM_64BIT )
+             {
++                bar_flag = pci_dev->base_addr[i] & 0xf;
+                 pci_register_io_region((PCIDevice *)assigned_device, i,
+-                    (uint32_t)pci_dev->size[i], PCI_ADDRESS_SPACE_MEM_PREFETCH,
++                    (uint32_t)pci_dev->size[i], bar_flag,
++                    pt_iomem_map);
++                pci_register_io_region((PCIDevice *)assigned_device, i + 1,
++                    (uint32_t)(pci_dev->size[i] >> 32), PCI_ADDRESS_SPACE_MEM,
+                     pt_iomem_map);
+                 *cmd |= PCI_COMMAND_MEMORY;
++                /* skip upper half. */
++                i++;
+             }
+             else
+             {
++                bar_flag = pci_dev->base_addr[i] & 0xf;
+                 pci_register_io_region((PCIDevice *)assigned_device, i,
+-                    (uint32_t)pci_dev->size[i], PCI_ADDRESS_SPACE_MEM,
++                    (uint32_t)pci_dev->size[i], bar_flag,
+                     pt_iomem_map);
+                 *cmd |= PCI_COMMAND_MEMORY;
+             }
+ 
+-            PT_LOG("IO region registered (size=0x%08x base_addr=0x%08x)\n",
+-                (uint32_t)(pci_dev->size[i]),
+-                (uint32_t)(pci_dev->base_addr[i]));
++            PT_LOG("IO region registered (bar:%d,size=0x%lx base_addr=0x%lx)\n",
++			        current_bar,
++                    (pci_dev->size[current_bar]),
++                    (pci_dev->base_addr[current_bar]));
+         }
+     }
+ 
+@@ -2171,8 +2187,7 @@ static void pt_unregister_regions(struct pt_dev *assigned_device)
+ 
+         type = d->io_regions[i].type;
+ 
+-        if ( type == PCI_ADDRESS_SPACE_MEM ||
+-             type == PCI_ADDRESS_SPACE_MEM_PREFETCH )
++        if ( !(type & PCI_ADDRESS_SPACE_IO) )
+         {
+             ret = _pt_iomem_helper(assigned_device, i,
+                                    assigned_device->bases[i].e_physbase,
+@@ -2304,6 +2319,7 @@ int pt_pci_host_write(struct pci_dev *pci_dev, u32 addr, u32 val, int len)
+     return ret;
+ }
+ 
++static uint64_t pt_get_bar_size(PCIIORegion *r);
+ /* parse BAR */
+ static int pt_bar_reg_parse(
+         struct pt_dev *ptdev, struct pt_reg_info_tbl *reg)
+@@ -2332,7 +2348,7 @@ static int pt_bar_reg_parse(
+ 
+     /* check unused BAR */
+     r = &d->io_regions[index];
+-    if (!r->size)
++    if (!pt_get_bar_size(r))
+         goto out;
+ 
+     /* for ExpROM BAR */
+@@ -2352,6 +2368,86 @@ out:
+     return bar_flag;
+ }
+ 
++static bool is_64bit_bar(PCIIORegion *r)
++{
++    return !!(r->type & PCI_ADDRESS_SPACE_MEM_64BIT);
++}
++
++static uint64_t pt_get_bar_size(PCIIORegion *r)
++{
++    if (is_64bit_bar(r))
++    {
++        uint64_t size64;
++        size64 = (r + 1)->size; 
++        size64 <<= 32; 
++        size64 += r->size;
++        return size64; 
++    }
++    return r->size; 
++}
++
++static uint64_t pt_get_bar_base(PCIIORegion *r)
++{
++    if (is_64bit_bar(r))
++    {
++        uint64_t base64;
++
++        base64 = (r + 1)->addr; 
++        base64 <<= 32; 
++        base64 += r->addr;
++        return base64 & PCI_BASE_ADDRESS_MEM_MASK; 
++    }
++    return r->addr & PCI_BASE_ADDRESS_MEM_MASK; 
++}
++
++int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint64_t addr,
++                        uint64_t size, uint8_t type)
++{
++    PCIDevice *devices = NULL;
++    PCIIORegion *r;
++    int ret = 0;
++    int i, j;
++
++    /* check Overlapped to Base Address */
++    for (i=0; i<256; i++)
++    {
++        if ( !(devices = bus->devices[i]) )
++            continue;
++
++        /* skip itself */
++        if (devices->devfn == devfn)
++            continue;
++        
++        for (j=0; j<PCI_NUM_REGIONS; j++)
++        {
++            r = &devices->io_regions[j];
++
++            /* skip different resource type, but don't skip when
++             * prefetch and non-prefetch memory are compared.
++             */
++            if (type != r->type)
++            {
++                if (type == PCI_ADDRESS_SPACE_IO ||
++                    r->type == PCI_ADDRESS_SPACE_IO)
++                    continue;
++            }
++
++            if ((addr < (pt_get_bar_base(r) + pt_get_bar_size(r))) && ((addr + size) > pt_get_bar_base(r)))
++            {
++                printf("Overlapped to device[%02x:%02x.%x][Region:%d]"
++                    "[Address:%lxh][Size:%lxh]\n", bus->bus_num,
++                    (devices->devfn >> 3) & 0x1F, (devices->devfn & 0x7),
++                    j, pt_get_bar_base(r), pt_get_bar_size(r));
++                ret = 1;
++                goto out;
++            }
++        }
++    }
++
++out:
++    return ret;
++}
++
+ /* mapping BAR */
+ static void pt_bar_mapping_one(struct pt_dev *ptdev, int bar, int io_enable,
+     int mem_enable)
+@@ -2361,13 +2457,13 @@ static void pt_bar_mapping_one(struct pt_dev *ptdev, int bar, int io_enable,
+     struct pt_reg_grp_tbl *reg_grp_entry = NULL;
+     struct pt_reg_tbl *reg_entry = NULL;
+     struct pt_region *base = NULL;
+-    uint32_t r_size = 0, r_addr = -1;
++    uint64_t r_size = 0, r_addr = -1;
+     int ret = 0;
+ 
+     r = &dev->io_regions[bar];
+-
++    
+     /* check valid region */
+-    if (!r->size)
++    if (!pt_get_bar_size(r))
+         return;
+ 
+     base = &ptdev->bases[bar];
+@@ -2377,12 +2473,13 @@ static void pt_bar_mapping_one(struct pt_dev *ptdev, int bar, int io_enable,
+            return;
+ 
+     /* copy region address to temporary */
+-    r_addr = r->addr;
++    r_addr = pt_get_bar_base(r);
+ 
+     /* need unmapping in case I/O Space or Memory Space disable */
+     if (((base->bar_flag == PT_BAR_FLAG_IO) && !io_enable ) ||
+         ((base->bar_flag == PT_BAR_FLAG_MEM) && !mem_enable ))
+         r_addr = -1;
++
+     if ( (bar == PCI_ROM_SLOT) && (r_addr != -1) )
+     {
+         reg_grp_entry = pt_find_reg_grp(ptdev, PCI_ROM_ADDRESS);
+@@ -2395,26 +2492,26 @@ static void pt_bar_mapping_one(struct pt_dev *ptdev, int bar, int io_enable,
+     }
+ 
+     /* prevent guest software mapping memory resource to 00000000h */
+-    if ((base->bar_flag == PT_BAR_FLAG_MEM) && ((r_addr & PCI_BASE_ADDRESS_MEM_MASK) == 0))
++    if ((base->bar_flag == PT_BAR_FLAG_MEM) && (pt_get_bar_base(r) == 0))
+         r_addr = -1;
+ 
+     /* align resource size (memory type only) */
+-    r_size = r->size;
++    r_size = pt_get_bar_size(r);
+     PT_GET_EMUL_SIZE(base->bar_flag, r_size);
+ 
+     /* check overlapped address */
+     ret = pt_chk_bar_overlap(dev->bus, dev->devfn,
+                     r_addr, r_size, r->type);
+     if (ret > 0)
+-        PT_LOG_DEV(dev, "Warning: [Region:%d][Address:%08xh]"
+-            "[Size:%08xh] is overlapped.\n", bar, r_addr, r_size);
++        PT_LOG_DEV(dev, "Warning: [Region:%d][Address:%lxh]"
++            "[Size:%lxh] is overlapped.\n", bar, r_addr, r_size);
+ 
+     /* check whether we need to update the mapping or not */
+     if (r_addr != ptdev->bases[bar].e_physbase)
+     {
+         /* mapping BAR */
+-        r->map_func((PCIDevice *)ptdev, bar, r_addr,
+-                     r_size, r->type);
++        r->map_func((PCIDevice *)ptdev, bar, (uint32_t)r_addr,
++                     (uint32_t)r_size, r->type);
+     }
+ }
+ 
+@@ -3010,7 +3107,7 @@ static uint32_t pt_bar_reg_init(struct pt_dev *ptdev,
+     }
+ 
+     /* set initial guest physical base address to -1 */
+-    ptdev->bases[index].e_physbase = -1;
++    ptdev->bases[index].e_physbase = -1UL;
+ 
+     /* set BAR flag */
+     ptdev->bases[index].bar_flag = pt_bar_reg_parse(ptdev, reg);
+@@ -3709,7 +3806,10 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
+     {
+     case PT_BAR_FLAG_MEM:
+         bar_emu_mask = PT_BAR_MEM_EMU_MASK;
+-        bar_ro_mask = PT_BAR_MEM_RO_MASK | (r_size - 1);
++        if (!r_size)
++            bar_ro_mask = PT_BAR_ALLF;
++        else
++            bar_ro_mask = PT_BAR_MEM_RO_MASK | (r_size - 1);
+         break;
+     case PT_BAR_FLAG_IO:
+         bar_emu_mask = PT_BAR_IO_EMU_MASK;
+@@ -3717,7 +3817,10 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
+         break;
+     case PT_BAR_FLAG_UPPER:
+         bar_emu_mask = PT_BAR_ALLF;
+-        bar_ro_mask = 0;    /* all upper 32bit are R/W */
++        if (!r_size)
++            bar_ro_mask = 0; 
++        else
++            bar_ro_mask = r_size - 1;
+         break;
+     default:
+         break;
+@@ -3730,6 +3833,7 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
+     /* check whether we need to update the virtual region address or not */
+     switch (ptdev->bases[index].bar_flag)
+     {
++    case PT_BAR_FLAG_UPPER:
+     case PT_BAR_FLAG_MEM:
+         /* nothing to do */
+         break;
+@@ -3753,42 +3857,6 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
+             goto exit;
+         }
+         break;
+-    case PT_BAR_FLAG_UPPER:
+-        if (cfg_entry->data)
+-        {
+-            if (cfg_entry->data != (PT_BAR_ALLF & ~bar_ro_mask))
+-            {
+-                PT_LOG_DEV(d, "Warning: Guest attempt to set high MMIO Base Address. "
+-                    "Ignore mapping. "
+-                    "[Offset:%02xh][High Address:%08xh]\n",
+-                    reg->offset, cfg_entry->data);
+-            }
+-            /* clear lower address */
+-            d->io_regions[index-1].addr = -1;
+-        }
+-        else
+-        {
+-            /* find lower 32bit BAR */
+-            prev_offset = (reg->offset - 4);
+-            reg_grp_entry = pt_find_reg_grp(ptdev, prev_offset);
+-            if (reg_grp_entry)
+-            {
+-                reg_entry = pt_find_reg(reg_grp_entry, prev_offset);
+-                if (reg_entry)
+-                    /* restore lower address */
+-                    d->io_regions[index-1].addr = reg_entry->data;
+-                else
+-                    return -1;
+-            }
+-            else
+-                return -1;
+-        }
+-
+-        /* never mapping the 'empty' upper region,
+-         * because we'll do it enough for the lower region.
+-         */
+-        r->addr = -1;
+-        goto exit;
+     default:
+         break;
+     }
+@@ -3802,7 +3870,7 @@ static int pt_bar_reg_write(struct pt_dev *ptdev,
+      * rather than mmio. Remapping this value to mmio should be prevented.
+      */
+ 
+-    if ( cfg_entry->data != writable_mask )
++    if ( cfg_entry->data != writable_mask || !cfg_entry->data)
+         r->addr = cfg_entry->data;
+ 
+ exit:
+diff --git a/hw/pass-through.h b/hw/pass-through.h
+index 66196a0..0235968 100644
+--- a/hw/pass-through.h
++++ b/hw/pass-through.h
+@@ -172,10 +172,13 @@ enum {
+ #define PT_MERGE_VALUE(value, data, val_mask) \
+     (((value) & (val_mask)) | ((data) & ~(val_mask)))
+ 
++#define valid_addr(addr) \
++    (addr >= 0x80000000 && !(addr & 0xfff))
++
+ struct pt_region {
+     /* Virtual phys base & size */
+-    uint32_t e_physbase;
+-    uint32_t e_size;
++    uint64_t e_physbase;
++    uint64_t e_size;
+     /* Index of region in qemu */
+     uint32_t memory_index;
+     /* BAR flag */
+diff --git a/hw/pci.c b/hw/pci.c
+index 20e1f03..c1d99a4 100644
+--- a/hw/pci.c
++++ b/hw/pci.c
+@@ -39,24 +39,6 @@ extern int igd_passthru;
+ 
+ //#define DEBUG_PCI
+ 
+-struct PCIBus {
+-    int bus_num;
+-    int devfn_min;
+-    pci_set_irq_fn set_irq;
+-    pci_map_irq_fn map_irq;
+-    uint32_t config_reg; /* XXX: suppress */
+-    /* low level pic */
+-    SetIRQFunc *low_set_irq;
+-    qemu_irq *irq_opaque;
+-    PCIDevice *devices[256];
+-    PCIDevice *parent_dev;
+-    PCIBus *next;
+-    /* The bus IRQ state is the logical OR of the connected devices.
+-       Keep a count of the number of devices with raised IRQs.  */
+-    int nirq;
+-    int irq_count[];
+-};
+-
+ static void pci_update_mappings(PCIDevice *d);
+ static void pci_set_irq(void *opaque, int irq_num, int level);
+ 
+@@ -986,50 +968,3 @@ PCIBus *pci_isa_bridge_init(PCIBus *bus, int devfn, uint16_t vid, uint16_t did,
+     return s;
+ }
+ 
+-int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint32_t addr,
+-                        uint32_t size, uint8_t type)
+-{
+-    PCIDevice *devices = NULL;
+-    PCIIORegion *r;
+-    int ret = 0;
+-    int i, j;
+-
+-    /* check Overlapped to Base Address */
+-    for (i=0; i<256; i++)
+-    {
+-        if ( !(devices = bus->devices[i]) )
+-            continue;
+-
+-        /* skip itself */
+-        if (devices->devfn == devfn)
+-            continue;
+-        
+-        for (j=0; j<PCI_NUM_REGIONS; j++)
+-        {
+-            r = &devices->io_regions[j];
+-
+-            /* skip different resource type, but don't skip when
+-             * prefetch and non-prefetch memory are compared.
+-             */
+-            if (type != r->type)
+-            {
+-                if (type == PCI_ADDRESS_SPACE_IO ||
+-                    r->type == PCI_ADDRESS_SPACE_IO)
+-                    continue;
+-            }
+-
+-            if ((addr < (r->addr + r->size)) && ((addr + size) > r->addr))
+-            {
+-                printf("Overlapped to device[%02x:%02x.%x][Region:%d]"
+-                    "[Address:%08xh][Size:%08xh]\n", bus->bus_num,
+-                    (devices->devfn >> 3) & 0x1F, (devices->devfn & 0x7),
+-                    j, r->addr, r->size);
+-                ret = 1;
+-                goto out;
+-            }
+-        }
+-    }
+-
+-out:
+-    return ret;
+-}
+diff --git a/hw/pci.h b/hw/pci.h
+index a8a3afc..d3c252c 100644
+--- a/hw/pci.h
++++ b/hw/pci.h
+@@ -137,6 +137,7 @@ typedef int PCIUnregisterFunc(PCIDevice *pci_dev);
+ 
+ #define PCI_ADDRESS_SPACE_MEM		0x00
+ #define PCI_ADDRESS_SPACE_IO		0x01
++#define PCI_ADDRESS_SPACE_MEM_64BIT	0x04
+ #define PCI_ADDRESS_SPACE_MEM_PREFETCH	0x08
+ 
+ typedef struct PCIIORegion {
+@@ -266,8 +267,8 @@ void pci_register_io_region(PCIDevice *pci_dev, int region_num,
+                             uint32_t size, int type,
+                             PCIMapIORegionFunc *map_func);
+ 
+-int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint32_t addr,
+-                       uint32_t size, uint8_t type);
++int pt_chk_bar_overlap(PCIBus *bus, int devfn, uint64_t addr,
++                       uint64_t size, uint8_t type);
+ 
+ uint32_t pci_default_read_config(PCIDevice *d,
+                                  uint32_t address, int len);
+@@ -391,5 +392,23 @@ void pci_bridge_write_config(PCIDevice *d,
+                              uint32_t address, uint32_t val, int len);
+ PCIBus *pci_register_secondary_bus(PCIDevice *dev, pci_map_irq_fn map_irq);
+ 
++struct PCIBus {
++    int bus_num;
++    int devfn_min;
++    pci_set_irq_fn set_irq;
++    pci_map_irq_fn map_irq;
++    uint32_t config_reg; /* XXX: suppress */
++    /* low level pic */
++    SetIRQFunc *low_set_irq;
++    qemu_irq *irq_opaque;
++    PCIDevice *devices[256];
++    PCIDevice *parent_dev;
++    PCIBus *next;
++    /* The bus IRQ state is the logical OR of the connected devices.
++       Keep a count of the number of devices with raised IRQs.  */
++    int nirq;
++    int irq_count[];
++};
++
+ 
+ #endif
