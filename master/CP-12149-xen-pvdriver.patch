@@ -219,7 +219,7 @@ diff --git a/xenstore.c b/xenstore.c
 index a5a2434..a2bc683 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -983,7 +983,26 @@ done:
+@@ -983,6 +983,26 @@ done:
      platform_revision = pch->revision;
  }
  
