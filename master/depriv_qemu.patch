@@ -107,7 +107,7 @@ index 50ecac0..bd872df 100644
  //#define DEBUG_TPM
  
 diff --git a/hw/xen_backend.c b/hw/xen_backend.c
-index 4b6f90d..6d35d25 100644
+index 368d4fb..d3a2bcf 100644
 --- a/hw/xen_backend.c
 +++ b/hw/xen_backend.c
 @@ -41,11 +41,11 @@
@@ -132,7 +132,7 @@ index 4b6f90d..6d35d25 100644
  	xen_be_printf(NULL, 0, "can't open xen interface\n");
  	goto err;
 diff --git a/hw/xen_backend.h b/hw/xen_backend.h
-index 8d1263d..f95015b 100644
+index 49d9c94..e5dcd3e 100644
 --- a/hw/xen_backend.h
 +++ b/hw/xen_backend.h
 @@ -54,7 +54,7 @@ struct XenDevice {
@@ -145,7 +145,7 @@ index 8d1263d..f95015b 100644
  
  /* xenstore helper functions */
 diff --git a/hw/xen_console.c b/hw/xen_console.c
-index ca781bb..3ae21e3 100644
+index 39b46c6..6df12d0 100644
 --- a/hw/xen_console.c
 +++ b/hw/xen_console.c
 @@ -38,6 +38,7 @@
@@ -157,10 +157,10 @@ index ca781bb..3ae21e3 100644
  struct buffer {
      uint8_t *data;
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index e8bfc4a..54962bd 100644
+index 4034e9b..5fabae6 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
-@@ -62,6 +62,7 @@
+@@ -63,6 +63,7 @@
  #include "qemu-xen.h"
  #include "hw/pc.h"
  #include "net.h"
@@ -168,7 +168,7 @@ index e8bfc4a..54962bd 100644
  
  //#define DEBUG_MMU
  
-@@ -177,6 +178,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -178,6 +179,13 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
              }
              bufioreq_local_port = rc;
          }
@@ -182,7 +182,7 @@ index e8bfc4a..54962bd 100644
      }
  
      return env;
-@@ -186,26 +194,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
+@@ -187,26 +195,19 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
  void cpu_reset(CPUX86State *env)
  {
      extern int s3_shutdown_flag;
@@ -217,7 +217,7 @@ index e8bfc4a..54962bd 100644
  }
  
  void cpu_x86_close(CPUX86State *env)
-@@ -458,14 +459,11 @@ void timeoffset_get(void)
+@@ -459,14 +460,11 @@ void timeoffset_get(void)
  
  static void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
  {
@@ -233,7 +233,7 @@ index e8bfc4a..54962bd 100644
  }
  
  static void __handle_ioreq(CPUState *env, ioreq_t *req)
-@@ -669,19 +667,12 @@ int main_loop(void)
+@@ -670,19 +668,12 @@ int main_loop(void)
  
  void destroy_hvm_domain(void)
  {
@@ -296,7 +296,7 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..db90d8f
+index 0000000..885efc7
 --- /dev/null
 +++ b/privsep.c
 @@ -0,0 +1,2081 @@
@@ -2368,12 +2368,12 @@ index 0000000..db90d8f
 +};
 +
 +int
-+xc_evtchn_restrict(xc_interface *xce_handle, int domid)
++xc_evtchn_restrict(xenevtchn_handle *xce_handle, int domid)
 +{
 +    int fd;
 +    struct ioctl_evtchn_restrict_domid restrict_domid = { domid };
 +
-+    fd = xc_evtchn_fd(xce_handle);
++    fd = xenevtchn_fd(xce_handle);
 +    if (fd < 0)
 +        return -1;
 +    if (ioctl(fd, IOCTL_EVTCHN_RESTRICT_DOMID, &restrict_domid) < 0)
@@ -2383,14 +2383,15 @@ index 0000000..db90d8f
 +
 diff --git a/privsep.h b/privsep.h
 new file mode 100644
-index 0000000..c49f4db
+index 0000000..21a67e3
 --- /dev/null
 +++ b/privsep.h
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,67 @@
 +#ifndef PRIVSEP_H
 +#define PRIVSEP_H
 +
 +#include <stdarg.h>
++#include "hw/xen_common.h"
 +
 +/* privsep.c */
 +void privsep_prepare(void);
@@ -2439,7 +2440,7 @@ index 0000000..c49f4db
 +
 +int xc_interface_restrict_qemu(xc_interface *xc_handle, int domid);
 +#define xc_interface_restrict(h,d) xc_interface_restrict_qemu(h,d)
-+int xc_evtchn_restrict(xc_interface *xce_handle, int domid);
++int xc_evtchn_restrict(xenevtchn_handle *xce_handle, int domid);
 +
 +typedef enum {
 +    /** not initialized at all, call privsep_prepare */
@@ -2580,7 +2581,7 @@ index ed085af..6e550ad 100644
  
  int log_printf(const char *fmt, ...)
 diff --git a/unittests/Makefile b/unittests/Makefile
-index c91e17c..623caa2 100644
+index c91e17c..d8bf62e 100644
 --- a/unittests/Makefile
 +++ b/unittests/Makefile
 @@ -1,16 +1,22 @@
@@ -2591,8 +2592,9 @@ index c91e17c..623caa2 100644
  VPATH=$(SRC_PATH)/tests
  
 -CFLAGS=-Wall -O2 -g -fno-strict-aliasing
+-LDFLAGS=
 +CFLAGS := -Wall -Werror -O2 -g -fno-strict-aliasing -ftest-coverage -fprofile-arcs
- LDFLAGS=
++LDFLAGS= -lxenevtchn
  
  TESTS=xen-tests
  

@@ -5121,15 +5121,15 @@ index 2469b73..f554239 100644
  
  /*
 diff --git a/xen-hooks.mak b/xen-hooks.mak
-index cd745ad..ba57a7a 100644
+index 3dad22a..212e9b6 100644
 --- a/xen-hooks.mak
 +++ b/xen-hooks.mak
-@@ -18,7 +18,7 @@ endif
+@@ -21,7 +21,7 @@ endif
  
  CFLAGS += $(CMDLINE_CFLAGS)
  
 -LIBS += -ldrm
 +LIBS += -ldrm -ldrm_intel
+ LIBS += -L$(XEN_ROOT)/tools/libs/evtchn -lxenevtchn
+ LIBS += -L$(XEN_ROOT)/tools/libs/gnttab -lxengnttab
  LIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
- LIBS += -L$(XEN_ROOT)/tools/xenstore -lxenstore
- LIBS += -Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog
