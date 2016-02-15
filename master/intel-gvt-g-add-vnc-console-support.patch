@@ -418,12 +418,14 @@ index 0fce2fd..e33a489 100644
              vga_draw_text(s, full_update);
              break;
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index debc12f..cec1236 100644
+index debc12f..c86cbe8 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
-@@ -9,6 +9,7 @@ Patch0: xen-device-model-development.patch
+@@ -8,7 +8,9 @@ Source0: xen-device-model-%{version}.tar.bz2
+ Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
  BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
++BuildRequires: xenserver-libdrm-devel
  Requires(pre): shadow-utils
 +Requires: libdrm
  Provides: qemu-xen(syslog) = 1
