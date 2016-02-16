@@ -184,6 +184,7 @@ intel-gvt-g-initial-backport.patch
 intel-gvt-g-hardcode-monitor-config.patch
 intel-gvt-g-add-vnc-console-support.patch
 intel-gvt-g-use-bitblt-for-vnc-console.patch
+intel-gvt-g-add-extra-pixel-format-support-in-vnc-console.patch
 # future Intel drivers will not require this patch but it is required to 
 # support existing vm upgrade to dundee
 igd_passthrough.patch

@@ -1,0 +1,111 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index c9740b4..1d6422d 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -47,8 +47,10 @@ typedef uint32_t pci_addr_t;
+ 
+ 
+ #include <libdrm/intel_bufmgr.h>
++#include <libdrm/drm_fourcc.h>
+ #include "intel-tools/intel_batchbuffer.h"
+ #include "intel-tools/intel_chipset.h"
++#include "host-utils.h"
+ /*  #include "intel-tools/intel_gpu_tools.h" */
+ 
+ 
+@@ -453,12 +455,46 @@ typedef struct xengt_surface {
+ 
+ static xengt_surface_t xengt_surface = { .bo=NULL, .batch=NULL};
+ 
++
++static PixelFormat qemu_set_pixelformat(uint32_t red, int32_t green, int32_t blue, int32_t alpha)
++{
++    PixelFormat pf;
++
++    memset(&pf, 0x00, sizeof(PixelFormat));
++
++    pf.rmask = red;
++    pf.gmask = green;
++    pf.bmask = blue;
++
++    pf.rbits = ctpop32(red);
++    pf.gbits = ctpop32(green);
++    pf.bbits = ctpop32(blue);
++    pf.abits = ctpop32(alpha);
++
++    pf.depth = pf.rbits + pf.gbits + pf.bbits;
++    pf.bits_per_pixel = pf.depth + pf.abits;
++    pf.bytes_per_pixel = pf.bits_per_pixel / 8;
++
++    pf.rmax = (1 << pf.rbits) -1;
++    pf.gmax = (1 << pf.gbits) -1;
++    pf.bmax = (1 << pf.bbits) -1;
++    pf.amax = (1 << pf.abits) -1;
++
++    pf.rshift = ffs(red) - 1;
++    pf.gshift = ffs(green) - 1;
++    pf.bshift = ffs(blue) -1;
++    pf.ashift = ffs(alpha) -1;
++    return pf;
++}
++
+ void xengt_draw_primary(DisplayState *ds)
+ {
+     xengt_surface_t *surface = &xengt_surface;
+     xengt_fb_t *fb;
+     struct drm_i915_gem_vgtbuffer *gem_vgtbuffer;
+ 
++    static uint32 last_pixel_format = 0;
++
+     if ((fb = xengt_get_fb()) == NULL || (fb->bo == NULL)) {
+         qemu_log("vGT: %s: no frame buffer.", __func__);
+         return;
+@@ -477,9 +513,10 @@ void xengt_draw_primary(DisplayState *ds)
+     if (!surface->bo ||
+         ds_get_width(ds) != gem_vgtbuffer->width ||
+         ds_get_height(ds) != gem_vgtbuffer->height ||
+-        ds_get_bits_per_pixel(ds) != gem_vgtbuffer->bpp) {
++        last_pixel_format != gem_vgtbuffer->drm_format) {
+         uint32_t width;
+         uint32_t linesize;
++        last_pixel_format = gem_vgtbuffer->drm_format;
+ 
+         if (surface->bo) {
+             drm_intel_bo_unreference(surface->bo);
+@@ -493,18 +530,33 @@ void xengt_draw_primary(DisplayState *ds)
+         surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc", gem_vgtbuffer->height*linesize,4096);
+         drm_intel_bo_map(surface->bo, 1);
+ 
+-        qemu_log("vGT: %s: Creating surface with w %d h %d, bbp %d , stride %d\n", __func__, width,
++        qemu_log("vGT: %s: Creating surface with w %d h %d, bbp %d , stride %d, fmt %x\n", __func__, width,
+                                                       gem_vgtbuffer->height,
+                                                       gem_vgtbuffer->bpp,
+-                                                      linesize);
++                                                      linesize,
++                                                      last_pixel_format);
+ 
+         ds->surface = qemu_create_displaysurface_from(width,
+                                                       gem_vgtbuffer->height,
+                                                       gem_vgtbuffer->bpp,
+                                                       linesize,
+                                                       surface->bo->virtual);
++
++        if ((gem_vgtbuffer->bpp==32) && (last_pixel_format!= DRM_FORMAT_XRGB8888 )) {
++             switch (last_pixel_format) {
++             case DRM_FORMAT_XBGR8888: ds->surface->pf = qemu_set_pixelformat(0xFF, 0xFF00, 0xFF0000, 0xFF000000);
++                 break;
++             case DRM_FORMAT_XBGR2101010: ds->surface->pf = qemu_set_pixelformat(0x3FF, 0xFFC00, 0x3FF00000, 0xC0000000);
++                 break;
++             case DRM_FORMAT_XRGB2101010: ds->surface->pf = qemu_set_pixelformat(0x3FF00000, 0xFFC00, 0x3FF, 0xC0000000);
++                 break;
++             default:
++                 qemu_log("vGT: %s: Unknown Pixelformat! ", __func__);
++            }
++        }
++
+         dpy_resize(ds);
+-    }
++     }
+ 
+      drm_intel_bo_unmap(surface->bo);
+ 
