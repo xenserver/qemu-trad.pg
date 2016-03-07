@@ -190,3 +190,4 @@ intel-gvt-g-add-extra-pixel-format-support-in-vnc-console.patch
 igd_passthrough.patch
 CP-12149-xen-pvdriver.patch
 0001-Add-64-bit-support-to-QEMU.patch
+limit-igd-passthrough-bar-to-512MB.patch

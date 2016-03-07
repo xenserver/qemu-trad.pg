@@ -1,0 +1,64 @@
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index 020e121..3193e62 100644
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -96,6 +96,7 @@
+ 
+ extern int gfx_passthru;
+ int igd_passthru = 0;
++extern int igd_max_bar_sz;
+ 
+ struct php_dev {
+     struct pt_dev *pt_dev;
+@@ -4569,6 +4570,11 @@ static struct pt_dev * register_real_device(PCIBus *e_bus,
+         return NULL;
+     }
+ 
++    /* Modify detected BAR size here */
++    if ( igd_passthru && r_bus == 0 && r_dev == 2 && r_func == 0 &&
++            pci_dev->size[2] > (igd_max_bar_sz * 1024 * 1024) )
++        pci_dev->size[2] = igd_max_bar_sz * 1024 * 1024;
++
+     dpci_infos.php_devs[e_devfn].pt_dev = assigned_device;
+ 
+     assigned_device->pci_dev = pci_dev;
+diff --git a/vl.c b/vl.c
+index 47646c8..6c71a0b 100644
+--- a/vl.c
++++ b/vl.c
+@@ -243,6 +243,7 @@ int vmsvga_enabled = 0;
+ int vgpu_enabled = 0;
+ int xengt_vga_enabled = 0;
+ int gfx_passthru = 0;
++int igd_max_bar_sz = 256;
+ #ifdef TARGET_SPARC
+ int graphic_width = 1024;
+ int graphic_height = 768;
+@@ -3884,6 +3885,7 @@ enum {
+     QEMU_OPTION_vgt_low_gm_sz,
+     QEMU_OPTION_vgt_high_gm_sz,
+     QEMU_OPTION_vgt_fence_sz,
++    QEMU_OPTION_igd_max_bar_sz,
+ 
+     /* Debug/Expert options: */
+     QEMU_OPTION_serial,
+@@ -4076,6 +4078,7 @@ static const QEMUOption qemu_options[] = {
+     { "vgt_low_gm_sz", HAS_ARG, QEMU_OPTION_vgt_low_gm_sz },
+     { "vgt_high_gm_sz", HAS_ARG, QEMU_OPTION_vgt_high_gm_sz },
+     { "vgt_fence_sz", HAS_ARG, QEMU_OPTION_vgt_fence_sz },
++    { "igd_max_bar_sz", HAS_ARG, QEMU_OPTION_igd_max_bar_sz },
+ 
+ #if defined(TARGET_ARM)
+     { "old-param", 0, QEMU_OPTION_old_param },
+@@ -5070,6 +5073,11 @@ int main(int argc, char **argv, char **envp)
+                     vgt_fence_sz = strtol(optarg,&ptr,10);
+                 }
+                 break;
++            case QEMU_OPTION_igd_max_bar_sz:
++                {
++                    igd_max_bar_sz = strtol(optarg,NULL,10);
++                }
++                break;
+             case QEMU_OPTION_disable_opengl:
+                 opengl_enabled = 0;
+                 break;
