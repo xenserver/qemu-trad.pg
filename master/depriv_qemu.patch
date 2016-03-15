@@ -21,7 +21,7 @@ index 85cea08..4532375 100644
  # need to fix this properly
  OBJS+=virtio.o virtio-blk.o virtio-balloon.o virtio-net.o virtio-console.o
 diff --git a/block-raw-posix.c b/block-raw-posix.c
-index 4110f33..82a9c50 100644
+index a00a96e..ef65db3 100644
 --- a/block-raw-posix.c
 +++ b/block-raw-posix.c
 @@ -32,6 +32,7 @@
@@ -157,7 +157,7 @@ index ca781bb..3ae21e3 100644
  struct buffer {
      uint8_t *data;
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index 427b34b..886635a 100644
+index e8bfc4a..54962bd 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
 @@ -62,6 +62,7 @@
@@ -233,7 +233,7 @@ index 427b34b..886635a 100644
  }
  
  static void __handle_ioreq(CPUState *env, ioreq_t *req)
-@@ -661,19 +659,12 @@ int main_loop(void)
+@@ -669,19 +667,12 @@ int main_loop(void)
  
  void destroy_hvm_domain(void)
  {
@@ -296,10 +296,10 @@ index 2fb5a51..5d5b910 100644
      for(;;) {
 diff --git a/privsep.c b/privsep.c
 new file mode 100644
-index 0000000..e5bb30b
+index 0000000..db90d8f
 --- /dev/null
 +++ b/privsep.c
-@@ -0,0 +1,2095 @@
+@@ -0,0 +1,2081 @@
 +/* Privilege separation.  Closely based on OpenBSD syslogd's
 + * privsep, which is:
 + *
@@ -525,17 +525,12 @@ index 0000000..e5bb30b
 +{
 +    if (strcmp(root_directory, "/var/empty")) {
 +        char name[80];
-+        struct stat buf;
 +        strcpy(name, root_directory);
 +        strcat(name, "/etc/localtime");
 +        unlink(name);
 +        strcpy(name, root_directory);
 +        strcat(name, "/etc");
 +        rmdir(name);
-+
-+        snprintf(name, 80, "%s/core.%d", root_directory, parent_pid);
-+        if (!stat(name, &buf) && !buf.st_size)
-+            unlink(name);
 +
 +        rmdir(root_directory);
 +    }
@@ -1637,8 +1632,6 @@ index 0000000..e5bb30b
 +    memset (&sigxfsz_handler, 0, sizeof(struct sigaction));
 +    sigterm_handler.sa_handler = sigterm_handler_f;
 +    sigxfsz_handler.sa_handler = sigxfsz_handler_f;
-+    char name[64];
-+    int f;
 +
 +    /* restrict network */
 +    if (unshare(CLONE_NEWNET))
@@ -1648,13 +1641,6 @@ index 0000000..e5bb30b
 +        || chroot(root_directory) < 0
 +        || chdir("/") < 0)
 +        err(1, "cannot chroot");
-+
-+    snprintf(name, 64, "core.%d", parent_pid);
-+    f = open(name, O_WRONLY|O_TRUNC|O_CREAT|O_NOFOLLOW, 0644);
-+    if (f > 0) {
-+        close(f);
-+        chown(name, qemu_uid, qemu_gid);
-+    }
 +
 +    if (setgroups(0, NULL) < 0)
 +        err(1, "setgroups()");
@@ -2468,10 +2454,10 @@ index 0000000..c49f4db
 +
 +#endif
 diff --git a/qemu-xen.h b/qemu-xen.h
-index 9b6b818..fa1483d 100644
+index 14cf220..b7f7e1e 100644
 --- a/qemu-xen.h
 +++ b/qemu-xen.h
-@@ -73,12 +73,10 @@ void xenstore_parse_pf_config(struct pci_config_header *pch);
+@@ -74,12 +74,10 @@ void xenstore_parse_pf_config(struct pci_config_header *pch);
  int xenstore_fd(void);
  struct xs_handle *xenstore_get(void);
  void xenstore_process_event(void *opaque);
@@ -2484,7 +2470,7 @@ index 9b6b818..fa1483d 100644
  int store_dev_info(const char *devName, int domid,
                     CharDriverState *cState, const char *storeString);
  
-@@ -125,7 +123,6 @@ int xenstore_write(const char *path, const char *val);
+@@ -126,7 +124,6 @@ int xenstore_write(const char *path, const char *val);
    * at least when it comes to running our own frontends
    */
  
@@ -2492,7 +2478,7 @@ index 9b6b818..fa1483d 100644
  char *xenstore_vm_read(int domid, const char *key, unsigned int *len);
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len);
  char *xenstore_read_battery_data(int battery_status);
-@@ -146,7 +143,7 @@ int xenfb_connect_vfb(const char *path);
+@@ -147,7 +144,7 @@ int xenfb_connect_vfb(const char *path);
  
  int has_tpm_device_danger(void);
  
@@ -3611,7 +3597,7 @@ index b65c0f1..37d01c8 100644
      qemu_fclose(f);
      if (ret < 0) {
 diff --git a/xenstore.c b/xenstore.c
-index a124ab9..60d6670 100644
+index eaad401..43bb5b6 100644
 --- a/xenstore.c
 +++ b/xenstore.c
 @@ -24,6 +24,7 @@
@@ -3677,7 +3663,7 @@ index a124ab9..60d6670 100644
                      xs_watch(xsh, buf, dev);
                      asprintf(&buf2, "%s/frontend", bpath);
                      frontend = xs_read(xsh, XBT_NULL, buf2, &len);
-@@ -1013,26 +999,19 @@ struct xs_handle *xenstore_get(void)
+@@ -1034,26 +1020,19 @@ struct xs_handle *xenstore_get(void)
  static void xenstore_process_logdirty_event(void)
  {
      char *act;
@@ -3709,7 +3695,7 @@ index a124ab9..60d6670 100644
      }
      fprintf(logfile, "Log-dirty command %s\n", act);
  
-@@ -1049,26 +1028,24 @@ static void xenstore_process_logdirty_event(void)
+@@ -1070,26 +1049,24 @@ static void xenstore_process_logdirty_event(void)
      xs_write(xsh, XBT_NULL, ret_path, act, len);
  
      free(act);
@@ -3743,7 +3729,7 @@ index a124ab9..60d6670 100644
      if (!xs_rm(xsh, XBT_NULL, path))
          fprintf(logfile, "xs_rm failed: path=%s\n", path);
  
-@@ -1079,13 +1056,7 @@ static void xenstore_process_dm_command_event(void)
+@@ -1100,13 +1077,7 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: continue after state save\n");
          xen_pause_requested = 0;
      } else if (!strncmp(command, "usb-add", len)) {
@@ -3758,7 +3744,7 @@ index a124ab9..60d6670 100644
          if (!par)
              goto out;
          do_usb_add(par);
-@@ -1093,12 +1064,6 @@ static void xenstore_process_dm_command_event(void)
+@@ -1114,12 +1085,6 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-add a usb device:%s\n",par);
      } else if (!strncmp(command, "usb-del", len)) {
          fprintf(logfile, "dm-command: usb-del a usb device\n");
@@ -3771,7 +3757,7 @@ index a124ab9..60d6670 100644
          if (!par)
              goto out;
          do_usb_del(par);
-@@ -1106,56 +1071,25 @@ static void xenstore_process_dm_command_event(void)
+@@ -1127,56 +1092,25 @@ static void xenstore_process_dm_command_event(void)
          fprintf(logfile, "dm-command: finish usb-del a usb device:%s\n",par);
  #ifdef CONFIG_PASSTHROUGH
      } else if (!strncmp(command, "pci-rem", len)) {
@@ -3835,7 +3821,7 @@ index a124ab9..60d6670 100644
  int
  xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
                                       uint32_t build_nr)
-@@ -1240,7 +1174,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
+@@ -1261,7 +1195,7 @@ xenstore_pv_driver_build_blacklisted(uint16_t product_nr,
  
  void xenstore_record_dm_state(const char *state)
  {
@@ -3844,7 +3830,7 @@ index a124ab9..60d6670 100644
  }
  static int xenstore_process_one_vcpu_set_event(char *node)
  {
-@@ -1612,23 +1546,6 @@ void xenstore_write_vncport(int display)
+@@ -1634,23 +1568,6 @@ void xenstore_write_vncport(int display)
      free(buf);
  }
  
@@ -3868,7 +3854,7 @@ index a124ab9..60d6670 100644
  void xenstore_read_vncpasswd(int domid, char *pwbuf, size_t pwbuflen)
  {
      char *buf = NULL, *path, *uuid = NULL, *passwd = NULL;
-@@ -1884,26 +1801,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
+@@ -1906,26 +1823,6 @@ char *xenstore_vm_read(int domid, const char *key, unsigned int *len)
      return value;
  }
  
@@ -3895,7 +3881,7 @@ index a124ab9..60d6670 100644
  char *xenstore_device_model_read(int domid, const char *key, unsigned int *len)
  {
      char *path = NULL, *value = NULL;
-@@ -2149,62 +2046,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
+@@ -2176,62 +2073,6 @@ void xenstore_dom_watch(int domid, const char *key, xenstore_callback fptr, void
      free(buf);
  }
  
@@ -3958,7 +3944,7 @@ index a124ab9..60d6670 100644
  char *xenstore_read(const char *path)
  {
      char *value = NULL;
-@@ -2215,9 +2056,3 @@ char *xenstore_read(const char *path)
+@@ -2242,9 +2083,3 @@ char *xenstore_read(const char *path)
      return xs_read(xsh, XBT_NULL, path, &len);
  }
  
