@@ -181,7 +181,7 @@ CA-156663-ioperms.patch
 0002-vga-fix-invalid-memory-accesses-with-bad-register-state.patch
 initialize-vga-vbe_LFB-regs-at-init.patch
 intel-gvt-g-initial-backport.patch
-intel-gvt-g-hardcode-monitor-config.patch
+intel-gvt-g-set-default-monitor-config.patch
 intel-gvt-g-add-vnc-console-support.patch
 intel-gvt-g-use-bitblt-for-vnc-console.patch
 intel-gvt-g-add-extra-pixel-format-support-in-vnc-console.patch

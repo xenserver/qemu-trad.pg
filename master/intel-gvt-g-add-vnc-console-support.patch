@@ -11,8 +11,20 @@ index 626e090..0652a5b 100644
  all: $(TOOLS) $(DOCS) recurse-all
  
  SUBDIR_RULES=$(patsubst %,subdir-%, $(TARGET_DIRS))
+diff --git a/Makefile.target b/Makefile.target
+index 8c07dd9..2cf50b4 100644
+--- a/Makefile.target
++++ b/Makefile.target
+@@ -586,6 +586,7 @@ ifdef CONFIG_AUDIO
+ OBJS+= $(SOUND_HW) pcspk.o
+ CPPFLAGS += -DHAS_AUDIO -DHAS_AUDIO_CHOICE
+ endif
++CPPFLAGS += -I/usr/include/libdrm
+ OBJS+= ide.o pckbd.o ps2.o vga.o vgpu_fb.o dma.o
+ OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pc.o
+ OBJS+= cirrus_vga.o apic.o parallel.o acpi.o piix_pci.o
 diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
-index b4436b3..0b45363 100644
+index 0b3b187..2469b73 100644
 --- a/hw/vga-xengt.c
 +++ b/hw/vga-xengt.c
 @@ -38,6 +38,14 @@ typedef uint32_t pci_addr_t;
@@ -38,17 +50,8 @@ index b4436b3..0b45363 100644
  
  #define EDID_SIZE 128
  #define MAX_INPUT_NUM 3
-@@ -68,7 +77,7 @@ typedef struct vgt_monitor_info {
- }vgt_monitor_info_t;
- 
- vgt_monitor_info_t monitor_config = {
--    .port_type = 1,
-+    .port_type = 2,
-     .port_is_dp = 1,
-     .port_override = 1,
-     /* Generic 1024x768 default EDID from linux/Documentation/EDID */
-@@ -215,6 +224,279 @@ static void config_hvm_monitors(void)
-     }
+@@ -359,6 +368,279 @@ finish_config:
+     return;
  }
  
 +int drm_fd;
@@ -327,15 +330,15 @@ index b4436b3..0b45363 100644
  /*
   *  Inform vGT driver to create a vGT instance
   */
-@@ -259,6 +541,7 @@ static void create_vgt_instance(void)
+@@ -403,6 +685,7 @@ static void create_vgt_instance(void)
      }
  
-     config_hvm_monitors();
+     config_vgt_guest_monitors();
 +    xengt_drm_init();
  }
  
  /*
-@@ -395,19 +678,18 @@ uint32_t vgt_bridge_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len)
+@@ -539,19 +822,18 @@ uint32_t vgt_bridge_pci_read(PCIDevice *pci_dev, uint32_t config_addr, int len)
      uint32_t val;
  
      val = pci_default_read_config(pci_dev, config_addr, len);

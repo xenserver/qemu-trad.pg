@@ -23,35 +23,35 @@ index 020e121..3193e62 100644
  
      assigned_device->pci_dev = pci_dev;
 diff --git a/vl.c b/vl.c
-index 47646c8..6c71a0b 100644
+index db52cb0..bb7f2f0 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -243,6 +243,7 @@ int vmsvga_enabled = 0;
  int vgpu_enabled = 0;
  int xengt_vga_enabled = 0;
  int gfx_passthru = 0;
-+int igd_max_bar_sz = 256;
++int igd_max_bar_sz = 512;
  #ifdef TARGET_SPARC
  int graphic_width = 1024;
  int graphic_height = 768;
-@@ -3884,6 +3885,7 @@ enum {
-     QEMU_OPTION_vgt_low_gm_sz,
+@@ -3885,6 +3886,7 @@ enum {
      QEMU_OPTION_vgt_high_gm_sz,
      QEMU_OPTION_vgt_fence_sz,
+     QEMU_OPTION_vgt_monitor_config_file,
 +    QEMU_OPTION_igd_max_bar_sz,
  
      /* Debug/Expert options: */
      QEMU_OPTION_serial,
-@@ -4076,6 +4078,7 @@ static const QEMUOption qemu_options[] = {
-     { "vgt_low_gm_sz", HAS_ARG, QEMU_OPTION_vgt_low_gm_sz },
+@@ -4078,6 +4080,7 @@ static const QEMUOption qemu_options[] = {
      { "vgt_high_gm_sz", HAS_ARG, QEMU_OPTION_vgt_high_gm_sz },
      { "vgt_fence_sz", HAS_ARG, QEMU_OPTION_vgt_fence_sz },
+     { "vgt_monitor_config_file", HAS_ARG, QEMU_OPTION_vgt_monitor_config_file },
 +    { "igd_max_bar_sz", HAS_ARG, QEMU_OPTION_igd_max_bar_sz },
  
  #if defined(TARGET_ARM)
      { "old-param", 0, QEMU_OPTION_old_param },
-@@ -5070,6 +5073,11 @@ int main(int argc, char **argv, char **envp)
-                     vgt_fence_sz = strtol(optarg,&ptr,10);
+@@ -5077,6 +5080,11 @@ int main(int argc, char **argv, char **envp)
+                     vgt_monitor_config_file = optarg;
                  }
                  break;
 +            case QEMU_OPTION_igd_max_bar_sz:

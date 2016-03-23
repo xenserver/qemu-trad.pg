@@ -1,0 +1,13 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index 29c2911..a528e78 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -90,7 +90,7 @@ int vgt_low_gm_sz = 128; /* in MB */
+ int vgt_high_gm_sz = 448; /* in MB */
+ int vgt_fence_sz = 4;
+ int vgt_primary = 1; /* -1 means "not specified */
+-const char *vgt_monitor_config_file = NULL;
++const char *vgt_monitor_config_file = "/etc/gvt-g-monitor.conf";
+ 
+ int vgt_legacy_vga_ram_size;
+ void vga_map(PCIDevice *pci_dev, int region_num,

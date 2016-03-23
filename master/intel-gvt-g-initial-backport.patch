@@ -144,7 +144,7 @@ index 56a1216..825d74b 100644
      *pi440fx_state = d;
 diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
 new file mode 100644
-index 0000000..5f08e8c
+index 0000000..46fe3eb
 --- /dev/null
 +++ b/hw/vga-xengt.c
 @@ -0,0 +1,646 @@
@@ -538,8 +538,8 @@ index 0000000..5f08e8c
 +     * driver to create a vgt instanc for Domain domid with the required
 +     * parameters. NOTE: aperture_size and gm_size are in MB.
 +     */
-+    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%u,%d\n", xen_domid,
-+        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_legacy_vga_ram_size >> 20, vgt_primary) < 0) {
++    if (!err && fprintf(vgt_file, "%d,%u,%u,%u,%d\n", xen_domid,
++        vgt_low_gm_sz, vgt_high_gm_sz, vgt_fence_sz, vgt_primary) < 0) {
 +        err = errno;
 +    }
 +
@@ -567,7 +567,7 @@ index 0000000..5f08e8c
 +    qemu_log("vGT: %s: domid=%d\n", __func__, xen_domid);
 +
 +    if ((vgt_file = fopen(path, "w")) == NULL) {
-+        fprintf(stdout, "vGT: open %s failed\n", path);
++        qemu_log("vGT: open %s failed\n", path);
 +        err = errno;
 +    }
 +
@@ -609,7 +609,7 @@ index 0000000..5f08e8c
 +            break;
 +#endif
 +	/*case 0xf8:
-+    		printf("mapping VGA RAM at 0x%x\n",val);
++    		qemu_log("mapping VGA RAM at 0x%x\n",val);
 +            vga_map(pci_find_device(0,2,0), 0, val, vgt_legacy_vga_ram_size, 0);
 +            break;*/
 +        default:
@@ -632,7 +632,7 @@ index 0000000..5f08e8c
 +     * only for a single VM scenario.
 +    */
 +    if ( !(host_dev = pt_pci_get_dev(0, 0, 0))) {
-+        fprintf(stderr, " Error, failed to get host PCI device\n");
++        qemu_log(" Error, failed to get host PCI device\n");
 +    }
 +
 +    *((u32*)(dev->config + addr)) = pt_pci_host_read(host_dev, addr, len);
@@ -667,13 +667,13 @@ index 0000000..5f08e8c
 +}
 +void vgt_bridge_pci_conf_init(PCIDevice *pci_dev)
 +{
-+    printf("vgt_bridge_pci_conf_init\n");
-+    printf("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
++    qemu_log("vgt_bridge_pci_conf_init\n");
++    qemu_log("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
 +    vgt_bridge_pci_conf_init_from_host(pci_dev, 0x00, 2); /* vendor id */
-+    printf("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
-+    printf("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
++    qemu_log("vendor id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x00));
++    qemu_log("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
 +    vgt_bridge_pci_conf_init_from_host(pci_dev, 0x02, 2); /* device id */
-+    printf("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
++    qemu_log("device id: %x\n", *(uint16_t *)((char *)pci_dev->config + 0x02));
 +    vgt_bridge_pci_conf_init_from_host(pci_dev, 0x06, 2); /* status */
 +    vgt_bridge_pci_conf_init_from_host(pci_dev, 0x08, 2); /* revision id */
 +    vgt_bridge_pci_conf_init_from_host(pci_dev, 0x34, 1); /* capability */
@@ -712,7 +712,7 @@ index 0000000..5f08e8c
 +{
 +    vgt_vga_state_t *d = DO_UPCAST(vgt_vga_state_t, dev, dev);
 +
-+    printf("vgt_initfn\n");
++    qemu_log("vgt_initfn\n");
 +    d->instance_created = FALSE;
 +
 +    create_vgt_instance();
@@ -727,7 +727,7 @@ index 0000000..5f08e8c
 +    uint8_t  rid;
 +
 +    if (!(host_dev = pt_pci_get_dev(0, 0, 0))) {
-+        fprintf(stderr, " Error, failed to get host PCI device\n");
++        qemu_log(" Error, failed to get host PCI device\n");
 +        return;
 +    }
 +
@@ -735,7 +735,7 @@ index 0000000..5f08e8c
 +    did = pt_pci_host_read(host_dev, PCI_DEVICE_ID, 2);
 +    rid = pt_pci_host_read(host_dev, PCI_REVISION, 1);
 +    if (vid != PCI_VENDOR_ID_INTEL) {
-+        fprintf(stderr, " Error, vga-xengt is only supported on Intel GPUs\n");
++        qemu_log(" Error, vga-xengt is only supported on Intel GPUs\n");
 +        return;
 +    }
 +
@@ -745,26 +745,26 @@ index 0000000..5f08e8c
 +                           PCI_ADDRESS_SPACE_MEM_PREFETCH, vgt_vga_map);
 +
 +    /* Note I have not set the class code of the bridge! */
-+    printf("Create xengt ISA bridge successfully\n");
++    qemu_log("Create xengt ISA bridge successfully\n");
 +    ret = pci_vga_init(pci_bus, PCI_DEVFN(0x2,0),
 +			 phys_ram_base + vga_ram_addr,
 +                         vga_ram_addr, vga_ram_size, 0, 0);
 +
 +    vgt_legacy_vga_ram_size = vga_ram_size;
 +    if (ret) {
-+        fprintf(stderr, "Warning: vga-xengt not available\n");
++        qemu_log("Warning: vga-xengt not available\n");
 +        return;
 +    }
 +
 +    create_vgt_instance();
 +    qemu_register_exit(vgt_cleanupfn2, NULL);
-+    printf("Create xengt VGA successfully\n");
++    qemu_log("Create xengt VGA successfully\n");
 +    return;
 +}
 +/*
 +static void vgt_class_initfn(ObjectClass *klass, void *data)
 +{
-+    printf("vgt_class_initfn\n");
++    qemu_log("vgt_class_initfn\n");
 +    DeviceClass *dc = DEVICE_CLASS(klass);
 +    PCIDeviceClass *ic = PCI_DEVICE_CLASS(klass);
 +    ic->init = vgt_initfn;
@@ -820,7 +820,7 @@ index 0000000..eef464c
 +#endif
 +#endif
 diff --git a/i386-dm/helper2.c b/i386-dm/helper2.c
-index 886635a..f1d1c76 100644
+index 54962bd..9244b52 100644
 --- a/i386-dm/helper2.c
 +++ b/i386-dm/helper2.c
 @@ -63,6 +63,7 @@
@@ -831,7 +831,7 @@ index 886635a..f1d1c76 100644
  
  //#define DEBUG_MMU
  
-@@ -660,7 +661,7 @@ int main_loop(void)
+@@ -668,7 +669,7 @@ int main_loop(void)
  void destroy_hvm_domain(void)
  {
      int sts;
