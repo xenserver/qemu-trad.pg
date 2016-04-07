@@ -1,0 +1,72 @@
+diff --git a/hw/ide.c b/hw/ide.c
+index 7e12e39..14498df 100644
+--- a/hw/ide.c
++++ b/hw/ide.c
+@@ -1233,7 +1233,9 @@ static void ide_read_dma_cb(void *opaque, int ret)
+ 	return;
+     }
+ 
+-    if (!s || !s->bs) return; /* ouch! (see ide_dma_error & ide_flush_cb) */
++    if (!s ||   /* Cancelled DMA? */
++        !s->bs) /* ouch! (see ide_dma_error & ide_flush_cb) */
++        return; 
+ 
+     n = s->io_buffer_size >> 9;
+     sector_num = ide_get_sector(s);
+@@ -1338,9 +1340,11 @@ static void ide_write_flush_cb(void *opaque, int ret) {
+     BMDMAState *bm = opaque;
+     IDEState *s = bm->ide_if;
+ 
++    if (!s)  /* Cancelled DMA? */
++         return;
+     if (ret != 0) {
+-	ide_dma_error(s);
+-	return;
++        ide_dma_error(s);
++        return;
+     }
+     s->status = READY_STAT | SEEK_STAT;
+     ide_set_irq(s);
+@@ -1374,7 +1378,9 @@ static void ide_write_dma_cb(void *opaque, int ret)
+             return;
+     }
+ 
+-    if (!s || !s->bs) return; /* ouch! (see ide_dma_error & ide_flush_cb) */
++    if (!s ||   /* Cancelled DMA? */
++        !s->bs) /* ouch! (see ide_dma_error & ide_flush_cb) */
++        return;
+ 
+     n = s->io_buffer_size >> 9;
+     sector_num = ide_get_sector(s);
+@@ -1432,7 +1438,9 @@ static void ide_flush_cb(void *opaque, int ret)
+ {
+     IDEState *s = opaque;
+ 
+-    if (!s->bs) return; /* ouch! (see below) */
++    if (!s ||   /* Cancelled DMA? */
++        !s->bs) /* ouch! (see below) */
++        return;
+ 
+     if (ret) {
+         /* We are completely doomed.  The IDE spec does not permit us
+@@ -1689,7 +1697,9 @@ static void ide_atapi_cmd_read_dma_cb(void *opaque, int ret)
+     IDEState *s = bm->ide_if;
+     int data_offset, n;
+ 
+-    if (!s->bs) return; /* ouch! (see ide_flush_cb) */
++    if (!s ||   /* Cancelled DMA? */
++        !s->bs) /* ouch! (see ide_flush_cb) */
++        return; 
+ 
+     if (ret < 0) {
+         ide_atapi_io_error(s, ret);
+@@ -3999,6 +4009,9 @@ static void pmac_ide_transfer_cb(void *opaque, int ret)
+     int n;
+     int64_t sector_num;
+ 
++    if (!s) /* Cancelled DMA? */
++        return;
++
+     if (ret < 0) {
+         m->aiocb = NULL;
+         qemu_sglist_destroy(&s->sg);
