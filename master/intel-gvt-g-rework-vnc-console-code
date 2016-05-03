@@ -1,0 +1,492 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index a528e78..10e4a76 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -379,17 +379,6 @@ finish_config:
+ 
+ int drm_fd;
+ 
+-static void xengt_drm_init(void)
+-{
+-    drm_fd = open("/dev/dri/card0", O_RDWR);
+-    if (drm_fd < 0) {
+-        qemu_log("vGT: %s failed: errno=%d\n", __func__, errno);
+-        exit(-1);
+-    }
+-
+-    qemu_log("vGT: %s done\n", __func__);
+-}
+-
+ static int xengt_enabled;
+ 
+ int xengt_is_enabled(void)
+@@ -421,6 +410,8 @@ done:
+ }
+ 
+ typedef struct xengt_fb {
++    int64_t created;
++    int64_t used;
+     uint64_t epoch;
+     struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
+     drm_intel_bo *bo;
+@@ -442,11 +433,14 @@ static void xengt_close_object(uint32_t handle)
+     (void) drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+ }
+ 
+-static void xengt_release_fb(unsigned int i)
++static void xengt_release_fb(unsigned int i, const char *reason)
+ {
+     xengt_fb_t *fb = &xengt_fb[i];
+ 
+-    qemu_log("vGT: %s %u (epoch %lu)\n", __func__, i, fb->epoch);
++    if (fb->gem_vgtbuffer.handle == 0)
++        return;
++
++    qemu_log("vGT: %s %u (%s)\n", __func__, i, reason);
+ 
+     if(fb->bo)
+          drm_intel_bo_unreference(fb->bo);
+@@ -456,7 +450,70 @@ static void xengt_release_fb(unsigned int i)
+     memset(fb, 0, sizeof(*fb));
+ }
+ 
+-static drm_intel_bufmgr *gem_vgt_bufmgr=NULL;
++QEMUTimer *drm_timer;
++
++#define XENGT_TIMER_PERIOD 1000 /* ms */
++
++/* Timeout to release a vgtbuffer object after last use */
++#define XENGT_VGTBUFFER_EXPIRE 5000 /* ms */
++
++static void xengt_timer(void *opaque)
++{
++    int64_t now;
++    int i;
++
++    now = qemu_get_clock(rt_clock);
++
++    for (i = 0; i < XENGT_NR_FB; i++) {
++        xengt_fb_t *fb = &xengt_fb[i];
++        int64_t delta;
++
++        if (fb->gem_vgtbuffer.handle == 0)
++            continue;
++
++        if ((now - fb->used) > XENGT_VGTBUFFER_EXPIRE)
++            xengt_release_fb(i, "unused");
++    }   
++
++    qemu_mod_timer(drm_timer, now + XENGT_TIMER_PERIOD);
++}
++
++static drm_intel_bufmgr *gem_vgt_bufmgr;
++struct intel_batchbuffer *gem_vgt_batchbuffer;
++
++static void xengt_drm_init(void)
++{
++    drm_fd = open("/dev/dri/card0", O_RDWR);
++    if (drm_fd < 0) {
++        qemu_log("vGT: %s failed: errno=%d\n", __func__, errno);
++        exit(-1);
++    }
++
++    qemu_log("vGT: %s opened drm\n", __func__);
++
++    gem_vgt_bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
++    if (gem_vgt_bufmgr == NULL) {
++        qemu_log("vGT: %s: drm_intel_bufmgr_gem_init failed\n", __func__);
++        exit(-1);
++    }
++
++    drm_intel_bufmgr_gem_enable_reuse(gem_vgt_bufmgr);
++
++    qemu_log("vGT: %s initialized bufmgr\n", __func__);
++
++    gem_vgt_batchbuffer = intel_batchbuffer_alloc(gem_vgt_bufmgr, intel_get_drm_devid(drm_fd));
++    if (gem_vgt_batchbuffer == NULL) {
++        qemu_log("vGT: %s: intel_batchbuffer_alloc failed\n", __func__);
++        exit(-1);
++    }
++
++    qemu_log("vGT: %s initialized batchbuffer\n", __func__);
++
++    drm_timer = qemu_new_timer(rt_clock, xengt_timer, NULL);
++    qemu_mod_timer(drm_timer, qemu_get_clock(rt_clock) + XENGT_TIMER_PERIOD);
++
++    qemu_log("vGT: %s created timer\n", __func__);
++}
+ 
+ static int gem_bo_globalize(uint32_t fd, uint32_t handle,  uint32_t* ghandle)
+ {
+@@ -465,9 +522,11 @@ static int gem_bo_globalize(uint32_t fd, uint32_t handle,  uint32_t* ghandle)
+ 
+     memset(&flink, 0, sizeof(flink));
+     flink.handle = handle;
++
+     ret = drmIoctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
+     if (ret != 0)
+-               return -errno;
++        return -errno;
++
+     *ghandle = flink.name;
+     return 0;
+ }
+@@ -497,22 +556,11 @@ static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
+     i = oldest;
+     fb = &xengt_fb[i];
+ 
+-    if (fb->gem_vgtbuffer.handle != 0)
+-        xengt_release_fb(i);
++    xengt_release_fb(i, "spill");
+ 
++    fb->used = fb->created = qemu_get_clock(rt_clock);
+     fb->epoch = epoch++;
+     fb->gem_vgtbuffer = *gem_vgtbuffer;
+-    fb->bo=NULL;
+-
+-    /* we have a new object, so create a bo for it */
+-    if (gem_vgt_bufmgr==NULL) {
+-            gem_vgt_bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
+-            if (!gem_vgt_bufmgr) {
+-                qemu_log("vGT: %s: drm_intel_bufmgr_gem_init failed!\n", __func__);
+-                return NULL;
+-            }
+-            drm_intel_bufmgr_gem_enable_reuse(gem_vgt_bufmgr);
+-    }
+ 
+     rc = gem_bo_globalize(drm_fd, gem_vgtbuffer->handle, &global_handle);
+     if (rc) {
+@@ -520,16 +568,14 @@ static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
+         return NULL;
+     }
+ 
+-    fb->bo =  drm_intel_bo_gem_create_from_name(gem_vgt_bufmgr,"src",  global_handle);
+-
++    fb->bo = drm_intel_bo_gem_create_from_name(gem_vgt_bufmgr, "src", global_handle);
+     if (!fb->bo) {
+          qemu_log("vGT: %s: Failed to create bo from handle %x!\n", __func__, global_handle);
+          return NULL;
+     }
+ 
+-    int linesize = gem_vgtbuffer->width * gem_vgtbuffer->bpp / 8;
+-    qemu_log("vGT: %s: Created bo, with size %ld, handle %d global handle %d.\n", __func__,
+-                         fb->bo->size ,fb->bo->handle, global_handle);
++    qemu_log("vGT: %s %u: Created bo, with size %ld, handle %d\n", __func__, i,
++             fb->bo->size ,fb->bo->handle);
+     return fb;
+ }
+ 
+@@ -542,13 +588,26 @@ static xengt_fb_t *xengt_lookup_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
+ 
+         if (memcmp(&fb->gem_vgtbuffer,
+                    gem_vgtbuffer,
+-                   offsetof(struct drm_i915_gem_vgtbuffer, handle)) == 0)
++                   offsetof(struct drm_i915_gem_vgtbuffer, handle)) == 0) {
++            fb->used = qemu_get_clock(rt_clock);
+             return fb;
++        }
+     }
+ 
+     return NULL;
+ }
+ 
++static void xengt_disable(void)
++{
++    int i;
++
++    for (i = 0; i < XENGT_NR_FB; i++)
++        xengt_release_fb(i, "disable");
++
++    xengt_enabled = 0;
++    qemu_log("vGT: disabled\n");
++}
++
+ static xengt_fb_t *xengt_get_fb(void)
+ {
+     struct drm_i915_gem_vgtbuffer gem_vgtbuffer;
+@@ -562,8 +621,10 @@ static xengt_fb_t *xengt_get_fb(void)
+     gem_vgtbuffer.flags = I915_VGTBUFFER_QUERY_ONLY;
+ 
+     rc = drmIoctl(drm_fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &gem_vgtbuffer);
+-    if (rc < 0)
++    if (rc < 0) {
++        xengt_disable();
+         goto done;
++    }
+ 
+     if ((fb = xengt_lookup_fb(&gem_vgtbuffer)) != NULL)
+         goto done;
+@@ -589,46 +650,136 @@ done:
+     return fb;
+ }
+ 
+-typedef struct xengt_surface {
+-    struct timespec ts;
++static int qemu_set_pixelformat(uint32_t drm_format, PixelFormat *pf)
++{
++    uint32_t red;
++    uint32_t green;
++    uint32_t blue;
++    uint32_t alpha;
++    int rc = 0;
++
++    switch (drm_format) {
++    case DRM_FORMAT_XRGB8888:
++        red = 0xFF0000;
++        green = 0xFF00;
++        blue = 0xFF;
++        alpha = 0xFF000000;
++        break;
++
++    case DRM_FORMAT_XBGR8888:
++        red = 0xFF;
++        green = 0xFF00;
++        blue = 0xFF0000;
++        alpha = 0xFF000000;
++        break;
++
++    case DRM_FORMAT_XBGR2101010:
++        red = 0x3FF;
++        green = 0xFFC00;
++        blue = 0x3FF00000;
++        alpha = 0xC0000000;
++        break;
++
++    case DRM_FORMAT_XRGB2101010:
++        red = 0x3FF00000;
++        green = 0xFFC00;
++        blue = 0x3FF;
++        alpha = 0xC0000000;
++        break;
++
++    default:
++        rc = -1;
++        break;
++    }
++
++    if (rc < 0)
++        return rc;
++
++    memset(pf, 0x00, sizeof(PixelFormat));
++
++    pf->rmask = red;
++    pf->gmask = green;
++    pf->bmask = blue;
++
++    pf->rbits = ctpop32(red);
++    pf->gbits = ctpop32(green);
++    pf->bbits = ctpop32(blue);
++    pf->abits = ctpop32(alpha);
++
++    pf->depth = pf->rbits + pf->gbits + pf->bbits;
++    pf->bits_per_pixel = pf->depth + pf->abits;
++    pf->bytes_per_pixel = pf->bits_per_pixel / 8;
++
++    pf->rmax = (1 << pf->rbits) -1;
++    pf->gmax = (1 << pf->gbits) -1;
++    pf->bmax = (1 << pf->bbits) -1;
++    pf->amax = (1 << pf->abits) -1;
++
++    pf->rshift = ffs(red) - 1;
++    pf->gshift = ffs(green) - 1;
++    pf->bshift = ffs(blue) -1;
++    pf->ashift = ffs(alpha) -1;
+ 
++    return 0;
++}
++
++typedef struct xengt_surface {
++    DisplayState *ds;
+     drm_intel_bo *bo;
+-    struct intel_batchbuffer *batch;
+-    int col;
+ } xengt_surface_t;
+ 
+-static xengt_surface_t xengt_surface = { .bo=NULL, .batch=NULL};
+-
++static xengt_surface_t xengt_surface;
+ 
+-static PixelFormat qemu_set_pixelformat(uint32_t red, int32_t green, int32_t blue, int32_t alpha)
++static void xengt_destroy_display_surface(void)
+ {
+-    PixelFormat pf;
++    xengt_surface_t *surface = &xengt_surface;
+ 
+-    memset(&pf, 0x00, sizeof(PixelFormat));
++    if (surface->ds == NULL)
++        return;
+ 
+-    pf.rmask = red;
+-    pf.gmask = green;
+-    pf.bmask = blue;
++    qemu_log("vGT: %s\n", __func__);
+ 
+-    pf.rbits = ctpop32(red);
+-    pf.gbits = ctpop32(green);
+-    pf.bbits = ctpop32(blue);
+-    pf.abits = ctpop32(alpha);
++    qemu_free_displaysurface(surface->ds);
++    surface->ds = NULL;
+ 
+-    pf.depth = pf.rbits + pf.gbits + pf.bbits;
+-    pf.bits_per_pixel = pf.depth + pf.abits;
+-    pf.bytes_per_pixel = pf.bits_per_pixel / 8;
++    drm_intel_bo_unmap(surface->bo);
++    drm_intel_bo_unreference(surface->bo);
++    surface->bo = NULL;
++}
+ 
+-    pf.rmax = (1 << pf.rbits) -1;
+-    pf.gmax = (1 << pf.gbits) -1;
+-    pf.bmax = (1 << pf.bbits) -1;
+-    pf.amax = (1 << pf.abits) -1;
++static void xengt_create_display_surface(DisplayState *ds,
++                                         struct drm_i915_gem_vgtbuffer *gem_vgtbuffer,
++                                         PixelFormat pf)
++{
++    xengt_surface_t *surface = &xengt_surface;
++    uint32_t width = P2ROUNDUP(gem_vgtbuffer->width, 16);
++    uint32_t linesize = width * gem_vgtbuffer->bpp / 8;
++
++    surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc",
++                                     P2ROUNDUP(gem_vgtbuffer->height * linesize,
++                                               4096),
++                                     4096);
++    if (surface->bo == NULL) {
++        qemu_log("vGT: %s: failed to allocate buffer", __func__);
++        return;
++    }
++        
++    drm_intel_bo_map(surface->bo, 1);
++
++    qemu_log("vGT: %s: w %d h %d, bbp %d , stride %d, fmt %x\n", __func__, width,
++             gem_vgtbuffer->height,
++             gem_vgtbuffer->bpp,
++             linesize,
++             gem_vgtbuffer->drm_format);
++
++    ds->surface = qemu_create_displaysurface_from(width,
++                                                  gem_vgtbuffer->height,
++                                                  gem_vgtbuffer->bpp,
++                                                  linesize,
++                                                  surface->bo->virtual);
++    ds->surface->pf = pf;
+ 
+-    pf.rshift = ffs(red) - 1;
+-    pf.gshift = ffs(green) - 1;
+-    pf.bshift = ffs(blue) -1;
+-    pf.ashift = ffs(alpha) -1;
+-    return pf;
++    surface->ds = ds;
+ }
+ 
+ void xengt_draw_primary(DisplayState *ds)
+@@ -636,81 +787,49 @@ void xengt_draw_primary(DisplayState *ds)
+     xengt_surface_t *surface = &xengt_surface;
+     xengt_fb_t *fb;
+     struct drm_i915_gem_vgtbuffer *gem_vgtbuffer;
+-
+-    static uint32 last_pixel_format = 0;
++    PixelFormat pf;
++    int rc;
+ 
+     if ((fb = xengt_get_fb()) == NULL || (fb->bo == NULL)) {
+-        qemu_log("vGT: %s: no frame buffer.", __func__);
++        if (xengt_enabled)
++            qemu_log("vGT: %s: no frame buffer", __func__);
+         return;
+     }
+ 
+     gem_vgtbuffer = &fb->gem_vgtbuffer;
+ 
+-    if (!surface->batch) {
+-         surface->batch = intel_batchbuffer_alloc(gem_vgt_bufmgr, intel_get_drm_devid(drm_fd));
+-         if (!surface->batch) {
+-                qemu_log("vGT: %s: Can't alloc surface batch!\n", __func__);
+-                return;
+-         }
++    rc = qemu_set_pixelformat(gem_vgtbuffer->drm_format, &pf);
++    if (rc < 0) {
++        qemu_log("vGT: %s: unknown format (%08x)", __func__, gem_vgtbuffer->drm_format);
++        return;
+     }
+ 
+-    if (!surface->bo ||
++    if (surface->ds != ds ||
+         ds_get_width(ds) != gem_vgtbuffer->width ||
+         ds_get_height(ds) != gem_vgtbuffer->height ||
+-        last_pixel_format != gem_vgtbuffer->drm_format) {
+-        uint32_t width;
+-        uint32_t linesize;
+-        last_pixel_format = gem_vgtbuffer->drm_format;
+-
+-        if (surface->bo) {
+-            drm_intel_bo_unreference(surface->bo);
+-        }
+-
+-        qemu_free_displaysurface(ds);
++	memcmp(&ds->surface->pf, &pf, sizeof(PixelFormat)) != 0) {
+ 
+-        width = P2ROUNDUP(gem_vgtbuffer->width, 16);
+-        linesize = width * gem_vgtbuffer->bpp / 8;
++        xengt_destroy_display_surface();
++        
++        xengt_create_display_surface(ds, gem_vgtbuffer, pf);
+ 
+-        surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc", gem_vgtbuffer->height*linesize,4096);
+-        drm_intel_bo_map(surface->bo, 1);
+-
+-        qemu_log("vGT: %s: Creating surface with w %d h %d, bbp %d , stride %d, fmt %x\n", __func__, width,
+-                                                      gem_vgtbuffer->height,
+-                                                      gem_vgtbuffer->bpp,
+-                                                      linesize,
+-                                                      last_pixel_format);
+-
+-        ds->surface = qemu_create_displaysurface_from(width,
+-                                                      gem_vgtbuffer->height,
+-                                                      gem_vgtbuffer->bpp,
+-                                                      linesize,
+-                                                      surface->bo->virtual);
+-
+-        if ((gem_vgtbuffer->bpp==32) && (last_pixel_format!= DRM_FORMAT_XRGB8888 )) {
+-             switch (last_pixel_format) {
+-             case DRM_FORMAT_XBGR8888: ds->surface->pf = qemu_set_pixelformat(0xFF, 0xFF00, 0xFF0000, 0xFF000000);
+-                 break;
+-             case DRM_FORMAT_XBGR2101010: ds->surface->pf = qemu_set_pixelformat(0x3FF, 0xFFC00, 0x3FF00000, 0xC0000000);
+-                 break;
+-             case DRM_FORMAT_XRGB2101010: ds->surface->pf = qemu_set_pixelformat(0x3FF00000, 0xFFC00, 0x3FF, 0xC0000000);
+-                 break;
+-             default:
+-                 qemu_log("vGT: %s: Unknown Pixelformat! ", __func__);
+-            }
+-        }
+-
+-        dpy_resize(ds);
+-     }
++        if (ds->surface != NULL)
++            dpy_resize(ds);
++    }
+ 
+-     drm_intel_bo_unmap(surface->bo);
++    if (ds->surface != NULL) {
++        drm_intel_bo_unmap(surface->bo);
+ 
+-     if (fb->bo)
+-         intel_blt_copy(surface->batch,
+-             fb->bo,      0, 0, gem_vgtbuffer->stride,
+-             surface->bo, 0, 0, ds_get_linesize(ds),
+-             gem_vgtbuffer->width, gem_vgtbuffer->height, gem_vgtbuffer->bpp);
++        if (fb->bo)
++            intel_blt_copy(gem_vgt_batchbuffer,
++                           fb->bo, 0, 0, gem_vgtbuffer->stride,
++                           surface->bo, 0, 0, ds_get_linesize(ds),
++                           gem_vgtbuffer->width, 
++                           gem_vgtbuffer->height, 
++                           gem_vgtbuffer->bpp);
+ 
+-    drm_intel_bo_map(surface->bo, 1);
++        drm_intel_bo_map(surface->bo, 1);
++    }
+ 
+     dpy_update(ds, 0, 0, gem_vgtbuffer->width, gem_vgtbuffer->height);
+     return;
