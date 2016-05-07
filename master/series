@@ -37,6 +37,13 @@ xsa140-qemut-5.patch # rtl8139: check IP Total Length field
 xsa140-qemut-6.patch # rtl8139: skip offload on short TCP header
 xsa140-qemut-7.patch # rtl8139: check TCP Data Offset field
 
+xsa179-qemu-trad-0001-vga-fix-banked-access-bounds-checking-CVE-2016-3710.patch
+xsa179-qemu-trad-0002-vga-add-vbe_enabled-helper.patch
+xsa179-qemu-trad-0003-vga-factor-out-vga-register-setup.patch
+xsa179-qemu-trad-0004-vga-update-vga-register-setup-on-vbe-changes.patch
+xsa179-qemu-trad-0005-vga-make-sure-vga-register-setup-for-vbe-stays-intac.patch
+fix-vga-debug-prints.patch
+
 # Functional fixes
 fix-cdrom-eject.patch
 fix-pasprintf.patch
