@@ -1,0 +1,13 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index 61b037b..5485874 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -946,7 +946,7 @@ void xengt_vga_init(PCIBus *pci_bus, ram_addr_t vga_ram_addr, int vga_ram_size)
+     uint16_t vid, did;
+     uint8_t  rid;
+ 
+-    if (!(host_dev = pt_pci_get_dev(0, 0, 0))) {
++    if (!(host_dev = pt_pci_get_dev(0, 0x1f, 0))) {
+         qemu_log(" Error, failed to get host PCI device\n");
+         return;
+     }
