@@ -1,11 +1,11 @@
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index c86cbe8..cec1236 100644
+index 13f0168..02f6733 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
 @@ -8,7 +8,6 @@ Source0: xen-device-model-%{version}.tar.bz2
  Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
- BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
+ BuildRequires: zlib-devel, xen-libs-devel, xen-dom0-libs-devel, pciutils-devel, libpciaccess-devel, check-devel
 -BuildRequires: xenserver-libdrm-devel
  Requires(pre): shadow-utils
  Requires: libdrm

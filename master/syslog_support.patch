@@ -81,7 +81,7 @@ index 4547359..4157f90 100755
  	echo "CONFIG_AUDIO=yes" >> $config_mak
  fi
 diff --git a/hw/xen_backend.h b/hw/xen_backend.h
-index b63a235..8d1263d 100644
+index 5c1adde..49d9c94 100644
 --- a/hw/xen_backend.h
 +++ b/hw/xen_backend.h
 @@ -83,7 +83,7 @@ int xen_be_bind_evtchn(struct XenDevice *xendev);
@@ -94,15 +94,15 @@ index b63a235..8d1263d 100644
  /* actual backend drivers */
  extern struct XenDevOps xen_console_ops;      /* xen_console.c     */
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index e44e9f0..debc12f 100644
+index b4edb2f..5504b90 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
 @@ -7,8 +7,9 @@ Group: System/Hypervisor
  Source0: xen-device-model-%{version}.tar.bz2
  Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
--BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel
-+BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
+-BuildRequires: zlib-devel, xen-libs-devel, xen-dom0-libs-devel, pciutils-devel, libpciaccess-devel
++BuildRequires: zlib-devel, xen-libs-devel, xen-dom0-libs-devel, pciutils-devel, libpciaccess-devel, check-devel
  Requires(pre): shadow-utils
 +Provides: qemu-xen(syslog) = 1
  

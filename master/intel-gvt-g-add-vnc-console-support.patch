@@ -24,7 +24,7 @@ index 8c07dd9..2cf50b4 100644
  OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pc.o
  OBJS+= cirrus_vga.o apic.o parallel.o acpi.o piix_pci.o
 diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
-index 0b3b187..2469b73 100644
+index e30bf5e..111c4ee 100644
 --- a/hw/vga-xengt.c
 +++ b/hw/vga-xengt.c
 @@ -38,6 +38,14 @@ typedef uint32_t pci_addr_t;
@@ -374,7 +374,7 @@ index eef464c..fd4ed52 100644
  		vga_ram_size);
  void vgt_bridge_pci_conf_init(PCIDevice *dev);
 diff --git a/hw/vga.c b/hw/vga.c
-index 0fce2fd..e33a489 100644
+index 22bdd13..8e64d21 100644
 --- a/hw/vga.c
 +++ b/hw/vga.c
 @@ -26,6 +26,7 @@
@@ -385,7 +385,7 @@ index 0fce2fd..e33a489 100644
  
  #include <sys/mman.h>
  #include "sysemu.h"
-@@ -1959,7 +1960,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
+@@ -1997,7 +1998,8 @@ static void vga_draw_blank(VGAState *s, int full_update)
  
  #define GMODE_TEXT     0
  #define GMODE_GRAPH    1
@@ -395,7 +395,7 @@ index 0fce2fd..e33a489 100644
  
  static void vga_update_display(void *opaque)
  {
-@@ -1970,16 +1972,21 @@ static void vga_update_display(void *opaque)
+@@ -2008,16 +2010,21 @@ static void vga_update_display(void *opaque)
          /* nothing to do */
      } else {
          full_update = 0;
@@ -421,13 +421,13 @@ index 0fce2fd..e33a489 100644
              vga_draw_text(s, full_update);
              break;
 diff --git a/mk/xen-device-model.spec.in b/mk/xen-device-model.spec.in
-index debc12f..c86cbe8 100644
+index 5504b90..13f0168 100644
 --- a/mk/xen-device-model.spec.in
 +++ b/mk/xen-device-model.spec.in
 @@ -8,7 +8,9 @@ Source0: xen-device-model-%{version}.tar.bz2
  Patch0: xen-device-model-development.patch
  BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
- BuildRequires: zlib-devel, xen-devel, xen-dom0-devel, pciutils-devel, check-devel
+ BuildRequires: zlib-devel, xen-libs-devel, xen-dom0-libs-devel, pciutils-devel, libpciaccess-devel, check-devel
 +BuildRequires: xenserver-libdrm-devel
  Requires(pre): shadow-utils
 +Requires: libdrm
