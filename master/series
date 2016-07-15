@@ -131,6 +131,7 @@ vnc-port.patch
 vnc_scan_code.patch
 vnc_xencenter_no_copyrect.patch
 large_resolution.patch
+cavium_n3_passthru.patch
 
 
 #

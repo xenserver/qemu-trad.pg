@@ -1,0 +1,16 @@
+diff --git a/hw/pass-through.c b/hw/pass-through.c
+index d1040fb..4941116 100644
+--- a/hw/pass-through.c
++++ b/hw/pass-through.c
+@@ -2720,8 +2720,9 @@ static int pt_hide_dev_cap(const struct pci_dev *dev, uint8_t grp_id)
+          * Controller looks trivial, e.g., the PCI Express Capabilities
+          * Register is 0. We should not try to expose it to guest.
+          */
+-        if (dev->vendor_id == PCI_VENDOR_ID_INTEL &&
+-                dev->device_id == PCI_DEVICE_ID_INTEL_82599_VF)
++        if (dev->vendor_id == PCI_VENDOR_ID_INTEL && (
++                dev->device_id == PCI_DEVICE_ID_INTEL_82599_VF ||
++                dev->device_id == 0x10d8))
+             return 1;
+         break;
+     }
