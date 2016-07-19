@@ -1,0 +1,246 @@
+diff --git a/hw/vga-xengt.c b/hw/vga-xengt.c
+index cdedccd..a4f2196 100644
+--- a/hw/vga-xengt.c
++++ b/hw/vga-xengt.c
+@@ -409,6 +409,79 @@ done:
+     return xengt_enabled;
+ }
+ 
++static drm_intel_bufmgr *gem_vgt_bufmgr;
++struct intel_batchbuffer *gem_vgt_batchbuffer;
++
++typedef struct xengt_surface {
++    DisplayState *ds;
++    drm_intel_bo *bo;
++} xengt_surface_t;
++
++static xengt_surface_t xengt_surface;
++
++#define	P2ROUNDUP(_x, _a) -(-(_x) & -(_a))
++
++static void xengt_destroy_display_surface(void)
++{
++    xengt_surface_t *surface = &xengt_surface;
++    DisplayState *ds = surface->ds;
++    int width;
++    int height;
++
++    if (surface->ds == NULL)
++        return;
++
++    qemu_log("vGT: %s\n", __func__);
++
++    width = ds_get_width(ds);
++    height = ds_get_height(ds);
++
++    qemu_free_displaysurface(surface->ds);
++    ds->surface = qemu_create_displaysurface(ds, width, height);
++
++    surface->ds = NULL;
++
++    drm_intel_bo_unmap(surface->bo);
++    drm_intel_bo_unreference(surface->bo);
++    surface->bo = NULL;
++}
++
++static void xengt_create_display_surface(DisplayState *ds,
++                                         struct drm_i915_gem_vgtbuffer *gem_vgtbuffer,
++                                         PixelFormat pf)
++{
++    xengt_surface_t *surface = &xengt_surface;
++    uint32_t width = P2ROUNDUP(gem_vgtbuffer->width, 16);
++    uint32_t linesize = width * gem_vgtbuffer->bpp / 8;
++
++    surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc",
++                                     P2ROUNDUP(gem_vgtbuffer->height * linesize,
++                                               4096),
++                                     4096);
++    if (surface->bo == NULL) {
++        qemu_log("vGT: %s: failed to allocate buffer", __func__);
++        return;
++    }
++        
++    drm_intel_bo_map(surface->bo, 1);
++
++    qemu_log("vGT: %s: w %d h %d, bbp %d , stride %d, fmt %x\n", __func__, width,
++             gem_vgtbuffer->height,
++             gem_vgtbuffer->bpp,
++             linesize,
++             gem_vgtbuffer->drm_format);
++
++    qemu_free_displaysurface(ds);
++    ds->surface = qemu_create_displaysurface_from(width,
++                                                  gem_vgtbuffer->height,
++                                                  gem_vgtbuffer->bpp,
++                                                  linesize,
++                                                  surface->bo->virtual);
++    ds->surface->pf = pf;
++
++    surface->ds = ds;
++}
++
+ typedef struct xengt_fb {
+     int64_t created;
+     int64_t used;
+@@ -421,8 +494,6 @@ typedef struct xengt_fb {
+ 
+ static xengt_fb_t xengt_fb[XENGT_NR_FB];
+ 
+-#define	P2ROUNDUP(_x, _a) -(-(_x) & -(_a))
+-
+ static void xengt_close_object(uint32_t handle)
+ {
+     struct drm_gem_close gem_close;
+@@ -433,6 +504,8 @@ static void xengt_close_object(uint32_t handle)
+     (void) drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+ }
+ 
++static unsigned int fb_count = 0;
++
+ static void xengt_release_fb(unsigned int i, const char *reason)
+ {
+     xengt_fb_t *fb = &xengt_fb[i];
+@@ -448,6 +521,10 @@ static void xengt_release_fb(unsigned int i, const char *reason)
+     xengt_close_object(fb->gem_vgtbuffer.handle);
+ 
+     memset(fb, 0, sizeof(*fb));
++    --fb_count;
++
++    if (fb_count == 0)
++      xengt_destroy_display_surface();
+ }
+ 
+ QEMUTimer *drm_timer;
+@@ -478,9 +555,6 @@ static void xengt_timer(void *opaque)
+     qemu_mod_timer(drm_timer, now + XENGT_TIMER_PERIOD);
+ }
+ 
+-static drm_intel_bufmgr *gem_vgt_bufmgr;
+-struct intel_batchbuffer *gem_vgt_batchbuffer;
+-
+ static void xengt_drm_init(void)
+ {
+     drm_fd = open("/dev/dri/card0", O_RDWR);
+@@ -576,6 +650,8 @@ static xengt_fb_t *xengt_new_fb(struct drm_i915_gem_vgtbuffer *gem_vgtbuffer)
+ 
+     qemu_log("vGT: %s %u: Created bo, with size %ld, handle %d\n", __func__, i,
+              fb->bo->size ,fb->bo->handle);
++
++    fb_count++;
+     return fb;
+ }
+ 
+@@ -723,66 +799,7 @@ static int qemu_set_pixelformat(uint32_t drm_format, PixelFormat *pf)
+     return 0;
+ }
+ 
+-typedef struct xengt_surface {
+-    DisplayState *ds;
+-    drm_intel_bo *bo;
+-} xengt_surface_t;
+-
+-static xengt_surface_t xengt_surface;
+-
+-static void xengt_destroy_display_surface(void)
+-{
+-    xengt_surface_t *surface = &xengt_surface;
+-
+-    if (surface->ds == NULL)
+-        return;
+-
+-    qemu_log("vGT: %s\n", __func__);
+-
+-    qemu_free_displaysurface(surface->ds);
+-    surface->ds = NULL;
+-
+-    drm_intel_bo_unmap(surface->bo);
+-    drm_intel_bo_unreference(surface->bo);
+-    surface->bo = NULL;
+-}
+-
+-static void xengt_create_display_surface(DisplayState *ds,
+-                                         struct drm_i915_gem_vgtbuffer *gem_vgtbuffer,
+-                                         PixelFormat pf)
+-{
+-    xengt_surface_t *surface = &xengt_surface;
+-    uint32_t width = P2ROUNDUP(gem_vgtbuffer->width, 16);
+-    uint32_t linesize = width * gem_vgtbuffer->bpp / 8;
+-
+-    surface->bo = drm_intel_bo_alloc(gem_vgt_bufmgr, "vnc",
+-                                     P2ROUNDUP(gem_vgtbuffer->height * linesize,
+-                                               4096),
+-                                     4096);
+-    if (surface->bo == NULL) {
+-        qemu_log("vGT: %s: failed to allocate buffer", __func__);
+-        return;
+-    }
+-        
+-    drm_intel_bo_map(surface->bo, 1);
+-
+-    qemu_log("vGT: %s: w %d h %d, bbp %d , stride %d, fmt %x\n", __func__, width,
+-             gem_vgtbuffer->height,
+-             gem_vgtbuffer->bpp,
+-             linesize,
+-             gem_vgtbuffer->drm_format);
+-
+-    ds->surface = qemu_create_displaysurface_from(width,
+-                                                  gem_vgtbuffer->height,
+-                                                  gem_vgtbuffer->bpp,
+-                                                  linesize,
+-                                                  surface->bo->virtual);
+-    ds->surface->pf = pf;
+-
+-    surface->ds = ds;
+-}
+-
+-void xengt_draw_primary(DisplayState *ds)
++void xengt_draw_primary(DisplayState *ds, int full_update)
+ {
+     xengt_surface_t *surface = &xengt_surface;
+     xengt_fb_t *fb;
+@@ -790,6 +807,9 @@ void xengt_draw_primary(DisplayState *ds)
+     PixelFormat pf;
+     int rc;
+ 
++    if (fb_count == 0)
++        full_update = 1;
++
+     if ((fb = xengt_get_fb()) == NULL || (fb->bo == NULL)) {
+         if (xengt_enabled)
+             qemu_log("vGT: %s: no frame buffer", __func__);
+@@ -804,7 +824,8 @@ void xengt_draw_primary(DisplayState *ds)
+         return;
+     }
+ 
+-    if (surface->ds != ds ||
++    if (full_update ||
++	surface->ds != ds ||
+         ds_get_width(ds) != gem_vgtbuffer->width ||
+         ds_get_height(ds) != gem_vgtbuffer->height ||
+ 	memcmp(&ds->surface->pf, &pf, sizeof(PixelFormat)) != 0) {
+diff --git a/hw/vga-xengt.h b/hw/vga-xengt.h
+index fd4ed52..8f8eab7 100644
+--- a/hw/vga-xengt.h
++++ b/hw/vga-xengt.h
+@@ -2,7 +2,7 @@
+ #define __XENGT_H__
+ 
+ int xengt_is_enabled(void);
+-void xengt_draw_primary(DisplayState *ds);
++void xengt_draw_primary(DisplayState *ds, int full_update);
+ void xengt_vga_init(PCIBus *pci_bus, ram_addr_t vga_ram_addr, int
+ 		vga_ram_size);
+ void vgt_bridge_pci_conf_init(PCIDevice *dev);
+diff --git a/hw/vga.c b/hw/vga.c
+index 8e64d21..b7f0acd 100644
+--- a/hw/vga.c
++++ b/hw/vga.c
+@@ -2023,7 +2023,7 @@ static void vga_update_display(void *opaque)
+         }
+         switch(graphic_mode) {
+         case GMODE_XENGT:
+-            xengt_draw_primary(s->ds);
++            xengt_draw_primary(s->ds, full_update);
+             break;
+         case GMODE_TEXT:
+             vga_draw_text(s, full_update);
