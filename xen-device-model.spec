@@ -3,7 +3,7 @@ Name: xen-device-model
 Version: 0.10.2.xs
 Release: 1
 License: GPL
-Source0: http://hg.uk.xensource.com/git/carbon/trunk/qemu-trad.git/snapshot/refs/heads/master#/%{name}.tar.gz
+Source0: http://hg.uk.xensource.com/git/carbon/%{branch}/qemu-trad.git/snapshot/refs/heads/master#/%{name}.tar.gz
 BuildRequires: zlib-devel, xen-libs-devel, xen-dom0-libs-devel, pciutils-devel, libpciaccess-devel, check-devel, libdrm-devel
 BuildRequires: ncurses-devel
 Requires(pre): shadow-utils
