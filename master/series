@@ -198,6 +198,7 @@ intel-gvt-g-add-skylake-blitter-support.patch
 intel-gvt-g-rework-vnc-console-code
 intel-gvt-g-vnc-full-update.patch
 intel-gvt-g-CA-213234.patch
+intel-gvt-g-add-vgt_cap-parameter.patch
 # Remove patch below when libdrm package is fixed to provide xenserver-libdrm
 intel-gvt-g-temporary-remove-dependency-on-xenserver-libdrm.patch
 # future Intel drivers will not require this patch but it is required to 
