@@ -15,10 +15,10 @@ index fcc75b1..6070dfe 100644
  // Please implement a power failure function to signal the OS
  #define qemu_system_powerdown() do{}while(0)
 diff --git a/vl.c b/vl.c
-index 095c7bf..a0fe73d 100644
+index 4b2e5fe..e70bc7b 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -3633,6 +3633,7 @@ static QEMUResetEntry *first_reset_entry;
+@@ -3632,6 +3632,7 @@ static QEMUResetEntry *first_reset_entry;
  static int reset_requested;
  static int shutdown_requested;
  static int powerdown_requested;
@@ -26,7 +26,7 @@ index 095c7bf..a0fe73d 100644
  
  int qemu_shutdown_requested(void)
  {
-@@ -3655,6 +3656,13 @@ int qemu_powerdown_requested(void)
+@@ -3654,6 +3655,13 @@ int qemu_powerdown_requested(void)
      return r;
  }
  
@@ -40,7 +40,7 @@ index 095c7bf..a0fe73d 100644
  void qemu_register_reset(QEMUResetHandler *func, void *opaque)
  {
      QEMUResetEntry **pre, *re;
-@@ -3708,6 +3716,11 @@ void qemu_system_powerdown_request(void)
+@@ -3707,6 +3715,11 @@ void qemu_system_powerdown_request(void)
          cpu_interrupt(cpu_single_env, CPU_INTERRUPT_EXIT);
  }
  
@@ -52,7 +52,7 @@ index 095c7bf..a0fe73d 100644
  #ifdef _WIN32
  static void host_main_loop_wait(int *timeout)
  {
-@@ -3835,6 +3848,12 @@ void main_loop_wait(int timeout)
+@@ -3834,6 +3847,12 @@ void main_loop_wait(int timeout)
      }
  #endif
  
@@ -66,10 +66,10 @@ index 095c7bf..a0fe73d 100644
      if (vm_running && likely(!(cur_cpu->singlestep_enabled & SSTEP_NOTIMER)))
          qemu_run_timers(&active_timers[QEMU_TIMER_VIRTUAL],
 diff --git a/xenstore.c b/xenstore.c
-index 1af7688..94acbdf 100644
+index 56bec53..d0ce0cf 100644
 --- a/xenstore.c
 +++ b/xenstore.c
-@@ -563,6 +563,7 @@ void xenstore_parse_domain_config(int hvm_domid)
+@@ -564,6 +564,7 @@ void xenstore_parse_domain_config(int hvm_domid)
      } else {
          guest_path = strdup(danger_path);
      }
@@ -77,27 +77,26 @@ index 1af7688..94acbdf 100644
  
      if (pasprintf(&buf, "%s/keymap", guest_path) != -1)
          xs_watch(xsh, buf, KEYMAP_TOKEN); // Ignore failure -- we can muddle on.i
-@@ -1425,6 +1426,7 @@ void xenstore_process_event(void *opaque)
- {
-     char **vec, *offset, *bpath = NULL, *buf = NULL, *drv = NULL, *image = NULL;
-     unsigned int len, num, hd_index, i;
-+    xc_dominfo_t dominfo;
- 
-     vec = xs_read_watch(xsh, &num);
-     if (!vec)
-@@ -1464,6 +1466,18 @@ void xenstore_process_event(void *opaque)
+@@ -1453,6 +1454,25 @@ void xenstore_process_event(void *opaque)
          goto out;
      }
  
 +    if (!strcmp(vec[XS_WATCH_TOKEN], "releaseDomain")) {
-+        int rc;
-+        if ( (rc=xc_domain_getinfo(xc_handle, domid, 1, &dominfo)) != 1
-+            || dominfo.domid != domid || dominfo.dying)
++        xc_dominfo_t dominfo;
++        int rc = xc_domain_getinfo(xc_handle, domid, 1, &dominfo);
++
++        if ( rc < 0 ) {
++            fprintf(stderr, "xc_domain_getinfo() failed (%d) %s\n",
++                    errno, strerror(errno));
++            exit(1);
++        } else if ( rc != 1 || dominfo.domid != domid ) {
++            fprintf(stderr, "No domain with domid %d\n", domid);
++            exit(1);
++        } else if ( dominfo.dying )
 +            qemu_system_exit_request();
 +        else
-+            fprintf(stderr," releaseDomain signal caught, but domain %d not dead:\n" \
-+                    "   rc %d dominfo.domid %d dominfo.dying %d\n",
-+                    domid, rc, dominfo.domid, dominfo.dying);
++            fprintf(stderr, "Processed releaseDomain, but domain %d not dead\n",
++                    domid);
 +        goto out;
 +    }
 +
