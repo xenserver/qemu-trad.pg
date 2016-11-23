@@ -1,5 +1,5 @@
 diff --git a/hw/pass-through.c b/hw/pass-through.c
-index 020e121..3193e62 100644
+index 70f60d2..b20d30f 100644
 --- a/hw/pass-through.c
 +++ b/hw/pass-through.c
 @@ -96,6 +96,7 @@
@@ -10,7 +10,7 @@ index 020e121..3193e62 100644
  
  struct php_dev {
      struct pt_dev *pt_dev;
-@@ -4569,6 +4570,11 @@ static struct pt_dev * register_real_device(PCIBus *e_bus,
+@@ -4570,6 +4571,11 @@ static struct pt_dev * register_real_device(PCIBus *e_bus,
          return NULL;
      }
  
@@ -23,7 +23,7 @@ index 020e121..3193e62 100644
  
      assigned_device->pci_dev = pci_dev;
 diff --git a/vl.c b/vl.c
-index db52cb0..bb7f2f0 100644
+index ad58b80..7409293 100644
 --- a/vl.c
 +++ b/vl.c
 @@ -243,6 +243,7 @@ int vmsvga_enabled = 0;
@@ -34,23 +34,23 @@ index db52cb0..bb7f2f0 100644
  #ifdef TARGET_SPARC
  int graphic_width = 1024;
  int graphic_height = 768;
-@@ -3885,6 +3886,7 @@ enum {
-     QEMU_OPTION_vgt_high_gm_sz,
+@@ -3886,6 +3887,7 @@ enum {
      QEMU_OPTION_vgt_fence_sz,
+     QEMU_OPTION_vgt_cap,
      QEMU_OPTION_vgt_monitor_config_file,
 +    QEMU_OPTION_igd_max_bar_sz,
  
      /* Debug/Expert options: */
      QEMU_OPTION_serial,
-@@ -4078,6 +4080,7 @@ static const QEMUOption qemu_options[] = {
-     { "vgt_high_gm_sz", HAS_ARG, QEMU_OPTION_vgt_high_gm_sz },
+@@ -4080,6 +4082,7 @@ static const QEMUOption qemu_options[] = {
      { "vgt_fence_sz", HAS_ARG, QEMU_OPTION_vgt_fence_sz },
+     { "vgt_cap", HAS_ARG, QEMU_OPTION_vgt_cap },
      { "vgt_monitor_config_file", HAS_ARG, QEMU_OPTION_vgt_monitor_config_file },
 +    { "igd_max_bar_sz", HAS_ARG, QEMU_OPTION_igd_max_bar_sz },
  
  #if defined(TARGET_ARM)
      { "old-param", 0, QEMU_OPTION_old_param },
-@@ -5077,6 +5080,11 @@ int main(int argc, char **argv, char **envp)
+@@ -5085,6 +5088,11 @@ int main(int argc, char **argv, char **envp)
                      vgt_monitor_config_file = optarg;
                  }
                  break;

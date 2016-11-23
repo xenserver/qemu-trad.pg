@@ -54,26 +54,26 @@ index a4f2196..7815a26 100644
      }
  
 diff --git a/vl.c b/vl.c
-index bb7f2f0..7409293 100644
+index 82bf379..89fcf11 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -3885,6 +3885,7 @@ enum {
+@@ -3884,6 +3884,7 @@ enum {
      QEMU_OPTION_vgt_low_gm_sz,
      QEMU_OPTION_vgt_high_gm_sz,
      QEMU_OPTION_vgt_fence_sz,
 +    QEMU_OPTION_vgt_cap,
      QEMU_OPTION_vgt_monitor_config_file,
-     QEMU_OPTION_igd_max_bar_sz,
  
-@@ -4079,6 +4080,7 @@ static const QEMUOption qemu_options[] = {
+     /* Debug/Expert options: */
+@@ -4077,6 +4078,7 @@ static const QEMUOption qemu_options[] = {
      { "vgt_low_gm_sz", HAS_ARG, QEMU_OPTION_vgt_low_gm_sz },
      { "vgt_high_gm_sz", HAS_ARG, QEMU_OPTION_vgt_high_gm_sz },
      { "vgt_fence_sz", HAS_ARG, QEMU_OPTION_vgt_fence_sz },
 +    { "vgt_cap", HAS_ARG, QEMU_OPTION_vgt_cap },
      { "vgt_monitor_config_file", HAS_ARG, QEMU_OPTION_vgt_monitor_config_file },
-     { "igd_max_bar_sz", HAS_ARG, QEMU_OPTION_igd_max_bar_sz },
  
-@@ -5075,6 +5077,12 @@ int main(int argc, char **argv, char **envp)
+ #if defined(TARGET_ARM)
+@@ -5074,6 +5076,12 @@ int main(int argc, char **argv, char **envp)
                      vgt_fence_sz = strtol(optarg,&ptr,10);
                  }
                  break;
