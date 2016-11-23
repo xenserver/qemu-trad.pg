@@ -44,6 +44,8 @@ xsa179-qemu-trad-0004-vga-update-vga-register-setup-on-vbe-changes.patch
 xsa179-qemu-trad-0005-vga-make-sure-vga-register-setup-for-vbe-stays-intac.patch
 fix-vga-debug-prints.patch
 
+xsa197-qemut.patch # xen: fix ioreq handling
+
 # Functional fixes
 fix-cdrom-eject.patch
 fix-pasprintf.patch
