@@ -9,10 +9,10 @@ Using a tree help saving memory.
 New Qemu upstream use a structure which is much more complicated.
 
 diff --git a/vl.c b/vl.c
-index 8385a5d..855e62b 100644
+index 7744521..542d079 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -59,6 +59,7 @@
+@@ -60,6 +60,7 @@
  #include <errno.h>
  #include <sys/time.h>
  #include <zlib.h>
@@ -20,7 +20,7 @@ index 8385a5d..855e62b 100644
  
  #ifndef _WIN32
  #include <pwd.h>
-@@ -193,11 +194,29 @@ int main(int argc, char **argv)
+@@ -194,11 +195,29 @@ int main(int argc, char **argv)
  /* XXX: use a two level table to limit memory usage */
  #define MAX_IOPORTS 65536
  
@@ -50,7 +50,7 @@ index 8385a5d..855e62b 100644
  /* Note: drives_table[MAX_DRIVES] is a dummy block driver if none available
     to store the VM snapshots */
  DriveInfo drives_table[MAX_DRIVES+1];
-@@ -296,8 +315,54 @@ PicState2 *isa_pic;
+@@ -297,8 +316,54 @@ PicState2 *isa_pic;
  static IOPortReadFunc default_ioport_readb, default_ioport_readw, default_ioport_readl;
  static IOPortWriteFunc default_ioport_writeb, default_ioport_writew, default_ioport_writel;
  
@@ -98,14 +98,14 @@ index 8385a5d..855e62b 100644
 +}
 +
 +
- static uint32_t ioport_read(int index, uint32_t address)
+ static uint32_t ioport_read(int index, uint16_t address)
  {
 +    const ioport_data_t *port = get_ioport(address);
 +#ifdef OLD_IOPORT
      static IOPortReadFunc *default_func[3] = {
          default_ioport_readb,
          default_ioport_readw,
-@@ -306,11 +371,18 @@ static uint32_t ioport_read(int index, uint32_t address)
+@@ -309,11 +374,18 @@ static uint32_t ioport_read(int index, uint16_t address)
      IOPortReadFunc *func = ioport_read_table[index][address];
      if (!func)
          func = default_func[index];
@@ -117,14 +117,14 @@ index 8385a5d..855e62b 100644
 +#endif
  }
  
- static void ioport_write(int index, uint32_t address, uint32_t data)
+ static void ioport_write(int index, uint16_t address, uint32_t data)
  {
 +    const ioport_data_t *port = get_ioport(address);
 +#ifdef OLD_IOPORT
      static IOPortWriteFunc *default_func[3] = {
          default_ioport_writeb,
          default_ioport_writew,
-@@ -319,7 +391,12 @@ static void ioport_write(int index, uint32_t address, uint32_t data)
+@@ -324,7 +396,12 @@ static void ioport_write(int index, uint16_t address, uint32_t data)
      IOPortWriteFunc *func = ioport_write_table[index][address];
      if (!func)
          func = default_func[index];
@@ -137,7 +137,7 @@ index 8385a5d..855e62b 100644
  }
  
  static uint32_t default_ioport_readb(void *opaque, uint32_t address)
-@@ -386,10 +463,19 @@ int register_ioport_read(int start, int length, int size,
+@@ -391,10 +468,19 @@ int register_ioport_read(int start, int length, int size,
          return -1;
      }
      for(i = start; i < start + length; i += size) {
@@ -157,7 +157,7 @@ index 8385a5d..855e62b 100644
      }
      return 0;
  }
-@@ -411,10 +497,19 @@ int register_ioport_write(int start, int length, int size,
+@@ -416,10 +502,19 @@ int register_ioport_write(int start, int length, int size,
          return -1;
      }
      for(i = start; i < start + length; i += size) {
@@ -177,7 +177,7 @@ index 8385a5d..855e62b 100644
      }
      return 0;
  }
-@@ -424,6 +519,12 @@ void isa_unassign_ioport(int start, int length)
+@@ -429,6 +524,12 @@ void isa_unassign_ioport(int start, int length)
      int i;
  
      for(i = start; i < start + length; i++) {
@@ -190,7 +190,7 @@ index 8385a5d..855e62b 100644
          ioport_read_table[0][i] = default_ioport_readb;
          ioport_read_table[1][i] = default_ioport_readw;
          ioport_read_table[2][i] = default_ioport_readl;
-@@ -433,6 +534,7 @@ void isa_unassign_ioport(int start, int length)
+@@ -438,6 +539,7 @@ void isa_unassign_ioport(int start, int length)
          ioport_write_table[2][i] = default_ioport_writel;
  
          ioport_opaque[i] = NULL;

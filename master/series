@@ -46,6 +46,8 @@ fix-vga-debug-prints.patch
 
 xsa197-qemut.patch # xen: fix ioreq handling
 
+xsa199-qemut.patch # xen: fix qemu ioport array overflow
+
 # Functional fixes
 fix-cdrom-eject.patch
 fix-pasprintf.patch
